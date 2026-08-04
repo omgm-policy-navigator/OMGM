@@ -1,0 +1,27 @@
+name: Release Readiness
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare CI env
+        run: |
+          cp .env.example .env
+          sed -i 's/replace-with-local-password/ci-local-only-password/g' .env
+      - name: Validate Compose
+        run: make compose-config
+      - name: Build backend image
+        run: docker compose build backend
+      - name: Build frontend image
+        run: docker compose build frontend

@@ -1,0 +1,10 @@
+{
+  "source": "sample",
+  "policies": [
+    {
+      "id": "sample-policy-1",
+      "name": "신혼부부 주거 지원 샘플",
+      "agency": "샘플 기관"
+    }
+  ]
+}
