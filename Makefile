@@ -31,10 +31,11 @@ check-env:
 
 env-check:
 	@git check-ignore -q .env
-	@git check-ignore -q backend/.venv
-	@git check-ignore -q data-pipeline/.venv
-	@git check-ignore -q frontend/node_modules
-	@git check-ignore -q frontend/dist
+	@git check-ignore -q backend/.venv/
+	@git check-ignore -q data-pipeline/.venv/
+	@git check-ignore -q frontend/node_modules/
+	@git check-ignore -q frontend/dist/
+	@git check-ignore -q frontend/tsconfig.tsbuildinfo
 	@printf "%s\n" "env and local artifacts are ignored"
 
 dev: check-env
