@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "chore/**"
+      - "fix/**"
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Test backend
+        run: |
+          cd backend
+          python -m unittest discover
+
+  data-pipeline:
+    name: Data Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install data pipeline
+        run: |
+          cd data-pipeline
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Test data pipeline
+        run: |
+          cd data-pipeline
+          python -m unittest discover
+      - name: Run sample pipeline
+        run: |
+          cd data-pipeline
+          python -m policy_pipeline.main --sample ../sample-data/sample-policy.json
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend
+        run: |
+          cd frontend
+          npm ci
+      - name: Test frontend
+        run: |
+          cd frontend
+          npm test
+      - name: Typecheck frontend
+        run: |
+          cd frontend
+          npm run typecheck
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  repository:
+    name: Repository Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prepare CI env
+        run: |
+          cp .env.example .env
+          sed -i 's/replace-with-local-password/ci-local-only-password/g' .env
+      - name: Validate structure
+        run: scripts/verify-structure.sh
+      - name: Validate Compose
+        run: make compose-config
+      - name: Validate ignored local artifacts
+        run: make env-check
+      - name: Validate markdown links
+        run: python scripts/check-doc-links.py
+      - name: Check whitespace
+        run: git diff --check
+      - name: Confirm no tracked env file
+        run: |
+          git ls-files --error-unmatch .env && exit 1 || true

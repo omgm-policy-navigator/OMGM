@@ -65,7 +65,8 @@ PostgreSQL과 pgvector는 같은 PostgreSQL 인스턴스에서 관리하고, 별
 | 문서 링크 | Markdown 상대 링크 검사 스크립트 | 통과 | 모든 상대 링크 유효 |
 | whitespace | `git diff --check` | 통과 | 출력 없음 |
 | Git ignore | `git check-ignore -v .env`, `backend/.venv`, `frontend/node_modules`, `frontend/dist` | 통과 | 비밀정보와 로컬 산출물 제외 |
-| 비밀정보 | `git status --short --ignored`와 파일 내용 검토 | 통과 | 실제 Secret 없음. `.env.example`의 `change-me`는 로컬 예제값 |
+| 비밀정보 | `git status --short --ignored`와 파일 내용 검토 | 통과 | 실제 Secret 없음. `.env.example`은 로컬 placeholder만 포함하고 `compose.yaml`은 `.env`의 `POSTGRES_PASSWORD`, `DATABASE_URL`을 요구함 |
+| CI/CD | GitHub Actions workflow 작성 | 통과 | `CI`는 PR/push 검증, `Release Readiness`는 Docker build 검증. 운영 자동 배포는 미확정으로 제외 |
 
 ## 미결 사항
 

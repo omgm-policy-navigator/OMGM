@@ -35,6 +35,12 @@
 
 PR에는 변경 범위, 검증 명령, 문서 링크, 남은 위험, 다음 Phase 입력물을 포함한다.
 
+## CI/CD 규칙
+
+PR과 주요 브랜치 push는 GitHub Actions `CI` workflow를 통과해야 한다. Backend, Data Pipeline, Frontend, 저장소 구조, Compose 설정, 문서 링크, env ignore 검사를 모두 포함한다.
+
+운영 배포 대상이 확정되기 전까지 CD는 자동 배포가 아니라 `Release Readiness` workflow의 Docker build 검증으로 제한한다. 실제 배포, registry push, 운영 Secret 주입은 배포 대상과 Secret 관리 방식이 확정된 뒤 추가한다.
+
 ## 설계 변경 추적
 
 확정 설계와 다른 구현 결정을 내리면 관련 문서를 먼저 갱신한다. 되돌리기 어려운 결정이면 ADR을 작성한다.
