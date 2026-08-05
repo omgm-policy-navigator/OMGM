@@ -11,9 +11,10 @@ from app.db.session import get_db
 from app.main import create_app
 
 TEST_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost:5432/test_db"
+NO_CACHE_VALUE = "no-cache, no-store, must-revalidate"
 
 
-async def asgi_get(app, path: str) -> tuple[int, dict[str, Any]]:
+async def asgi_get(app, path: str) -> tuple[int, dict[str, str], dict[str, Any]]:
     messages: list[dict[str, Any]] = []
 
     async def receive() -> dict[str, Any]:
@@ -41,10 +42,11 @@ async def asgi_get(app, path: str) -> tuple[int, dict[str, Any]]:
         send,
     )
 
-    status = next(message["status"] for message in messages if message["type"] == "http.response.start")
+    start = next(message for message in messages if message["type"] == "http.response.start")
+    headers = {key.decode().lower(): value.decode() for key, value in start.get("headers", [])}
     body_messages = (message.get("body", b"") for message in messages if message["type"] == "http.response.body")
     response_body = b"".join(body_messages)
-    return status, json.loads(response_body)
+    return start["status"], headers, json.loads(response_body)
 
 
 def make_test_config() -> AppConfig:
@@ -55,7 +57,7 @@ class HealthApiTests(unittest.TestCase):
     def test_health_returns_ok(self) -> None:
         app = create_app(make_test_config())
 
-        status, body = asyncio.run(asgi_get(app, "/health/live"))
+        status, _headers, body = asyncio.run(asgi_get(app, "/health/live"))
 
         self.assertEqual(status, HTTPStatus.OK)
         self.assertEqual(body["status"], "ok")
@@ -71,30 +73,35 @@ class HealthApiTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_get_db
 
-        status, body = asyncio.run(asgi_get(app, "/health/ready"))
+        status, headers, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.OK)
+        self.assertEqual(headers["cache-control"], NO_CACHE_VALUE)
         self.assertEqual(body["status"], "ready")
         self.assertEqual(body["database"], "connected")
         session.execute.assert_awaited_once()
 
-    def test_readiness_returns_unavailable_when_database_ping_fails(self) -> None:
+    def test_readiness_returns_unavailable_without_leaking_database_error(self) -> None:
         app = create_app(make_test_config())
         session = AsyncMock()
-        session.execute.side_effect = RuntimeError("db unavailable")
+        session.execute.side_effect = RuntimeError("db unavailable on 10.0.0.8:5432 as marry_policy")
 
         async def override_get_db() -> AsyncIterator[AsyncMock]:
             yield session
 
         app.dependency_overrides[get_db] = override_get_db
 
-        status, body = asyncio.run(asgi_get(app, "/health/ready"))
+        with self.assertLogs("app.api.health", level="ERROR") as logs:
+            status, headers, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.SERVICE_UNAVAILABLE)
+        self.assertEqual(headers["cache-control"], NO_CACHE_VALUE)
         self.assertEqual(body["status"], "not_ready")
         self.assertEqual(body["database"], "unavailable")
+        self.assertNotIn("10.0.0.8", json.dumps(body))
+        self.assertIn("DB readiness check failed", logs.output[0])
 
-    def test_readiness_returns_unavailable_when_database_ping_times_out(self) -> None:
+    def test_readiness_returns_timeout_when_database_ping_times_out(self) -> None:
         app = create_app(make_test_config())
         session = AsyncMock()
 
@@ -108,8 +115,11 @@ class HealthApiTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_get_db
 
-        status, body = asyncio.run(asgi_get(app, "/health/ready"))
+        with self.assertLogs("app.api.health", level="ERROR") as logs:
+            status, headers, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.SERVICE_UNAVAILABLE)
+        self.assertEqual(headers["cache-control"], NO_CACHE_VALUE)
         self.assertEqual(body["status"], "not_ready")
-        self.assertEqual(body["database"], "unavailable")
+        self.assertEqual(body["database"], "timeout")
+        self.assertIn("DB readiness check timed out", logs.output[0])

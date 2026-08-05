@@ -422,7 +422,7 @@ Mocks must preserve the response envelopes, status strings, and null handling de
 
 ### `GET /health/ready`
 
-Returns process readiness and verifies that PostgreSQL accepts a simple query. `GET /ready` remains as a compatibility alias. This endpoint is intended for local and container readiness checks; it does not expose connection strings or database error details.
+Returns process readiness and verifies that PostgreSQL accepts a simple query. `GET /ready` remains as a compatibility alias. This endpoint is intended for local and container readiness checks; it does not expose connection strings or database error details. Responses include `Cache-Control: no-cache, no-store, must-revalidate` so intermediaries do not cache readiness state.
 
 Response `200`:
 
@@ -443,5 +443,16 @@ Response `503` when PostgreSQL cannot be reached:
   "service": "omgm-backend",
   "environment": "local",
   "database": "unavailable"
+}
+```
+
+Response `503` when PostgreSQL does not respond within the readiness timeout:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "timeout"
 }
 ```

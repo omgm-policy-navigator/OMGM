@@ -67,7 +67,7 @@ Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/live
 Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/ready
 ```
 
-Result: passed. `/health/live` returned `200` with `status: ok`; `/health/ready` returned `200` with `status: ready` and `database: connected`.
+Result: passed. `/health/live` returned `200` with `status: ok`; `/health/ready` returned `200` with `status: ready`, `database: connected`, and `Cache-Control: no-cache, no-store, must-revalidate`.
 
 ```bash
 git diff --check
