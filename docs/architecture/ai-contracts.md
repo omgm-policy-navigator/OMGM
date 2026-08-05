@@ -131,3 +131,27 @@ Fallback responses must not convert unknown data to false or zero, must not crea
 ## Scope Note
 
 This AI A0 contract does not define Analysis D0 raw policy data schemas, source classification, processing/review/freshness state axes, file storage conventions, raw source hashes, or privacy collection gates. Those belong in a separate Analysis D0 branch and PR.
+
+
+## Runtime Contract
+
+AI Phase A1 introduces provider-swappable local generation through `app.llm.LLMProvider`.
+
+Supported providers:
+
+- `ollama`: Calls local Ollama for JSON generation.
+- `fake`: Returns a configured `AIOutput` for deterministic tests.
+- `template`: Returns the safe `LLM_UNAVAILABLE` fallback without calling a model.
+
+Default Ollama generation settings:
+
+- Model: `qwen3:4b`
+- Mode: non-thinking (`think=false`)
+- JSON output: `format=json`
+- Streaming: disabled (`stream=false`)
+- Temperature: `0.1`
+- Timeout: `30` seconds
+
+Runtime health checks report `READY`, `MODEL_NOT_INSTALLED`, or `UNAVAILABLE`. Provider failures are contained inside the LLM boundary and must not make the backend process unhealthy by themselves.
+
+Ollama JSON responses are parsed and validated as `AIOutput`. Invalid JSON or schema violations are treated as provider failures, not as eligibility evidence. The LLM runtime must not log prompts, raw sensitive user facts, or full raw model responses.

@@ -89,3 +89,10 @@ Any API contract change must update `docs/architecture/api-contracts.md` in the 
 Phase B1 introduces SQLAlchemy async engine setup in `app/db/session.py`, Alembic migration wiring, and a database-backed readiness endpoint. No persistence entities are introduced in this phase; the initial migration enables the pgvector `vector` extension so future schema phases can build on a verified migration path.
 
 `GET /health/live` is the process liveness check. `GET /health/ready` performs a PostgreSQL `select 1` through the configured async engine and returns `503` without raw database error details when the connection is unavailable. `GET /health` and `GET /ready` remain compatibility aliases.
+
+
+## Phase A1 LLM Runtime
+
+Phase A1 adds provider-swappable LLM runtime code under `app/llm`. `OllamaLLMProvider` owns local Ollama health checks, timeout handling, model-missing detection, non-thinking JSON generation, and `AIOutput` validation. `FakeLLMProvider` and `TemplateLLMProvider` allow tests and local fallback paths to avoid a live model.
+
+The LLM runtime is not wired into API routes in A1. Connection failures, timeouts, missing models, and invalid JSON are represented as provider errors or health statuses so they do not become backend process health failures.
