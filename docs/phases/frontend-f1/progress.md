@@ -19,6 +19,10 @@ Completed on branch `frontend-f1-react-query-ui`.
 - Added TypeScript and Vite `@/*` path aliases for the FSD source structure.
 - Added ESLint FSD layer-direction rules for `shared`, `entities`, `features`, and `pages`.
 - Added FSD public API `index.ts` entry points and lint guardrails that block deep imports into `pages`, `features`, and `entities` slices.
+- Documented the FSD public API export template so slice authors expose intentional named exports instead of bypassing guardrails.
+- Documented `shared/` placement rules to prevent domain logic from accumulating in shared utilities or UI.
+- Added `"sideEffects": false` to the frontend package to support tree-shaking for side-effect-free modules.
+- Documented data-level mocking as the testing and Storybook default instead of mocking whole FSD public APIs.
 - Added runtime fail-fast validation for required `VITE_*` environment variables.
 - Ensured the environment validation module is the first import evaluated from `main.tsx`.
 - Added explicit API client error type and mutation/query default options.

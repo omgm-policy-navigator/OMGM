@@ -36,9 +36,13 @@ frontend/src/
 - `VITE_API_MODE=mock` returns a synthetic Health response.
 - `VITE_API_MODE=live` calls the backend `GET /health` endpoint through the API client.
 - FSD slice imports for `pages`, `features`, and `entities` must go through each slice `index.ts`.
+- Each FSD slice `index.ts` must explicitly re-export only the external interface, component, hook, and type surface intended for other slices. Do not use broad `export *` as the default pattern.
 - The allowed layer direction is `app -> pages -> widgets -> features -> entities -> shared`; lower layers must not import higher layers.
+- `shared/` must stay domain-free. It may contain UI primitives, global config, common fetchers, pure utilities, and global types only. Policy, chat, graph, eligibility, or user-fact logic belongs in `entities` or `features`.
 - Environment validation must be imported as the first side effect in `main.tsx` before app composition is loaded.
 - Vite and Vitest use `vite-tsconfig-paths` so `@/*` aliases are derived from `tsconfig.json`.
+- Slice public APIs should use named exports to preserve readable imports and tree-shaking. The frontend package declares `"sideEffects": false` because modules are expected to be side-effect free except explicit entry side effects such as `main.tsx` and environment validation.
+- Component tests and future Storybook stories must not mock whole FSD slice public APIs such as `vi.mock("@/entities/policy")`. Prefer data-level mocks through API/MSW handlers so unrelated exports in the same public API remain intact.
 
 ## Completion Criteria
 
@@ -48,6 +52,8 @@ frontend/src/
 - Frontend CI runs lint, test, typecheck, and build.
 - Environment variables remain under `VITE_*` and contain no secrets.
 - Deep imports such as `@/features/health/api/useHealthQuery` from outside the slice fail lint.
+- Slice `index.ts` files expose the public contract with named re-exports only.
+- Shared code contains no domain-specific policy/chat/graph logic.
 
 ## Out of Scope
 
