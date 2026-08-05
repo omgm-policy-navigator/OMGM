@@ -13,6 +13,9 @@ Only `GET /health` is implemented today. All other contracts below are mockable 
 - Unknown user facts are represented as `null` or omitted with explicit status text. They are not converted to `false`, `0`, or an empty string.
 - Mock data is synthetic and must not include real personal data, income, asset, address, or application records.
 - API response schemas are client DTOs and must not be imported from SQLAlchemy entities.
+- Server state is managed through TanStack Query or an equivalent server-state cache. F0 uses TanStack Query terminology for query keys and invalidation rules.
+- Cross-panel UI state is managed by a dedicated Zustand store or split React Context. Store selectors must prevent chat input changes from rerendering graph and detail panels.
+- Component-local UI state remains inside the owning component unless another panel explicitly depends on it.
 - Error mocks use the shared error envelope:
 
 ```json
@@ -34,6 +37,38 @@ Only `GET /health` is implemented today. All other contracts below are mockable 
 | `PolicyGraphPanel` | `GET /api/policies/{policyId}/graph` | Graph projection nodes and edges | View transform, selected node, hovered node, keyboard focus position |
 | `PolicyDetailPanel` | `GET /api/policies/{policyId}`, `POST /api/evaluations`, `GET /api/evaluations/{evaluationId}` | Policy detail, source metadata, eligibility result, evidence | Expanded evidence rows, selected detail tab, copied-link feedback |
 | `SessionControl` | `POST /api/session`, `POST /api/session/reset`, `DELETE /api/session` | Session creation, reset, deletion, expiry timestamp | Reset confirmation dialog, local disabled state while resetting |
+
+## State Ownership and Cache Keys
+
+| Component | Server state cache key | Cross-panel UI state | Local UI state |
+| --- | --- | --- | --- |
+| `NavigatorPage` | `["session"]` and mutation coordination only | `selectedCategoryId`, `activePolicyId`, `selectedNodeId`, `activePanel`, latest graph-click token | Route-level composition flags only. |
+| `CategorySelector` | `["policies", { "region": region, "lifeEvent": lifeEvent, "cursor": cursor }]` | Writes `selectedCategoryId` | Opened selector and keyboard highlight. |
+| `ChatPanel` | `["conversation", conversationId]`, answer mutation by `conversationId` | Reads `activePolicyId`, `selectedNodeId`, `activePanel` | Draft message, focused question id, typing indicator, submit pending marker. |
+| `PolicyGraphPanel` | `["policyGraph", activePolicyId]` | Reads/writes `selectedNodeId` | `hoveredNodeId`, `zoomLevel`, pan offset, keyboard focus position. |
+| `PolicyDetailPanel` | `["policy", activePolicyId]`, `["evaluation", evaluationId]` | Reads `activePolicyId`, `selectedNodeId`, highlighted evidence id | Expanded evidence rows, selected detail tab, copied-link feedback. |
+| `SessionControl` | Session reset/delete mutations | Clears `selectedNodeId`, `activePolicyId`, and `activePanel` after successful reset/delete | Confirmation dialog and button pending marker. |
+
+Query invalidation rules:
+
+- Selecting a new policy enables `["policy", activePolicyId]` and `["policyGraph", activePolicyId]`.
+- Submitting answers invalidates `["conversation", conversationId]` and current evaluation queries.
+- Resetting or deleting the session clears session-dependent query cache entries and cross-panel selections.
+- Graph hover, zoom, draft input, and copied-link feedback never invalidate server-state queries.
+
+## MSW Mock Standard
+
+Frontend implementation phases must use MSW for API mocking rather than plain JSON-only fixtures. The handler set must live in a frontend-owned mock boundary such as `frontend/src/mocks/handlers.ts`.
+
+Required handler groups:
+
+- Success handlers for each endpoint used by F0 screens.
+- Loading or delayed handlers for session, policy list, graph, conversation answer, and evaluation requests.
+- Network error handlers for recoverable client states.
+- Empty response handlers for no policy list results and empty graph nodes.
+- 4xx and 5xx handlers that return the shared error envelope.
+
+Mock response variants must be selected by test setup or scenario configuration, not by changing production API client code.
 
 ## Mock Payloads
 
@@ -325,6 +360,20 @@ Response `200`:
 9. After a successful answer response, `NavigatorPage` refreshes evaluation by calling `POST /api/evaluations` with a new `Idempotency-Key`.
 10. If the answer response includes conflicts, `PolicyDetailPanel` marks impacted evaluations as `CONFLICTED` until the user resolves the conflict.
 
+### Async Sequence and Race Handling
+
+Each graph node click creates a new `graphClickToken` in cross-panel UI state. Any previous in-flight orchestration for another node is cancelled or ignored.
+
+| Step | Async work | Required stale-response behavior |
+| --- | --- | --- |
+| Select node | Write `selectedNodeId` and `graphClickToken`. | Supersedes prior node selections immediately. |
+| Fetch policy detail or graph-dependent data | Use current `activePolicyId` and selected-node token. | Abort previous fetch with `AbortController` where supported. |
+| Create conversation for missing facts | Call `POST /api/conversations` only if the latest selected node still needs a chat question. | Ignore response if the token is stale. |
+| Focus chat question or evidence | Update `activePanel`, focused question, and highlighted evidence. | Apply only when `selectedNodeId` still matches the original click. |
+| Submit answer and refresh evaluation | Run answer mutation, then evaluation mutation with a new `Idempotency-Key`. | Invalidate only current session/policy evaluation state. |
+
+Implementation phases must pass an `AbortSignal` through fetch-backed API clients. If the selected node changes, pending detail, graph-click, and conversation bootstrap requests should be aborted. If a library cannot cancel a request, completion handlers must compare `graphClickToken` before writing UI state.
+
 ## Accessibility and Responsive Criteria
 
 - `NavigatorPage` exposes one main landmark and each panel has an accessible name.
@@ -333,6 +382,7 @@ Response `200`:
 - `PolicyGraphPanel` supports keyboard navigation across nodes and exposes selected node text outside the canvas or SVG.
 - `PolicyDetailPanel` keeps source links keyboard reachable and labels external links.
 - `SessionControl` reset/delete actions require explicit confirmation and return focus to the triggering control.
-- At widths below `768px`, panels stack in this order: `CategorySelector`, `ChatPanel`, `PolicyGraphPanel`, `PolicyDetailPanel`, `SessionControl`.
-- At widths `768px` and above, chat and graph may sit side by side, with detail shown as a secondary panel.
+- At widths below `768px`, mobile uses tab or drawer navigation with one primary work panel visible at a time. Priority is `CategorySelector`, `ChatPanel`, `PolicyGraphPanel`, `PolicyDetailPanel`, then `SessionControl`.
+- From `768px` to `1199px`, tablet uses a two-pane split layout where chat and graph remain primary and detail appears as a drawer or secondary panel.
+- At `1200px` and above, desktop uses a three-column or pinned split-panel layout where graph, chat, and selected policy detail can be visible together.
 - No horizontal scrolling is required for Korean policy names; long labels wrap or truncate with full text available through accessible text.

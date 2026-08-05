@@ -16,6 +16,12 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Defined loading, error, and empty states for session, category policy list, chat, graph, policy detail, and evaluation areas.
 - Defined the graph node click flow into policy detail, evidence highlighting, and chat follow-up questions.
 - Recorded accessibility and responsive criteria for the F0 screen structure.
+- Added a three-layer state architecture: global/server state, cross-panel UI state, and local UI state.
+- Documented TanStack Query-style server state keys and invalidation rules.
+- Documented Zustand or split React Context as the cross-panel UI state boundary to avoid `NavigatorPage` becoming a God Component.
+- Added async sequencing, stale-response guards, and `AbortController` expectations for graph node click orchestration.
+- Added MSW as the frontend API mocking standard with success, loading, network error, empty, and error-envelope handler requirements.
+- Expanded responsive layout criteria for mobile, tablet, and desktop breakpoints.
 
 ## Deferred
 

@@ -32,6 +32,17 @@ git diff --check
 
 Result: passed.
 
+## Review Follow-up Verification
+
+After adding the P1/P2 review follow-ups for state architecture, graph-click race handling, MSW mocks, and responsive breakpoints, these checks were rerun:
+
+```bash
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash
