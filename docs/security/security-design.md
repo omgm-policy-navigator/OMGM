@@ -77,3 +77,8 @@ AI citation URL은 공개 HTTP(S) 출처만 허용한다. Schema는 사설·loop
 ## MVP와 운영 환경 차이
 
 Phase 0는 로컬 실행과 Health Check만 제공한다. 운영 배포 전 인증, 인가, Secret 관리, DB 암호화, 로깅 보존, Rate Limit, CORS, 업로드 정책을 확정해야 한다.
+
+
+## AI A1 Runtime Security Note
+
+The local LLM runtime uses provider-level timeouts and validates generated JSON against `AIOutput` before any downstream use. Provider failures, missing models, invalid JSON, and connection failures are handled inside the LLM boundary. Prompts, raw sensitive user facts, and full raw model responses must not be logged.
