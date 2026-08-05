@@ -12,6 +12,7 @@ Run the React, Vite, and TypeScript frontend project with a minimal app shell, A
 - Display a synthetic mock Health response without requiring the backend server.
 - Add a common layout shell.
 - Add ESLint and wire it into frontend CI.
+- Enforce FSD public API imports and one-way layer dependencies with ESLint.
 - Keep environment variables separated through `VITE_*` values.
 
 ## Source Structure
@@ -34,6 +35,10 @@ frontend/src/
 - `shared/` owns reusable API, config, and UI primitives.
 - `VITE_API_MODE=mock` returns a synthetic Health response.
 - `VITE_API_MODE=live` calls the backend `GET /health` endpoint through the API client.
+- FSD slice imports for `pages`, `features`, and `entities` must go through each slice `index.ts`.
+- The allowed layer direction is `app -> pages -> widgets -> features -> entities -> shared`; lower layers must not import higher layers.
+- Environment validation must be imported as the first side effect in `main.tsx` before app composition is loaded.
+- Vite and Vitest use `vite-tsconfig-paths` so `@/*` aliases are derived from `tsconfig.json`.
 
 ## Completion Criteria
 
@@ -42,6 +47,7 @@ frontend/src/
 - Lint, test, typecheck, and build pass.
 - Frontend CI runs lint, test, typecheck, and build.
 - Environment variables remain under `VITE_*` and contain no secrets.
+- Deep imports such as `@/features/health/api/useHealthQuery` from outside the slice fail lint.
 
 ## Out of Scope
 

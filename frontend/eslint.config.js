@@ -2,6 +2,20 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const publicApiOnlyPatterns = [
+  {
+    group: ["@/pages/*/*", "@/features/*/*", "@/entities/*/*"],
+    message: "Import FSD slices through their public index.ts entry point.",
+  },
+];
+
+const restrictedImportPatterns = (patterns) => [
+  "error",
+  {
+    patterns: [...publicApiOnlyPatterns, ...patterns],
+  },
+];
+
 export default tseslint.config(
   {
     ignores: ["dist/**", "node_modules/**", "*.tsbuildinfo", "eslint.config.js"],
@@ -22,70 +36,51 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-floating-promises": "error",
+      "no-restricted-imports": restrictedImportPatterns([]),
     },
   },
   {
     files: ["src/shared/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": [
-        "error",
+      "no-restricted-imports": restrictedImportPatterns([
         {
-          patterns: [
-            {
-              group: ["@/app/**", "@/pages/**", "@/features/**", "@/entities/**"],
-              message: "shared must not depend on higher FSD layers.",
-            },
-          ],
+          group: ["@/app/**", "@/pages/**", "@/features/**", "@/entities/**"],
+          message: "shared must not depend on higher FSD layers.",
         },
-      ],
+      ]),
     },
   },
   {
     files: ["src/entities/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": [
-        "error",
+      "no-restricted-imports": restrictedImportPatterns([
         {
-          patterns: [
-            {
-              group: ["@/app/**", "@/pages/**", "@/features/**"],
-              message: "entities may depend on shared only, not app/pages/features.",
-            },
-          ],
+          group: ["@/app/**", "@/pages/**", "@/features/**"],
+          message: "entities may depend on shared only, not app/pages/features.",
         },
-      ],
+      ]),
     },
   },
   {
     files: ["src/features/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": [
-        "error",
+      "no-restricted-imports": restrictedImportPatterns([
         {
-          patterns: [
-            {
-              group: ["@/app/**", "@/pages/**"],
-              message: "features may depend on entities/shared only, not app/pages.",
-            },
-          ],
+          group: ["@/app/**", "@/pages/**"],
+          message: "features may depend on entities/shared only, not app/pages.",
         },
-      ],
+      ]),
     },
   },
   {
     files: ["src/pages/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": [
-        "error",
+      "no-restricted-imports": restrictedImportPatterns([
         {
-          patterns: [
-            {
-              group: ["@/app/**"],
-              message: "pages must not depend on app.",
-            },
-          ],
+          group: ["@/app/**"],
+          message: "pages must not depend on app.",
         },
-      ],
+      ]),
     },
   },
   {

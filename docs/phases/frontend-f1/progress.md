@@ -18,8 +18,11 @@ Completed on branch `frontend-f1-react-query-ui`.
 - Updated phase verification records.
 - Added TypeScript and Vite `@/*` path aliases for the FSD source structure.
 - Added ESLint FSD layer-direction rules for `shared`, `entities`, `features`, and `pages`.
+- Added FSD public API `index.ts` entry points and lint guardrails that block deep imports into `pages`, `features`, and `entities` slices.
 - Added runtime fail-fast validation for required `VITE_*` environment variables.
+- Ensured the environment validation module is the first import evaluated from `main.tsx`.
 - Added explicit API client error type and mutation/query default options.
+- Replaced the manual Vite alias with `vite-tsconfig-paths` so Vite and Vitest consume `tsconfig.json` path aliases consistently.
 - Configured Vitest env values so tests validate the app without depending on a live backend or local `.env`.
 
 ## Deferred

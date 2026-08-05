@@ -107,3 +107,18 @@ cd frontend && npm.cmd run build
 ```
 
 Result: passed. Test and build used elevated filesystem access because esbuild needs normal access to load Vite config in this local environment.
+
+## FSD Public API Follow-up Verification
+
+After blocking FSD deep imports, adding slice `index.ts` entry points, moving environment validation to the first `main.tsx` side-effect import, and switching Vite/Vitest alias resolution to `vite-tsconfig-paths`, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run lint
+cd frontend && npm.cmd run typecheck
+cd frontend && npm.cmd test
+cd frontend && npm.cmd run build
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed. Test and build used elevated filesystem access because esbuild needs normal access to load Vite config in this local environment. A source search found no remaining deep imports into `pages`, `features`, or `entities` slices.

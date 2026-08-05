@@ -1,7 +1,7 @@
 import { appConfig } from "../config/appConfig";
 import { getJson } from "./client";
 
-type HealthResponse = {
+export type HealthResponse = {
   status: "ok";
   service: string;
   environment: string;
