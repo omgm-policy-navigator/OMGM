@@ -10,14 +10,14 @@ from app.main import create_app, error_payload
 
 class AppTests(unittest.TestCase):
     def test_health_payload(self) -> None:
-        payload = health_payload(AppConfig(app_env="test"))
+        payload = health_payload(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["service"], "omgm-backend")
         self.assertEqual(payload["environment"], "test")
 
     def test_fastapi_app_loads(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         self.assertEqual(app.title, "나만 결혼해? Backend")
 

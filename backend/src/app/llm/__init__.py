@@ -1,8 +1,8 @@
 """LLM boundary for Ollama-facing helpers and DTOs."""
 
 from app.llm.schemas import (
-    AIConditionReference,
     AICitation,
+    AIConditionReference,
     AINextQuestion,
     AIOutput,
     AIResultStatus,

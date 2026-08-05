@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.core.config import AppConfig
 from app.core.errors import AppError
-from app.core.logging import get_logger
 from app.core.lifespan import lifespan
+from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 

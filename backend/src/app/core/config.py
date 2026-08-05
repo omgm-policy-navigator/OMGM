@@ -1,62 +1,48 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from pydantic import Field, ValidationError, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.errors import ConfigurationError
 
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
-@dataclass(frozen=True)
-class AppConfig:
+class AppConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=("../.env", ".env"), env_file_encoding="utf-8", extra="ignore")
+
     app_env: str = "local"
     backend_host: str = "0.0.0.0"
-    backend_port: int = 8000
+    backend_port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"
     cors_allowed_origins: str = "http://localhost:5173"
-    database_url: str = ""
+    database_url: str
+    database_pool_size: int = Field(default=5, ge=1)
+    database_max_overflow: int = Field(default=10, ge=0)
     ollama_base_url: str = "http://localhost:11434"
     ollama_generation_model: str = "qwen3:4b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
-    llm_timeout_seconds: int = 30
+    llm_timeout_seconds: int = Field(default=30, gt=0)
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, value: str) -> str:
+        log_level = value.strip().upper()
+        if log_level not in VALID_LOG_LEVELS:
+            raise ValueError("LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
+        return log_level
+
+    @field_validator("app_env", "backend_host", "database_url")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value must not be empty.")
+        return stripped
 
     @classmethod
-    def from_env(cls) -> "AppConfig":
-        app_env = os.getenv("APP_ENV", "local").strip() or "local"
-        backend_host = os.getenv("BACKEND_HOST", "0.0.0.0").strip() or "0.0.0.0"
-        log_level = (os.getenv("LOG_LEVEL", "INFO").strip() or "INFO").upper()
-        raw_port = os.getenv("BACKEND_PORT", "8000").strip() or "8000"
-        raw_llm_timeout = os.getenv("LLM_TIMEOUT_SECONDS", "30").strip() or "30"
-
-        if log_level not in VALID_LOG_LEVELS:
-            raise ConfigurationError("LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
-
+    def from_env(cls) -> AppConfig:
         try:
-            backend_port = int(raw_port)
-        except ValueError as exc:
-            raise ConfigurationError("BACKEND_PORT must be an integer.") from exc
-
-        if not 1 <= backend_port <= 65535:
-            raise ConfigurationError("BACKEND_PORT must be between 1 and 65535.")
-
-        try:
-            llm_timeout_seconds = int(raw_llm_timeout)
-        except ValueError as exc:
-            raise ConfigurationError("LLM_TIMEOUT_SECONDS must be an integer.") from exc
-
-        if llm_timeout_seconds <= 0:
-            raise ConfigurationError("LLM_TIMEOUT_SECONDS must be positive.")
-
-        return cls(
-            app_env=app_env,
-            backend_host=backend_host,
-            backend_port=backend_port,
-            log_level=log_level,
-            cors_allowed_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
-            database_url=os.getenv("DATABASE_URL", ""),
-            ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-            ollama_generation_model=os.getenv("OLLAMA_GENERATION_MODEL", "qwen3:4b"),
-            ollama_embedding_model=os.getenv("OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:0.6b"),
-            llm_timeout_seconds=llm_timeout_seconds,
-        )
+            return cls()
+        except ValidationError as exc:
+            raise ConfigurationError("Backend configuration is invalid.") from exc

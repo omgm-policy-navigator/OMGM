@@ -75,7 +75,7 @@ class AIOutput(BaseModel):
     next_question: AINextQuestion | None = Field(default=None, alias="nextQuestion")
 
     @model_validator(mode="after")
-    def validate_status_contract(self) -> "AIOutput":
+    def validate_status_contract(self) -> AIOutput:
         matched_ids = {condition.condition_id for condition in self.matched_conditions}
         missing_ids = {condition.condition_id for condition in self.missing_conditions}
         overlapping_ids = matched_ids.intersection(missing_ids)

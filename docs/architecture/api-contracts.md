@@ -86,6 +86,21 @@ Missing user information is not an error when the request itself is valid. Evalu
 
 ## Implemented Endpoint
 
+
+### `GET /health/live`
+
+Returns backend process liveness without checking PostgreSQL or other dependencies. `GET /health` remains as a compatibility alias.
+
+Response `200`:
+
+```json
+{
+  "status": "ok",
+  "service": "omgm-backend",
+  "environment": "local"
+}
+```
+
 ### `GET /health`
 
 Returns backend process health.
@@ -404,3 +419,40 @@ Saved policy and notification contracts are intentionally not fixed in B0. They 
 ## Mock Contract Rules
 
 Mocks must preserve the response envelopes, status strings, and null handling defined here. Mock data must be synthetic and must not include real personal data or real application records.
+
+### `GET /health/ready`
+
+Returns process readiness and verifies that PostgreSQL accepts a simple query. `GET /ready` remains as a compatibility alias. This endpoint is intended for local and container readiness checks; it does not expose connection strings or database error details. Responses include `Cache-Control: no-cache, no-store, must-revalidate` so intermediaries do not cache readiness state.
+
+Response `200`:
+
+```json
+{
+  "status": "ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "connected"
+}
+```
+
+Response `503` when PostgreSQL cannot be reached:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "unavailable"
+}
+```
+
+Response `503` when PostgreSQL does not respond within the readiness timeout:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "timeout"
+}
+```
