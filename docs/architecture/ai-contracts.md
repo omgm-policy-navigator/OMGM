@@ -35,11 +35,26 @@ The backend schema is `app.llm.AIOutput`. JSON responses and mocks use this shap
 
 ```json
 {
-  "answer": "",
+  "answer": "공고문 기준으로 거주 지역 조건은 충족합니다.",
   "resultStatus": "ANSWERED",
-  "matchedConditions": [],
+  "matchedConditions": [
+    {
+      "conditionId": "region",
+      "label": "거주 지역",
+      "reason": "서울 거주"
+    }
+  ],
   "missingConditions": [],
-  "citations": [],
+  "citations": [
+    {
+      "sourceId": "doc_1",
+      "title": "신혼부부 주거 지원 공고",
+      "url": "https://example.go.kr/policy/1",
+      "policyVersionId": "policy_version_1",
+      "evidenceId": "chunk_1",
+      "excerpt": "공고문에서 확인된 근거 문구"
+    }
+  ],
   "nextQuestion": null
 }
 ```
@@ -54,9 +69,41 @@ Allowed `resultStatus` values:
 
 `matchedConditions` and `missingConditions` are references to condition IDs and labels. They are not final eligibility decisions.
 
-`citations` must reference approved sources with `sourceId`, `title`, `url`, and `policyVersionId`. Excerpts are optional and must not include sensitive user facts.
+`citations` must reference approved sources with `sourceId`, `title`, `url`, `policyVersionId`, and `evidenceId`. `evidenceId` identifies the approved evidence unit, such as a document chunk. Excerpts are optional, capped, and must not include sensitive user facts.
+
+Citation URLs must be absolute `http` or `https` URLs. `javascript:`, local file paths, localhost URLs, and internal administrator URLs must not be exposed. The stored URL should be the canonical public source URL, not a redirect URL.
 
 `nextQuestion` is either `null` or one follow-up question with `questionId`, `prompt`, and `factKey`.
+
+Text and identifier fields are non-empty. `answer` is capped so LLM output cannot grow without bound.
+
+## Status Invariants
+
+`ANSWERED`:
+
+- Requires at least one citation.
+- Must not include `missingConditions`.
+- Must set `nextQuestion` to `null`.
+
+`NEEDS_CONFIRMATION`:
+
+- Requires at least one `missingConditions` entry.
+- May include `nextQuestion` when one follow-up is known.
+
+`INSUFFICIENT_EVIDENCE`:
+
+- Must not include citations.
+- Must not assert policy facts.
+
+`LLM_UNAVAILABLE` and `SAFETY_BLOCKED`:
+
+- Must not include `matchedConditions`, `missingConditions`, `citations`, or `nextQuestion`.
+- Must not include policy facts, eligibility-like claims, or condition references.
+
+Across all statuses:
+
+- The same `conditionId` cannot appear in both `matchedConditions` and `missingConditions`.
+- `citations` cannot repeat the same `evidenceId`.
 
 ## Fallback Contract
 
@@ -78,3 +125,7 @@ When RAG evidence is insufficient, the backend returns `INSUFFICIENT_EVIDENCE`, 
 When required user facts are missing, the backend returns `NEEDS_CONFIRMATION` with `missingConditions` and, when available, `nextQuestion`.
 
 Fallback responses must not convert unknown data to false or zero, must not create arbitrary policy facts, and must not invent an eligibility-like result.
+
+## Scope Note
+
+This AI A0 contract does not define Analysis D0 raw policy data schemas, source classification, processing/review/freshness state axes, file storage conventions, raw source hashes, or privacy collection gates. Those belong in a separate Analysis D0 branch and PR.

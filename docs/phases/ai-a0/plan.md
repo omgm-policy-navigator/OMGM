@@ -24,3 +24,4 @@ Define the LLM role and output contract before implementing AI behavior.
 - RAG retrieval implementation.
 - Policy rule extraction pipeline implementation.
 - API routes for AI responses.
+- Analysis D0 raw policy schemas, source classification, raw artifact storage conventions, processing/review/freshness status axes, and privacy collection gates.

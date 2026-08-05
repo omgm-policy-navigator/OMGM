@@ -12,7 +12,7 @@ python3 scripts/check-doc-links.py
 
 Result: record after implementation.
 
-Actual result: passed. Backend unittest discovery ran 18 tests.
+Actual result: passed. Backend unittest discovery ran 29 tests.
 
 ## Not Applicable
 
