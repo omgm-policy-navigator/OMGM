@@ -53,6 +53,8 @@ Phase 0에는 업로드 기능이 없다. 향후 서류 업로드가 생기면 �
 
 로그는 JSON 구조를 사용한다. 토큰, 비밀번호, API 키, 암호화 키, 주민등록 관련 정보, 소득·자산 원문 값을 기록하지 않는다.
 
+예상하지 못한 서버 예외는 stack trace와 제한된 진단 정보만 기록한다. 허용되는 요청 메타데이터는 HTTP method, route path, request ID 또는 trace ID, 예외 type이다. request body 전체, 쿠키, 세션 ID, Authorization header, query parameter 전체, 사용자 사실 원문은 로그에 남기지 않는다.
+
 ## AI·RAG 보안
 
 정책 문서는 명령이 아닌 데이터다. 정책 원문 안의 Prompt Injection 문구를 실행하지 않는다. LLM 입력에는 불필요한 개인정보를 전달하지 않고, LLM 응답 문자열만으로 판정하지 않는다.

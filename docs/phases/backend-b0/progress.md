@@ -16,6 +16,7 @@ Completed on branch `backend-phase-b0`.
 - Clarified that RAG retrieves approved evidence for structured candidates and does not create policy eligibility candidates.
 - Confirmed MVP policy versioning uses explicit `policy_version` ownership rather than `verified_at` or source hashes as ad hoc versions.
 - Added FastAPI error handlers so `AppError`, request validation errors, and unexpected exceptions use the documented error envelope.
+- Added limited server-side exception logging for unexpected errors without request bodies, cookies, session IDs, or user facts.
 - Fixed anonymous session creation to a single `201 Created` contract with backend-generated HttpOnly cookie and `expiresAt`.
 - Moved the Rule Engine into `app/modules/eligibility` so evaluation ownership has one feature-module boundary.
 - Documented evaluation idempotency, response ordering, pagination, API version strategy, and CSRF/Origin expectations.

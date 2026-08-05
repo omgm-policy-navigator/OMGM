@@ -68,17 +68,27 @@ class ErrorResponseIntegrationTests(unittest.TestCase):
         self.assertEqual(body["error"]["message"], "Request validation failed.")
         self.assertEqual(body["error"]["details"][0]["location"], ["body", "value"])
 
-    def test_unhandled_error_uses_safe_error_envelope(self) -> None:
+    def test_unhandled_error_uses_safe_error_envelope_and_logs_diagnostics(self) -> None:
         app = create_app(AppConfig(app_env="test"))
 
-        @app.get("/internal-error-test")
+        @app.post("/internal-error-test")
         def internal_error_test() -> None:
             raise RuntimeError("sensitive internal detail")
 
-        status, body = asyncio.run(asgi_request(app, "GET", "/internal-error-test"))
+        with self.assertLogs("app.main", level="ERROR") as logs:
+            status, body = asyncio.run(asgi_request(app, "POST", "/internal-error-test", {"income": 123456789}))
 
         self.assertEqual(status, HTTPStatus.INTERNAL_SERVER_ERROR)
         self.assertEqual(
             body,
             {"error": {"code": "INTERNAL_ERROR", "message": "An unexpected error occurred."}},
         )
+        record = logs.records[0]
+        joined_logs = "\n".join(logs.output)
+        self.assertEqual(record.getMessage(), "Unhandled backend error")
+        self.assertEqual(record.method, "POST")
+        self.assertEqual(record.path, "/internal-error-test")
+        self.assertEqual(record.exception_type, "RuntimeError")
+        self.assertIn("RuntimeError", joined_logs)
+        self.assertIn("sensitive internal detail", joined_logs)
+        self.assertNotIn("123456789", joined_logs)

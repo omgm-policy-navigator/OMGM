@@ -1,14 +1,17 @@
 from http import HTTPStatus
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import AppConfig
 from app.core.errors import AppError
+from app.core.logging import get_logger
 from app.core.lifespan import lifespan
+
+logger = get_logger(__name__)
 
 
 def error_payload(code: str, message: str, details: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -50,7 +53,15 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def internal_error_handler(_request, _exc: Exception) -> JSONResponse:
+    async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception(
+            "Unhandled backend error",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "exception_type": type(exc).__name__,
+            },
+        )
         return JSONResponse(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             content=error_payload("INTERNAL_ERROR", "An unexpected error occurred."),

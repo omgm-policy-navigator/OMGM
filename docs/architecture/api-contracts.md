@@ -66,6 +66,8 @@ Unexpected error example:
 }
 ```
 
+Unexpected exceptions must be logged server-side with stack trace and limited request metadata: HTTP method, route path, request ID or trace ID when available, and exception type. Logs must not include request bodies, cookies, session IDs, Authorization headers, full query strings, or sensitive user facts such as income and asset values.
+
 ### Error Codes
 
 | Code | HTTP status | Meaning |

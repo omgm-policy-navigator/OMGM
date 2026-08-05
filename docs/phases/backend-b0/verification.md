@@ -20,7 +20,7 @@ git diff --check
 python3 scripts/check-doc-links.py
 ```
 
-Result: passed. Backend unittest discovery ran 14 tests, including integration checks for validation and internal error envelopes.
+Result: passed. Backend unittest discovery ran 14 tests, including integration checks for validation errors, internal error envelopes, and limited diagnostic logging for unexpected exceptions.
 
 ```bash
 cd backend && .venv/bin/python -m unittest discover -s tests
