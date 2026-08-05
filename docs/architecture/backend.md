@@ -14,15 +14,15 @@ backend/
 │       ├── core/
 │       ├── db/
 │       ├── modules/
-│       ├── llm/
-│       └── eligibility/
+│       │   └── eligibility/
+│       └── llm/
 └── tests/
     ├── unit/
     ├── integration/
     └── fixtures/
 ```
 
-`eligibility` already exists from Phase 0 and remains the first concrete Rule Engine module. Future feature modules are created only when implementation begins.
+`app/modules/eligibility` is the first concrete feature module. It owns the evaluation use case boundary and keeps Rule Engine logic as pure domain code inside the module. Future feature modules are created only when implementation begins.
 
 ## Responsibility Map
 
@@ -31,8 +31,8 @@ backend/
 | HTTP and SSE boundary | `app/api` | `app/core`, feature modules | Write SQL, calculate eligibility rules, call Ollama directly from route handlers |
 | Configuration, logging, lifespan, app errors | `app/core` | Python stdlib, framework primitives | Own business rules or persistence models |
 | Database sessions and persistence setup | `app/db` | SQLAlchemy/Alembic when introduced, `app/core` config | Expose SQLAlchemy sessions to analysis modules as a required dependency |
-| Rule Engine | `app/eligibility` | Structured policy rules, normalized user facts | Use LLM text to decide final status, generate natural-language explanations |
-| Business features | `app/modules` | `app/core`, `app/db` repositories, `app/eligibility`, `app/llm` through explicit module functions | Create broad layered folders without real implementation |
+| Rule Engine and eligibility evaluation | `app/modules/eligibility` | Structured policy rules, normalized user facts | Use LLM text to decide final status, generate natural-language explanations |
+| Business features | `app/modules` | `app/core`, `app/db` repositories, sibling modules through explicit module functions, `app/llm` | Create broad layered folders without real implementation |
 | LLM/Ollama boundary | `app/llm` | `app/core` config, HTTP client library when introduced | Decide eligibility, persist raw sensitive facts, bypass policy evidence |
 | RAG | Future `app/modules/rag` | approved document chunks for policies selected by metadata and Rule Engine, embeddings, metadata filters, `app/llm` query helpers | Create policy eligibility candidates, invent policies, or make final eligibility decisions |
 | Graph projection | Future `app/modules/graph` | policy metadata, relationships, evaluation summaries | Own source policy data or mutate eligibility results |
@@ -47,7 +47,7 @@ backend/
 | Conversation orchestration | Future `app/modules/conversation` | Mock API contract only |
 | Question engine and user facts | Future `app/modules/user_facts` | Mock API contract only |
 | Policy catalog and detail lookup | Future `app/modules/policies` | Mock API contract only |
-| Eligibility evaluation | `app/eligibility` now, future module facade under `app/modules/evaluations` | Rule core implemented, API contract only |
+| Eligibility evaluation | `app/modules/eligibility` | Rule core implemented, API contract only |
 | RAG evidence retrieval | Future `app/modules/rag` | Mock API contract only |
 | Policy graph projection | Future `app/modules/graph` | Mock API contract only |
 | Saved policies | Future `app/modules/saved_policies` | Deferred until retention and identity rules are decided |

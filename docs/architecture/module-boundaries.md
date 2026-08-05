@@ -74,15 +74,15 @@
 
 테스트 범위: timeout/config 적용, fake client contract, 민감정보 최소화.
 
-## `backend/src/app/eligibility`
+## `backend/src/app/modules/eligibility`
 
-책임: 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 신청 가능성 상태 계산.
+책임: 평가 use case 경계, 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 신청 가능성 상태 계산.
 
 입력: 구조화 정책 규칙, 사용자 사실, `policy_version`.
 
 출력: `LIKELY_ELIGIBLE`, `LIKELY_INELIGIBLE`, `NEEDS_CONFIRMATION` 등 신청 가능성 결과와 별도 evaluation state.
 
-금지 의존성: LLM 응답 문자열 기반 최종 판정, 자연어 설명 생성, HTTP 직접 처리.
+금지 의존성: LLM 응답 문자열 기반 최종 판정, 자연어 설명 생성, HTTP 직접 처리, 다른 평가 facade와 책임 중복.
 
 테스트 범위: 정보 부족, 필수 조건 불충족, 충족, 답변 충돌, 정책 버전 변경.
 

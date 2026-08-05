@@ -9,7 +9,7 @@ The package root is `backend/src/app`. The Phase B0 folder contract maps to this
 - `app/api`: FastAPI routers, request/response schemas, SSE boundaries, and safe error responses.
 - `app/core`: configuration, logging, lifespan, and shared application errors.
 - `app/db`: database session setup, migrations integration, and persistence helpers when DB work begins.
-- `app/modules`: business modules grouped by feature responsibility.
+- `app/modules`: business modules grouped by feature responsibility. `app/modules/eligibility` owns the Rule Engine and evaluation domain logic.
 - `app/llm`: Ollama client wrappers and prompt-facing DTOs. It must not calculate eligibility.
 
 ## Dependency Rules
@@ -25,7 +25,7 @@ The package root is `backend/src/app`. The Phase B0 folder contract maps to this
 
 ## Data Ownership
 
-- Anonymous sessions own browser-session identity and temporary conversation state until account identity exists.
+- Anonymous sessions are server-generated cookie identities and own temporary conversation state until account identity exists.
 - User fact modules own normalized answers, fact versions, and conflict markers.
 - Data Pipeline owns raw API payloads, raw HTML/PDF, extraction candidates, review-pending data, and source hashes before publication.
 - Backend Policy modules own approved and published `policy`, `policy_version`, `policy_rule`, `policy_document`, and service read models.

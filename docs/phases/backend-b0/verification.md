@@ -8,6 +8,20 @@ docker compose -f compose.yaml config
 
 Result: passed.
 
+## Error Contract Review Verification
+
+After addressing the error response and session lifecycle review, the applicable checks were rerun:
+
+```bash
+cd backend && .venv/bin/python -m unittest discover -s tests
+docker compose -f compose.yaml config
+git diff --check
+./scripts/verify-structure.sh
+python3 scripts/check-doc-links.py
+```
+
+Result: passed. Backend unittest discovery ran 14 tests, including integration checks for validation and internal error envelopes.
+
 ```bash
 cd backend && .venv/bin/python -m unittest discover -s tests
 ```

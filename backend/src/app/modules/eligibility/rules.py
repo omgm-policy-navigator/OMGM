@@ -56,15 +56,24 @@ def evaluate_conditions(conditions: list[Condition], answers: dict[str, Any]) ->
 
     if needs_confirmation:
         return EvaluationResult(
-            EligibilityStatus.NEEDS_CONFIRMATION,
-            EvaluationState.ACTIVE,
-            tuple(satisfied),
-            tuple(unsatisfied),
-            tuple(needs_confirmation),
+            eligibility_status=EligibilityStatus.NEEDS_CONFIRMATION,
+            evaluation_state=EvaluationState.ACTIVE,
+            satisfied=tuple(satisfied),
+            unsatisfied=tuple(unsatisfied),
+            needs_confirmation=tuple(needs_confirmation),
         )
     if unsatisfied:
-        return EvaluationResult(EligibilityStatus.LIKELY_INELIGIBLE, EvaluationState.ACTIVE, tuple(satisfied), tuple(unsatisfied), ())
-    return EvaluationResult(EligibilityStatus.LIKELY_ELIGIBLE, EvaluationState.ACTIVE, tuple(satisfied), (), ())
+        return EvaluationResult(
+            eligibility_status=EligibilityStatus.LIKELY_INELIGIBLE,
+            evaluation_state=EvaluationState.ACTIVE,
+            satisfied=tuple(satisfied),
+            unsatisfied=tuple(unsatisfied),
+        )
+    return EvaluationResult(
+        eligibility_status=EligibilityStatus.LIKELY_ELIGIBLE,
+        evaluation_state=EvaluationState.ACTIVE,
+        satisfied=tuple(satisfied),
+    )
 
 
 def mark_stale(current_policy_version: str, evaluated_policy_version: str) -> bool:

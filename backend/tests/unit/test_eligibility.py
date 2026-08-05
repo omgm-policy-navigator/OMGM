@@ -1,6 +1,6 @@
 import unittest
 
-from app.eligibility.rules import (
+from app.modules.eligibility.rules import (
     Condition,
     EvaluationState,
     EligibilityStatus,
