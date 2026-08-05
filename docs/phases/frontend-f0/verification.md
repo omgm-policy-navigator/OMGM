@@ -61,6 +61,16 @@ git diff --check
 
 Result: passed.
 
+After adding the fourth review follow-ups for TypeScript strictness, restricted-import linting expectations, OpenAPI type-sync CI, TanStack Query signal usage, and inactive-panel render skipping, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run typecheck
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash

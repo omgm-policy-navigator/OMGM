@@ -101,6 +101,13 @@ interface NavigatorUiStore {
 
 Frontend implementation review must reject UI store additions whose type is an API response DTO, generated OpenAPI response type, graph node array, policy detail object, conversation response, evaluation result, or evidence collection.
 
+This rule must be enforced by compiler and linter configuration when implementation begins:
+
+- `frontend/tsconfig.json` keeps `strict`, `noImplicitAny`, and `strictNullChecks` enabled.
+- Store files must not import generated API response types or DTO modules.
+- React component files must not import low-level HTTP clients directly; components use feature hooks.
+- ESLint `no-restricted-imports` or an equivalent custom rule should fail PRs that cross these boundaries.
+
 ## MSW Mock Standard
 
 Frontend implementation phases must use MSW for API mocking rather than plain JSON-only fixtures. The handler set must live in a frontend-owned mock boundary such as `frontend/src/mocks/handlers.ts`.
@@ -156,6 +163,13 @@ export const handlers = [
 ```
 
 Before OpenAPI exists, the same handler must use an explicit local `PolicyDetailResponse` interface copied from `docs/architecture/api-contracts.md`, and the PR verification notes must state that OpenAPI generation was not yet applicable.
+
+CI/CD guardrail once OpenAPI exists:
+
+- Generate `frontend/src/generated/api.schema.d.ts` from backend OpenAPI using `openapi-typescript` or an equivalent tool.
+- Fail if generated output differs from the committed file.
+- Run frontend typecheck after generation so MSW handler drift fails fast.
+- Treat manual MSW response changes without regenerated types as incomplete.
 
 ## Mock Payloads
 
@@ -461,6 +475,16 @@ Each graph node click creates a new `graphClickToken` in cross-panel UI state. A
 
 Implementation phases must pass an `AbortSignal` through fetch-backed API clients. If the selected node changes, pending detail, graph-click, and conversation bootstrap requests should be aborted. If a library cannot cancel a request, completion handlers must compare `graphClickToken` before writing UI state.
 
+When TanStack Query owns a request, query cancellation uses the built-in `queryFn` signal. Do not wrap a query-owned fetch in a second manually-created `AbortController`.
+
+```ts
+useQuery({
+  queryKey: ["policy", selectedNodeId],
+  queryFn: ({ signal }) => fetchPolicyDetail(selectedNodeId, { signal }),
+  enabled: selectedNodeId !== null,
+});
+```
+
 Standard hook boundary:
 
 - `usePolicyNodeSelection` owns `AbortController` lifecycle for rapid graph node switching.
@@ -529,3 +553,4 @@ function usePolicyNodeSelection() {
 - No horizontal scrolling is required for Korean policy names; long labels wrap or truncate with full text available through accessible text.
 - Mobile tab or drawer switching preserves draft chat input, graph zoom, graph pan, and scroll position. Prefer hiding inactive panels with CSS while removing them from keyboard and screen-reader navigation, or lift only the volatile local state that must survive an unavoidable unmount.
 - Hidden mobile panels must pause expensive work. A graph rendered in canvas or SVG must stop `requestAnimationFrame`, physics simulation ticks, resize observers that trigger layout work, or heavy redraw timers while the graph tab/drawer is inactive. Paused work resumes only when the panel is visible again.
+- Hidden mobile panels must avoid expensive rerender work. Keep persisted UI state, but use `React.memo`, narrow store selectors, query `enabled` flags, and an `isActivePanel` prop so inactive panels skip graph layout mapping, parsing, canvas redraw, virtual-list measurement, and other heavy derived computations.

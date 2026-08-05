@@ -30,6 +30,10 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added OpenAPI-generated type expectations for MSW handler response type safety once backend OpenAPI is available.
 - Added silent handling rules for `AbortError` and `CanceledError` so user-intent cancellation does not show error UI.
 - Added mobile hidden-panel resource rules so graph animation and redraw loops pause when inactive.
+- Explicitly enabled `noImplicitAny` and `strictNullChecks` in `frontend/tsconfig.json` in addition to existing `strict`.
+- Added compiler, restricted import lint, and OpenAPI type-sync CI guardrails for future implementation phases.
+- Clarified TanStack Query cancellation must use `queryFn` `signal` instead of duplicate manual controllers.
+- Added inactive mounted-panel rerender guardrails using `React.memo`, narrow selectors, query `enabled`, and `isActivePanel`.
 
 ## Deferred
 

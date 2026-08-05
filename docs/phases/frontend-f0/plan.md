@@ -81,6 +81,34 @@ type NavigatorUiState = {
 
 Code review for frontend implementation must reject UI store fields typed as API response DTOs, arrays of graph nodes from the server, evidence arrays, conversation responses, policy details, or evaluation results.
 
+The guardrail must also be automated. Frontend TypeScript config keeps `strict`, `noImplicitAny`, and `strictNullChecks` enabled. Implementation phases that add ESLint must include restricted import rules that prevent UI store files from importing API DTO modules or generated response types, and prevent components from importing low-level fetch or axios clients directly. Components call feature hooks; hooks call API clients.
+
+Example restricted-import intent:
+
+```js
+{
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/generated/api-types", "**/api/dto/**"],
+            "message": "UI stores must keep IDs and pure UI flags only. Do not import API DTOs into store files."
+          },
+          {
+            "group": ["axios", "**/api/client"],
+            "message": "Components must call feature hooks instead of direct HTTP clients."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+If the repo adopts file-scoped overrides, the DTO import restriction must apply to store paths such as `frontend/src/**/store*.ts` and `frontend/src/**/ui-store*.ts`; the direct HTTP client restriction must apply to React component files.
+
 ## Server State
 
 Server state is fetched from backend contracts and cached or invalidated by the frontend:
@@ -186,6 +214,15 @@ const policyDetailMock: PolicyDetailResponse = {
 
 CI for the implementation phase should include API type generation and TypeScript typecheck. If OpenAPI is not available yet, typed local DTO interfaces must be colocated with the mock handlers and reviewed against `docs/architecture/api-contracts.md`.
 
+OpenAPI type sync must be fail-fast in CI once the backend exports OpenAPI. The expected check is:
+
+1. Build or start the backend OpenAPI source.
+2. Generate frontend API types into the committed schema type file, for example `frontend/src/generated/api.schema.d.ts`.
+3. Run a clean diff check.
+4. Run frontend typecheck and tests.
+
+If generated `api.schema.d.ts` differs from the committed file, CI fails and the PR must include the regenerated type file plus any required MSW handler updates. Local-only generation without a CI diff check is not sufficient.
+
 ## Loading, Error, and Empty States
 
 Each screen must define these states before implementation:
@@ -220,6 +257,16 @@ Graph node selection is a user intent with a monotonic request token:
 | 5 | Submit answer | Call answer mutation, then evaluation mutation. | Invalidate only queries for the current session, policy, and fact version. |
 
 Implementation phases must cancel stale requests with `AbortController` for fetch-backed clients. When a library cannot physically cancel the work, completion handlers must check the latest selected-node token before updating cross-panel UI state.
+
+When TanStack Query owns a server-state request, do not create an extra `AbortController` around that query. Use the `signal` provided to `queryFn` and pass it to the fetch or axios adapter. Manual controllers are reserved for non-query orchestration work such as graph-click side effects that are not represented as a TanStack Query.
+
+```ts
+const policyDetailQuery = useQuery({
+  queryKey: ["policy", selectedNodeId],
+  queryFn: ({ signal }) => fetchPolicyDetail(selectedNodeId, { signal }),
+  enabled: selectedNodeId !== null,
+});
+```
 
 Standard implementation pattern:
 
@@ -327,6 +374,29 @@ Mobile panel switching must preserve user work in progress. Do not unmount `Chat
 
 CSS-based hiding does not mean heavy work keeps running. When the graph panel is inactive or hidden, graph animation loops, canvas redraw loops, expensive layout timers, and streaming visual effects must pause. They resume only when `activePanel === "graph"` or when the desktop layout shows the graph as visible. Chat polling, SSE subscriptions, or timers introduced in later phases must follow the same active/visible guard.
 
+Inactive-but-mounted panels must also avoid expensive subscriptions and derived computations. Use `React.memo`, narrow Zustand selectors, query `enabled` flags, and an `isActivePanel` prop so hidden panels can skip parsing, layout calculation, graph projection mapping, or virtual-list measurement. The shell may keep DOM mounted for state preservation, but heavy child work should early-return or pause when inactive.
+
+```tsx
+const PolicyGraphPanel = memo(function PolicyGraphPanel({
+  isActivePanel,
+}: {
+  isActivePanel: boolean;
+}) {
+  const activePolicyId = useNavigatorUiStore((state) => state.activePolicyId);
+  const graphQuery = usePolicyGraphQuery(activePolicyId, {
+    enabled: isActivePanel && activePolicyId !== null,
+  });
+
+  useGraphAnimation({ paused: !isActivePanel });
+
+  if (!isActivePanel) {
+    return <section aria-hidden="true" hidden />;
+  }
+
+  return <GraphCanvas data={graphQuery.data} />;
+});
+```
+
 ## Completion Criteria
 
 - Each screen's API usage is defined.
@@ -342,6 +412,9 @@ CSS-based hiding does not mean heavy work keeps running. When the graph panel is
 - OpenAPI-generated API types are required for MSW type safety once OpenAPI is available.
 - Abort/cancel errors are classified as silent user-intent cancellation.
 - Hidden mobile panels must pause heavy graph rendering loops.
+- TypeScript strictness, restricted import linting, and OpenAPI type-sync CI guardrails are specified.
+- TanStack Query requests use `queryFn` signals rather than duplicate manual controllers.
+- Inactive mounted panels skip expensive subscriptions and derived work.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope
