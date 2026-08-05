@@ -52,6 +52,15 @@ git diff --check
 
 Result: passed.
 
+After adding the third review follow-ups for type-level UI store guardrails, OpenAPI-generated MSW response types, silent abort/cancel handling, and hidden mobile graph work pausing, these checks were rerun:
+
+```bash
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash

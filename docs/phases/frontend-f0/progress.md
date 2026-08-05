@@ -26,6 +26,10 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added `usePolicyNodeSelection` as the standard hook boundary for rapid graph node switching, request abortion, and stale-token checks.
 - Clarified that MSW handlers must stay aligned with `docs/architecture/api-contracts.md` or generated OpenAPI DTO types.
 - Added mobile tab/drawer state preservation rules for chat drafts, graph zoom/pan, and scroll position.
+- Added TypeScript store-interface guardrails that allow only identifiers, primitive UI flags, and actions in cross-panel UI state.
+- Added OpenAPI-generated type expectations for MSW handler response type safety once backend OpenAPI is available.
+- Added silent handling rules for `AbortError` and `CanceledError` so user-intent cancellation does not show error UI.
+- Added mobile hidden-panel resource rules so graph animation and redraw loops pause when inactive.
 
 ## Deferred
 

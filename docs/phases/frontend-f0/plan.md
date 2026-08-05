@@ -53,6 +53,34 @@ Zustand is preferred for cross-panel UI state once implementation begins because
 
 Cross-panel UI state must store identifiers and view intent only. It must not copy server cache data into the UI store. For example, the store may contain `selectedNodeId`, `activePolicyId`, `highlightedEvidenceId`, and `activePanel`, but it must not contain a policy detail JSON object, graph node payload list, conversation response, evaluation result, or evidence array. Panels read server data through query hooks using those IDs.
 
+Implementation phases must enforce this rule at the TypeScript type boundary. The store interface allows primitive identifiers, enum-like view state, booleans, numbers for pure UI values, and actions. It must not import API DTO response types.
+
+```ts
+type NavigatorPanel = "chat" | "graph" | "detail";
+
+type NavigatorUiState = {
+  selectedCategoryId: string | null;
+  activePolicyId: string | null;
+  selectedNodeId: string | null;
+  highlightedEvidenceId: string | null;
+  activePanel: NavigatorPanel;
+  graphClickToken: number;
+  isResetDialogOpen: boolean;
+  actions: {
+    selectNode: (nodeId: string | null, policyId: string | null) => void;
+    setActivePanel: (panel: NavigatorPanel) => void;
+    setResetDialogOpen: (open: boolean) => void;
+  };
+};
+
+// Guardrail violation: server data must stay in TanStack Query or equivalent.
+// selectedNodeDetail: PolicyDetailResponse;
+// graphData: PolicyGraphResponse;
+// evaluationResult: EvaluationResponse;
+```
+
+Code review for frontend implementation must reject UI store fields typed as API response DTOs, arrays of graph nodes from the server, evidence arrays, conversation responses, policy details, or evaluation results.
+
 ## Server State
 
 Server state is fetched from backend contracts and cached or invalidated by the frontend:
@@ -133,6 +161,31 @@ MSW is the F0 standard for frontend API mocking once implementation begins. Mock
 
 The single source of truth for mock shapes is `docs/architecture/api-contracts.md`, or a generated OpenAPI JSON/YAML file once the backend exposes one. TypeScript interfaces for MSW response bodies must mirror that source. Mock handler changes that add, remove, or rename response fields must update the backend contract or generated API type source in the same PR.
 
+Once the backend publishes OpenAPI, frontend implementation must generate TypeScript API types from that OpenAPI file, for example with `openapi-typescript` or an equivalent generator. MSW handlers and API clients must use those generated types so contract drift fails typecheck or CI.
+
+```ts
+import type { paths } from "../generated/api-types";
+
+type PolicyDetailResponse =
+  paths["/api/policies/{policyId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+const policyDetailMock: PolicyDetailResponse = {
+  policyId: "policy_mock_housing_001",
+  title: "신혼부부 주거 지원",
+  agency: "서울시",
+  region: "서울",
+  status: "ACTIVE",
+  policyVersionId: "policy_version_mock_001",
+  source: {
+    url: "https://example.go.kr/policy/mock-housing-001",
+    collectedAt: "2026-08-05T00:00:00Z",
+    documentHash: "sha256:mock",
+  },
+};
+```
+
+CI for the implementation phase should include API type generation and TypeScript typecheck. If OpenAPI is not available yet, typed local DTO interfaces must be colocated with the mock handlers and reviewed against `docs/architecture/api-contracts.md`.
+
 ## Loading, Error, and Empty States
 
 Each screen must define these states before implementation:
@@ -211,7 +264,7 @@ function usePolicyNodeSelection() {
 
       focusPanelTarget(input);
     } catch (error) {
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || isAbortLikeError(error)) {
         return;
       }
       throw error;
@@ -221,6 +274,22 @@ function usePolicyNodeSelection() {
 ```
 
 The hook owns request cancellation for graph-click orchestration. API client functions accept `AbortSignal`; UI store actions only update IDs and tokens.
+
+`AbortError`, Axios `CanceledError`, TanStack Query cancellation, and equivalent user-intent cancellation results are not user-facing errors. They must not trigger error boundaries, error pages, or toast notifications.
+
+```ts
+function isAbortLikeError(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (typeof error === "object" && error !== null && "name" in error) {
+    return (error as { name?: string }).name === "CanceledError";
+  }
+
+  return false;
+}
+```
 
 ```mermaid
 sequenceDiagram
@@ -256,6 +325,8 @@ Mobile tab state belongs to cross-panel UI state as `activePanel`; graph zoom an
 
 Mobile panel switching must preserve user work in progress. Do not unmount `ChatPanel` or `PolicyGraphPanel` during tab/drawer changes if it would reset draft answers, focused question state, graph zoom, graph pan, or scroll position. Prefer CSS visibility control such as `display: none` for inactive panels when accessibility semantics are preserved, or lift only the specific volatile state that must survive unmounting. Inactive panels must not remain reachable by keyboard or screen readers.
 
+CSS-based hiding does not mean heavy work keeps running. When the graph panel is inactive or hidden, graph animation loops, canvas redraw loops, expensive layout timers, and streaming visual effects must pause. They resume only when `activePanel === "graph"` or when the desktop layout shows the graph as visible. Chat polling, SSE subscriptions, or timers introduced in later phases must follow the same active/visible guard.
+
 ## Completion Criteria
 
 - Each screen's API usage is defined.
@@ -267,6 +338,10 @@ Mobile panel switching must preserve user work in progress. Do not unmount `Chat
 - MSW-based mock expectations are defined.
 - UI store server-data duplication is explicitly prohibited.
 - Mobile tab/drawer panel state preservation is defined.
+- Type-level UI store guardrails are defined.
+- OpenAPI-generated API types are required for MSW type safety once OpenAPI is available.
+- Abort/cancel errors are classified as silent user-intent cancellation.
+- Hidden mobile panels must pause heavy graph rendering loops.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope

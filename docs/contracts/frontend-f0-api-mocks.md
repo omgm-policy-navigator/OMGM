@@ -70,6 +70,37 @@ const policyQuery = useQuery({
 
 The UI store must contain `activePolicyId`, not `policyQuery.data`. Components derive the displayed server data from the server-state cache.
 
+### UI Store Type Guardrail
+
+The cross-panel UI store type must be constrained to primitive identifiers and pure UI flags. It must not import backend DTOs or generated API response types.
+
+```ts
+type ActivePanel = "chat" | "graph" | "detail";
+
+interface NavigatorUiStore {
+  selectedCategoryId: string | null;
+  activePolicyId: string | null;
+  selectedNodeId: string | null;
+  highlightedEvidenceId: string | null;
+  activePanel: ActivePanel;
+  graphClickToken: number;
+  isResetDialogOpen: boolean;
+  actions: {
+    selectNode: (nodeId: string | null, policyId: string | null) => void;
+    setActivePanel: (panel: ActivePanel) => void;
+    setResetDialogOpen: (open: boolean) => void;
+  };
+}
+
+// Not allowed in NavigatorUiStore:
+// selectedNodeDetail: PolicyDetailResponse;
+// graph: PolicyGraphResponse;
+// evaluation: EvaluationResponse;
+// evidence: EvidenceResponse[];
+```
+
+Frontend implementation review must reject UI store additions whose type is an API response DTO, generated OpenAPI response type, graph node array, policy detail object, conversation response, evaluation result, or evidence collection.
+
 ## MSW Mock Standard
 
 Frontend implementation phases must use MSW for API mocking rather than plain JSON-only fixtures. The handler set must live in a frontend-owned mock boundary such as `frontend/src/mocks/handlers.ts`.
@@ -93,6 +124,38 @@ MSW handlers must return values typed with explicit TypeScript interfaces or gen
 - A matching change to `docs/architecture/api-contracts.md`.
 - A regeneration from the backend OpenAPI contract.
 - A note proving the changed field is frontend-only test data and not part of the API response.
+
+After OpenAPI exists, CI must generate or verify TypeScript API types before frontend tests run. MSW handlers should type responses with generated path response types.
+
+```ts
+import { http, HttpResponse } from "msw";
+import type { paths } from "../generated/api-types";
+
+type PolicyDetailResponse =
+  paths["/api/policies/{policyId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export const handlers = [
+  http.get("/api/policies/:policyId", () => {
+    const body: PolicyDetailResponse = {
+      policyId: "policy_mock_housing_001",
+      title: "신혼부부 주거 지원",
+      agency: "서울시",
+      region: "서울",
+      status: "ACTIVE",
+      policyVersionId: "policy_version_mock_001",
+      source: {
+        url: "https://example.go.kr/policy/mock-housing-001",
+        collectedAt: "2026-08-05T00:00:00Z",
+        documentHash: "sha256:mock",
+      },
+    };
+
+    return HttpResponse.json<PolicyDetailResponse>(body);
+  }),
+];
+```
+
+Before OpenAPI exists, the same handler must use an explicit local `PolicyDetailResponse` interface copied from `docs/architecture/api-contracts.md`, and the PR verification notes must state that OpenAPI generation was not yet applicable.
 
 ## Mock Payloads
 
@@ -404,10 +467,21 @@ Standard hook boundary:
 - UI store actions write only `selectedNodeId`, `activePolicyId`, `activePanel`, highlighted IDs, and a monotonic `graphClickToken`.
 - API client functions accept `{ signal?: AbortSignal }`.
 - Components must not start independent graph-click side effects that bypass this hook.
+- Canceled node-selection requests are silent control flow and must not display error UI.
 
 Minimal implementation shape:
 
 ```ts
+function isAbortLikeError(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error as { name?: string }).name === "CanceledError")
+  );
+}
+
 function usePolicyNodeSelection() {
   const controllerRef = useRef<AbortController | null>(null);
   const tokenRef = useRef(0);
@@ -419,14 +493,24 @@ function usePolicyNodeSelection() {
     const token = tokenRef.current + 1;
     tokenRef.current = token;
 
-    setSelectedNode({ nodeId, policyId, graphClickToken: token });
-    await ensureConversationOrEvidenceTarget(nodeId, { signal: controller.signal });
+    try {
+      setSelectedNode({ nodeId, policyId, graphClickToken: token });
+      await ensureConversationOrEvidenceTarget(nodeId, {
+        signal: controller.signal,
+      });
 
-    if (controller.signal.aborted || token !== tokenRef.current) {
-      return;
+      if (controller.signal.aborted || token !== tokenRef.current) {
+        return;
+      }
+
+      focusCurrentNodeTarget(nodeId);
+    } catch (error) {
+      if (controller.signal.aborted || isAbortLikeError(error)) {
+        return;
+      }
+
+      throw error;
     }
-
-    focusCurrentNodeTarget(nodeId);
   }, []);
 }
 ```
@@ -444,3 +528,4 @@ function usePolicyNodeSelection() {
 - At `1200px` and above, desktop uses a three-column or pinned split-panel layout where graph, chat, and selected policy detail can be visible together.
 - No horizontal scrolling is required for Korean policy names; long labels wrap or truncate with full text available through accessible text.
 - Mobile tab or drawer switching preserves draft chat input, graph zoom, graph pan, and scroll position. Prefer hiding inactive panels with CSS while removing them from keyboard and screen-reader navigation, or lift only the volatile local state that must survive an unavoidable unmount.
+- Hidden mobile panels must pause expensive work. A graph rendered in canvas or SVG must stop `requestAnimationFrame`, physics simulation ticks, resize observers that trigger layout work, or heavy redraw timers while the graph tab/drawer is inactive. Paused work resumes only when the panel is visible again.
