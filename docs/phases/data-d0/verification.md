@@ -7,7 +7,7 @@ $env:PYTHONPATH='src'
 python -m unittest discover -s tests -v
 ```
 
-Result: passed. Data Pipeline tests 9개를 실행했으며 Raw schema 검증, 상태 enum, exact-byte SHA-256, 결정적 파일 경로를 포함한다.
+Result: passed. Data Pipeline tests 14개를 실행했으며 Raw schema 동기화, 런타임 타입 검증, 상태 시각 불변조건, 수집 이벤트 경로 분리, canonical URL, exact-byte SHA-256을 포함한다.
 
 ```powershell
 docker compose -f compose.yaml config --quiet

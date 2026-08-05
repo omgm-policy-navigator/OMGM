@@ -8,25 +8,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import PurePosixPath
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import urlsplit
 
 
 SCHEMA_VERSION = "1.0"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{2,63}$")
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
-_SENSITIVE_QUERY_KEYS = {
-    "access_token",
-    "api_key",
-    "apikey",
-    "authorization",
-    "key",
-    "password",
-    "secret",
-    "service_key",
-    "servicekey",
-    "token",
-}
 
 
 class SourceAuthority(StrEnum):
@@ -60,25 +48,29 @@ def sha256_bytes(content: bytes) -> str:
 
 
 def _require_utc(value: datetime, field_name: str) -> None:
+    if not isinstance(value, datetime):
+        raise TypeError(f"{field_name} must be a datetime")
     if value.tzinfo is None or value.utcoffset() != timezone.utc.utcoffset(value):
         raise ValueError(f"{field_name} must be timezone-aware UTC")
 
 
 def _validate_source_url(value: str) -> None:
+    if not isinstance(value, str):
+        raise TypeError("source_url must be a string")
     parsed = urlsplit(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("source_url must be an absolute HTTP(S) URL")
     if parsed.username or parsed.password:
         raise ValueError("source_url must not contain credentials")
-    query_keys = {key.lower() for key, _ in parse_qsl(parsed.query, keep_blank_values=True)}
-    if query_keys & _SENSITIVE_QUERY_KEYS:
-        raise ValueError("source_url must not contain secret query parameters")
+    if parsed.query or parsed.fragment:
+        raise ValueError("source_url must be canonical and contain no query or fragment")
 
 
 @dataclass(frozen=True, slots=True)
 class RawPolicyMetadata:
     """Sidecar metadata for one immutable raw policy source object."""
 
+    collection_id: str
     raw_policy_id: str
     source_authority: SourceAuthority
     source_format: SourceFormat
@@ -94,17 +86,25 @@ class RawPolicyMetadata:
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if not isinstance(self.source_authority, SourceAuthority):
+            raise TypeError("source_authority must be SourceAuthority")
+        if not isinstance(self.source_format, SourceFormat):
+            raise TypeError("source_format must be SourceFormat")
+        if not isinstance(self.status, RawPolicyStatus):
+            raise TypeError("status must be RawPolicyStatus")
         if self.schema_version != SCHEMA_VERSION:
             raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
-        if not _IDENTIFIER_PATTERN.fullmatch(self.raw_policy_id):
-            raise ValueError("raw_policy_id must be 3-64 lowercase identifier characters")
-        if not self.publisher.strip():
-            raise ValueError("publisher must not be empty")
-        if not self.collector.strip():
-            raise ValueError("collector must not be empty")
-        if not self.media_type.strip():
-            raise ValueError("media_type must not be empty")
-        if not _SHA256_PATTERN.fullmatch(self.content_sha256):
+        for field_name in ("collection_id", "raw_policy_id"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not _IDENTIFIER_PATTERN.fullmatch(value):
+                raise ValueError(f"{field_name} must be 3-64 lowercase identifier characters")
+        for field_name in ("publisher", "collector", "media_type"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must not be empty")
+        if not isinstance(self.content_sha256, str) or not _SHA256_PATTERN.fullmatch(
+            self.content_sha256
+        ):
             raise ValueError("content_sha256 must be a lowercase SHA-256 hex digest")
         _validate_source_url(self.source_url)
         _require_utc(self.collected_at, "collected_at")
@@ -112,7 +112,11 @@ class RawPolicyMetadata:
             _require_utc(self.status_updated_at, "status_updated_at")
             if self.status_updated_at < self.collected_at:
                 raise ValueError("status_updated_at must not precede collected_at")
+        elif self.status is not RawPolicyStatus.COLLECTED:
+            raise ValueError("status_updated_at is required when status is not COLLECTED")
         if self.original_filename is not None:
+            if not isinstance(self.original_filename, str):
+                raise TypeError("original_filename must be a string or None")
             if PurePosixPath(self.original_filename).name != self.original_filename:
                 raise ValueError("original_filename must be a basename")
 
@@ -144,5 +148,7 @@ def raw_storage_paths(
         metadata.source_authority.value.lower(),
         source_slug,
     )
-    basename = f"{metadata.raw_policy_id}__{metadata.content_sha256[:12]}"
+    basename = (
+        f"{metadata.raw_policy_id}__{metadata.content_sha256}__{metadata.collection_id}"
+    )
     return directory / f"{basename}.{normalized_extension}", directory / f"{basename}.metadata.json"

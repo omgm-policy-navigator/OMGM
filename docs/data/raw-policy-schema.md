@@ -13,10 +13,11 @@ D0는 수집한 정책 원문을 재현 가능하게 보존하는 계약을 정�
 | 필드 | 형식 | 필수 | 기준 |
 | --- | --- | --- | --- |
 | `schema_version` | string | 예 | D0는 `1.0` |
+| `collection_id` | string | 예 | 3~64자 소문자 식별자. 개별 수집 이벤트마다 고유 |
 | `raw_policy_id` | string | 예 | 3~64자 소문자 영문·숫자·`_`·`-`, 수집 레코드의 안정 식별자 |
 | `source_authority` | enum | 예 | `OFFICIAL` 또는 `SECONDARY` |
 | `source_format` | enum | 예 | `API_JSON`, `HTML`, `PDF`, `DOCUMENT`, `TEXT` |
-| `source_url` | URL | 예 | 절대 HTTP(S) URL. 자격 증명과 secret query parameter 금지 |
+| `source_url` | URL | 예 | query와 fragment를 제거한 canonical 절대 HTTP(S) URL. 자격 증명 금지 |
 | `publisher` | string | 예 | 문서를 게시한 기관 또는 매체 |
 | `collected_at` | datetime | 예 | 실제 원문을 받은 UTC 시각, ISO 8601 |
 | `content_sha256` | string | 예 | 저장한 원문 바이트 전체의 소문자 SHA-256 |
@@ -24,9 +25,9 @@ D0는 수집한 정책 원문을 재현 가능하게 보존하는 계약을 정�
 | `original_filename` | string/null | 아니요 | 경로가 제거된 원래 basename |
 | `collector` | string | 예 | 수집 방식/구현 식별자. 기본값 `manual` |
 | `status` | enum | 예 | 아래 검수 상태. 최초값 `COLLECTED` |
-| `status_updated_at` | datetime/null | 아니요 | 상태를 마지막으로 변경한 UTC 시각 |
+| `status_updated_at` | datetime/null | 조건부 | 상태를 마지막으로 변경한 UTC 시각. `COLLECTED` 이외 상태에서는 필수 |
 
-HTTP status, ETag, Last-Modified 같은 전송 진단값은 수집기 구현 Phase에서 별도 수집 이벤트로 확장할 수 있다. D0 필수 계약에는 넣지 않는다. API key, cookie, Authorization header, 전체 요청/응답 header는 저장하지 않는다.
+HTTP status, ETag, Last-Modified 같은 전송 진단값은 수집기 구현 Phase에서 별도 수집 이벤트로 확장할 수 있다. D0 필수 계약에는 넣지 않는다. 원래 요청 URL의 query와 fragment는 모두 제거하고 canonical URL만 저장한다. API key, cookie, Authorization header, 전체 요청/응답 header는 저장하지 않는다.
 
 ## 출처 구분
 
@@ -55,8 +56,8 @@ HTTP status, ETag, Last-Modified 같은 전송 진단값은 수집기 구현 Pha
 ```text
 data/
   raw/YYYY/MM/DD/{official|secondary}/{source-slug}/
-    {raw-policy-id}__{sha256-first-12}.{ext}
-    {raw-policy-id}__{sha256-first-12}.metadata.json
+    {raw-policy-id}__{full-sha256}__{collection-id}.{ext}
+    {raw-policy-id}__{full-sha256}__{collection-id}.metadata.json
   processed/{raw-policy-id}/{processor-version}/
     ... derived artifacts ...
 ```
@@ -64,6 +65,8 @@ data/
 - 경로 날짜는 `collected_at`의 UTC 날짜다.
 - `source-slug`는 3~64자의 소문자 kebab-case다.
 - 확장자는 실제 보관 형식과 일치하는 1~8자 소문자 영숫자다.
+- `collection-id`가 개별 수집 이력을 분리하므로 동일한 원문을 같은 날 여러 URL에서 수집해도 sidecar를 덮어쓰지 않는다.
+- 축약하지 않은 SHA-256 전체를 경로에 사용해 서로 다른 원문 간 경로 충돌을 방지한다.
 - Processed 산출물은 `raw_policy_id`, `content_sha256`, 가공기 버전을 참조해야 한다.
 - 저장 루트와 실제 정책 원문은 Git에 커밋하지 않는다. 테스트에는 비민감 합성 샘플만 사용한다.
 

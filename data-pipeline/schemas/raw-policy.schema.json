@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "collection_id",
     "raw_policy_id",
     "source_authority",
     "source_format",
@@ -19,6 +20,10 @@
   ],
   "properties": {
     "schema_version": { "const": "1.0" },
+    "collection_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
+    },
     "raw_policy_id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
@@ -32,7 +37,7 @@
     "source_url": {
       "type": "string",
       "format": "uri",
-      "pattern": "^https?://"
+      "pattern": "^https?://[^?#]+$"
     },
     "publisher": { "type": "string", "minLength": 1 },
     "collected_at": { "type": "string", "format": "date-time" },
@@ -54,5 +59,17 @@
       ]
     },
     "status_updated_at": { "type": ["string", "null"], "format": "date-time" }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "not": { "const": "COLLECTED" } } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["status_updated_at"],
+        "properties": { "status_updated_at": { "type": "string" } }
+      }
+    }
+  ]
 }
