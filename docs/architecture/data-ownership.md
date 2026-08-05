@@ -24,6 +24,8 @@
 
 조회 허용 범위: 관리자 검수와 게시 준비 흐름. Backend API 요청 처리 경로가 수집 원본을 직접 소유하거나 수정하지 않는다.
 
+Raw 원문과 Processed 산출물의 분리, 출처 등급, 검수 상태, 파일 경로는 [Raw Policy Schema](../data/raw-policy-schema.md)를 따른다. 공식 원문에서 승인된 산출물만 게시 정책 영역으로 전달할 수 있으며 2차 출처는 단독 판정 근거가 될 수 없다.
+
 ## 게시 정책 영역
 
 소유 데이터: 승인·게시된 정책 식별자, 정책명, 기관, 지역, 대상, 신청 기간, 정책 상태, `policy_version`, 승인된 `policy_rule`, 승인된 `policy_document`, 서비스 조회용 Read Model.
