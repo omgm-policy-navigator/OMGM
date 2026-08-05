@@ -15,12 +15,17 @@ def health_payload(config: AppConfig) -> dict[str, str]:
     }
 
 
-@router.get("/health")
-def health(request: Request) -> dict[str, str]:
+@router.get("/health/live")
+def liveness(request: Request) -> dict[str, str]:
     return health_payload(request.app.state.config)
 
 
-@router.get("/ready")
+@router.get("/health")
+def health(request: Request) -> dict[str, str]:
+    return liveness(request)
+
+
+@router.get("/health/ready")
 async def readiness(request: Request) -> JSONResponse:
     payload = health_payload(request.app.state.config)
     try:
@@ -32,3 +37,8 @@ async def readiness(request: Request) -> JSONResponse:
 
     payload["database"] = "ok"
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload)
+
+
+@router.get("/ready")
+async def ready(request: Request) -> JSONResponse:
+    return await readiness(request)

@@ -56,7 +56,7 @@ async def asgi_request(app, method: str, path: str, body: dict[str, Any] | None 
 
 class ErrorResponseIntegrationTests(unittest.TestCase):
     def test_request_validation_error_uses_error_envelope(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         @app.post("/validation-test")
         def validation_test(value: int = Body(..., embed=True)) -> dict[str, int]:
@@ -70,7 +70,7 @@ class ErrorResponseIntegrationTests(unittest.TestCase):
         self.assertEqual(body["error"]["details"][0]["location"], ["body", "value"])
 
     def test_unhandled_error_uses_safe_error_envelope_and_logs_diagnostics(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         @app.post("/internal-error-test")
         def internal_error_test() -> None:

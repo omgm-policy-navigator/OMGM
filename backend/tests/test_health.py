@@ -45,9 +45,9 @@ async def asgi_get(app, path: str) -> tuple[int, dict[str, Any]]:
 
 class HealthApiTests(unittest.TestCase):
     def test_health_returns_ok(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
-        status, body = asyncio.run(asgi_get(app, "/health"))
+        status, body = asyncio.run(asgi_get(app, "/health/live"))
 
         self.assertEqual(status, HTTPStatus.OK)
         self.assertEqual(body["status"], "ok")
@@ -55,20 +55,20 @@ class HealthApiTests(unittest.TestCase):
         self.assertEqual(body["environment"], "test")
 
     def test_readiness_returns_ok_when_database_ping_succeeds(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         with patch("app.api.health.check_database", new=AsyncMock(return_value=None)):
-            status, body = asyncio.run(asgi_get(app, "/ready"))
+            status, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.OK)
         self.assertEqual(body["status"], "ok")
         self.assertEqual(body["database"], "ok")
 
     def test_readiness_returns_unavailable_when_database_ping_fails(self) -> None:
-        app = create_app(AppConfig(app_env="test"))
+        app = create_app(AppConfig(app_env="test", database_url="postgresql+asyncpg://user:pass@localhost:5432/test_db"))
 
         with patch("app.api.health.check_database", new=AsyncMock(side_effect=RuntimeError("db unavailable"))):
-            status, body = asyncio.run(asgi_get(app, "/ready"))
+            status, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.SERVICE_UNAVAILABLE)
         self.assertEqual(body["status"], "not_ready")

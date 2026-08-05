@@ -9,7 +9,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.db.session import DEFAULT_DATABASE_URL, normalize_database_url
+from app.db.session import normalize_database_url
 
 config = context.config
 
@@ -20,7 +20,10 @@ target_metadata = None
 
 
 def get_database_url() -> str:
-    return normalize_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before running Alembic migrations.")
+    return normalize_database_url(database_url)
 
 
 def run_migrations_offline() -> None:

@@ -14,7 +14,11 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = AppConfig.from_env()
     configure_logging(config.log_level)
-    configure_database(config.database_url)
+    configure_database(
+        config.database_url,
+        pool_size=config.database_pool_size,
+        max_overflow=config.database_max_overflow,
+    )
     app.state.config = config
     logger.info("backend_started", extra={"environment": config.app_env, "port": config.backend_port})
     try:

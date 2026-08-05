@@ -24,8 +24,8 @@ uv run uvicorn app.main:app --reload
 Health and readiness:
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/ready
+curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
 ```
 
 API docs are available at `http://localhost:8000/docs` while the server is running.

@@ -14,7 +14,7 @@ cd backend
 uv run pytest
 ```
 
-Result: passed. 17 tests passed.
+Result: passed. 21 tests passed.
 
 ```bash
 cd backend
@@ -47,13 +47,13 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm backend alembic down
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend alembic upgrade head
 ```
 
-Result: passed. Empty baseline migration `20260805_0001` upgrades and downgrades successfully against PostgreSQL.
+Result: passed. Baseline migration `20260805_0001` enables the pgvector `vector` extension and upgrades/downgrades successfully against PostgreSQL.
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest
 ```
 
-Result: passed. 17 tests passed in the Linux backend container.
+Result: passed. 21 tests passed in the Linux backend container.
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check src/app tests
@@ -63,11 +63,11 @@ Result: passed.
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yaml up -d backend
-Invoke-WebRequest -UseBasicParsing http://localhost:8000/health
-Invoke-WebRequest -UseBasicParsing http://localhost:8000/ready
+Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/live
+Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/ready
 ```
 
-Result: passed. `/health` returned `200` with `status: ok`; `/ready` returned `200` with `database: ok`.
+Result: passed. `/health/live` returned `200` with `status: ok`; `/health/ready` returned `200` with `database: ok`.
 
 ```bash
 git diff --check
