@@ -14,6 +14,7 @@ Implemented on branch `backend-b2-policy-catalog`.
 - Added DTO schemas so API responses do not expose SQLAlchemy entities directly.
 - Added tests for category listing, approved policy listing, inactive policy blocking, detail source fields, documents, and 404 handling.
 - Added eager loading for policy detail/document relationship reads to avoid relationship-level N+1 queries.
+- Added `PolicyStatus` enum and active policy filter helper so category, detail, and document queries all enforce approved active policy scope.
 
 ## Deferred
 

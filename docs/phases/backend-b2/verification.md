@@ -78,6 +78,7 @@ Result: passed.
 ## Notes
 
 - Migration adds policy catalog tables and seed data.
+- `PolicyStatus` enum-backed filters enforce approved active policy scope for category, detail, and document reads.
 - Seed inserts use `ON CONFLICT` so rerunning migration seed SQL or `python -m app.db.seed` updates existing rows instead of duplicating them.
 - Public B2 routes intentionally remain under `/api/...` because `docs/architecture/api-contracts.md` defines MVP endpoints without a version prefix; `/api/v1` is deferred until a breaking version is introduced.
 - B2 does not add policy evaluation, RAG chunking, or admin editing flows.

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.catalog.models import Category, Policy, PolicyDocument
+from app.catalog.models import Category, Policy, PolicyDocument, PolicyStatus
 from app.catalog.schemas import (
     CategoryResponse,
     PolicyDetailResponse,
@@ -13,7 +13,7 @@ from app.catalog.schemas import (
     PolicySummaryResponse,
 )
 
-APPROVED_POLICY_STATUS = "APPROVED"
+ACTIVE_POLICY_STATUS = PolicyStatus.APPROVED
 
 
 def category_to_response(category: Category) -> CategoryResponse:
@@ -67,10 +67,10 @@ def document_to_response(document: PolicyDocument) -> PolicyDocumentResponse:
     )
 
 
-def approved_policy_filters(policy_id: str):
+def active_policy_filters(policy_id: str):
     return (
         Policy.id == policy_id,
-        Policy.status == APPROVED_POLICY_STATUS,
+        Policy.status == ACTIVE_POLICY_STATUS,
         Policy.is_active.is_(True),
     )
 
@@ -85,7 +85,7 @@ async def list_policies_by_category(session: AsyncSession, category_code: str) -
         select(Policy)
         .where(
             Policy.category_code == category_code,
-            Policy.status == APPROVED_POLICY_STATUS,
+            Policy.status == ACTIVE_POLICY_STATUS,
             Policy.is_active.is_(True),
         )
         .order_by(Policy.title, Policy.id)
@@ -97,7 +97,7 @@ async def get_approved_policy(session: AsyncSession, policy_id: str) -> PolicyDe
     result = await session.execute(
         select(Policy)
         .options(selectinload(Policy.documents), selectinload(Policy.rules))
-        .where(*approved_policy_filters(policy_id))
+        .where(*active_policy_filters(policy_id))
     )
     policy = result.scalar_one_or_none()
     if policy is None:
@@ -107,7 +107,7 @@ async def get_approved_policy(session: AsyncSession, policy_id: str) -> PolicyDe
 
 async def list_policy_documents(session: AsyncSession, policy_id: str) -> list[PolicyDocumentResponse] | None:
     result = await session.execute(
-        select(Policy).options(selectinload(Policy.documents)).where(*approved_policy_filters(policy_id))
+        select(Policy).options(selectinload(Policy.documents)).where(*active_policy_filters(policy_id))
     )
     policy = result.scalar_one_or_none()
     if policy is None:

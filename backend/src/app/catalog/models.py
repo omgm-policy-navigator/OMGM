@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import StrEnum
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -9,6 +10,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase):
     pass
 
+
+
+
+class PolicyStatus(StrEnum):
+    APPROVED = "APPROVED"
+    DRAFT = "DRAFT"
+    INACTIVE = "INACTIVE"
 
 class Category(Base):
     __tablename__ = "category"
