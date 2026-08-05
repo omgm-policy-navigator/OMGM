@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.catalog.models import Category, Policy, PolicyDocument
 from app.catalog.schemas import (
@@ -66,6 +67,14 @@ def document_to_response(document: PolicyDocument) -> PolicyDocumentResponse:
     )
 
 
+def approved_policy_filters(policy_id: str):
+    return (
+        Policy.id == policy_id,
+        Policy.status == APPROVED_POLICY_STATUS,
+        Policy.is_active.is_(True),
+    )
+
+
 async def list_categories(session: AsyncSession) -> list[CategoryResponse]:
     result = await session.execute(select(Category).order_by(Category.sort_order, Category.code))
     return [category_to_response(category) for category in result.scalars().all()]
@@ -86,11 +95,9 @@ async def list_policies_by_category(session: AsyncSession, category_code: str) -
 
 async def get_approved_policy(session: AsyncSession, policy_id: str) -> PolicyDetailResponse | None:
     result = await session.execute(
-        select(Policy).where(
-            Policy.id == policy_id,
-            Policy.status == APPROVED_POLICY_STATUS,
-            Policy.is_active.is_(True),
-        )
+        select(Policy)
+        .options(selectinload(Policy.documents), selectinload(Policy.rules))
+        .where(*approved_policy_filters(policy_id))
     )
     policy = result.scalar_one_or_none()
     if policy is None:
@@ -99,17 +106,12 @@ async def get_approved_policy(session: AsyncSession, policy_id: str) -> PolicyDe
 
 
 async def list_policy_documents(session: AsyncSession, policy_id: str) -> list[PolicyDocumentResponse] | None:
-    policy_result = await session.execute(
-        select(Policy.id).where(
-            Policy.id == policy_id,
-            Policy.status == APPROVED_POLICY_STATUS,
-            Policy.is_active.is_(True),
-        )
+    result = await session.execute(
+        select(Policy).options(selectinload(Policy.documents)).where(*approved_policy_filters(policy_id))
     )
-    if policy_result.scalar_one_or_none() is None:
+    policy = result.scalar_one_or_none()
+    if policy is None:
         return None
 
-    result = await session.execute(
-        select(PolicyDocument).where(PolicyDocument.policy_id == policy_id).order_by(PolicyDocument.title)
-    )
-    return [document_to_response(document) for document in result.scalars().all()]
+    documents = sorted(policy.documents, key=lambda document: document.title)
+    return [document_to_response(document) for document in documents]

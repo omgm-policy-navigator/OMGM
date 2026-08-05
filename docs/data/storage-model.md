@@ -51,4 +51,4 @@ Phase B2 creates the first physical policy catalog tables:
 - `policy_document`: official source document metadata, reviewed date, collected timestamp, and document hash.
 - `policy_relation`: lightweight relation edges between policies.
 
-Seed data is inserted through Alembic with `ON CONFLICT` upserts so repeated seed execution does not duplicate catalog rows.
+Seed data is inserted through Alembic and can be reapplied through `python -m app.db.seed`; both paths use `ON CONFLICT` upserts so repeated seed execution does not duplicate catalog rows.

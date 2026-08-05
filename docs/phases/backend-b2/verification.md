@@ -31,6 +31,13 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm backend alembic upgr
 Result: passed. Migration `20260805_0002_policy_catalog` applied.
 
 ```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --rm backend python -m app.db.seed
+docker compose -f compose.yaml -f compose.dev.yaml run --rm backend python -m app.db.seed
+```
+
+Result: passed. Runtime seed command completed twice without duplicate rows.
+
+```bash
 docker compose -f compose.yaml -f compose.dev.yaml exec -T postgres psql -U marry_policy -d marry_policy -c "select (select count(*) from category) as categories, (select count(*) from policy where status='APPROVED' and is_active is true) as approved_active, (select count(*) from policy where is_active is false) as inactive;"
 ```
 
@@ -71,5 +78,6 @@ Result: passed.
 ## Notes
 
 - Migration adds policy catalog tables and seed data.
-- Seed inserts use `ON CONFLICT` so rerunning seed SQL updates existing rows instead of duplicating them.
+- Seed inserts use `ON CONFLICT` so rerunning migration seed SQL or `python -m app.db.seed` updates existing rows instead of duplicating them.
+- Public B2 routes intentionally remain under `/api/...` because `docs/architecture/api-contracts.md` defines MVP endpoints without a version prefix; `/api/v1` is deferred until a breaking version is introduced.
 - B2 does not add policy evaluation, RAG chunking, or admin editing flows.

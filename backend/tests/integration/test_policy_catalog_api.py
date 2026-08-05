@@ -77,7 +77,12 @@ def category(code: str, order: int) -> SimpleNamespace:
     return SimpleNamespace(code=code, name=code.title(), description=f"{code} policies", sort_order=order)
 
 
-def policy(policy_id: str, active: bool = True, status: str = "APPROVED") -> SimpleNamespace:
+def policy(
+    policy_id: str,
+    active: bool = True,
+    status: str = "APPROVED",
+    documents: list[SimpleNamespace] | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
         id=policy_id,
         category_code="housing",
@@ -92,6 +97,8 @@ def policy(policy_id: str, active: bool = True, status: str = "APPROVED") -> Sim
         official_source_url="https://example.go.kr/policies/housing-001",
         source_label="Official notice",
         reviewed_at=date(2026, 8, 1),
+        documents=documents or [],
+        rules=[],
     )
 
 
@@ -159,10 +166,11 @@ class PolicyCatalogApiTests(unittest.TestCase):
 
     def test_policy_documents_return_official_source_and_reviewed_date(self) -> None:
         session = AsyncMock()
-        session.execute.side_effect = [
-            FakeScalarResult([], one="policy_housing_001"),
-            FakeScalarResult([document("policy_housing_001")]),
-        ]
+        catalog_document = document("policy_housing_001")
+        session.execute.return_value = FakeScalarResult(
+            [],
+            one=policy("policy_housing_001", documents=[catalog_document]),
+        )
         app = app_with_session(session)
 
         status, body = asyncio.run(asgi_get(app, "/api/policies/policy_housing_001/documents"))
