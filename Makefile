@@ -2,7 +2,7 @@ SHELL := /bin/sh
 
 .PHONY: help check-env env-check dev dev-logs dev-down setup setup-backend setup-frontend \
 	backend-run frontend-run \
-	test test-backend test-frontend typecheck-frontend build-frontend \
+	test migrate-backend test-backend lint-backend test-frontend lint-frontend typecheck-frontend build-frontend \
 	docker-up docker-build docker-infra-up docker-down docker-ps docker-logs compose-config \
 	health verify clean
 
@@ -15,7 +15,9 @@ help:
 	@printf "%s\n" "  setup             Install backend and frontend dependencies"
 	@printf "%s\n" "  backend-run       Run FastAPI backend on port 8000"
 	@printf "%s\n" "  frontend-run      Run Vite frontend on port 5173"
-	@printf "%s\n" "  test              Run backend and frontend test/typecheck/build"
+	@printf "%s\n" "  test              Run backend and frontend verification in Docker"
+	@printf "%s\n" "  migrate-backend   Apply Alembic migrations in Docker"
+	@printf "%s\n" "  lint-backend      Run backend Ruff in Docker"
 	@printf "%s\n" "  docker-up         Build and run the full local stack"
 	@printf "%s\n" "  docker-infra-up   Run PostgreSQL/pgvector and Ollama only"
 	@printf "%s\n" "  docker-down       Stop local Docker Compose stack"
@@ -62,19 +64,28 @@ backend-run:
 frontend-run:
 	cd frontend && npm run dev
 
-test: test-backend test-frontend typecheck-frontend build-frontend
+test: migrate-backend test-backend lint-backend test-frontend lint-frontend typecheck-frontend build-frontend
+
+migrate-backend:
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm backend alembic upgrade head
 
 test-backend:
-	cd backend && . .venv/bin/activate && python -m unittest discover
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm backend pytest
+
+lint-backend:
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm backend ruff check src/app tests
 
 test-frontend:
-	cd frontend && npm test
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm --no-deps frontend npm test
+
+lint-frontend:
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm --no-deps frontend npm run lint
 
 typecheck-frontend:
-	cd frontend && npm run typecheck
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm --no-deps frontend npm run typecheck
 
 build-frontend:
-	cd frontend && npm run build
+	docker compose -f compose.yaml -f compose.dev.yaml run --build --rm --no-deps frontend npm run build
 
 docker-up: check-env
 	docker compose up --build

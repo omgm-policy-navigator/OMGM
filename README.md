@@ -48,6 +48,8 @@ make health
 
 ## 주요 명령
 
+`make test`와 `scripts/test-all.sh`는 로컬 Python·Node 설치 대신 Docker Compose 안에서 migration, 테스트, Lint, 타입 검사와 빌드를 실행합니다. Windows의 pytest 임시 폴더 및 Vite 파일 접근 권한에 영향을 받지 않습니다.
+
 ```bash
 make help
 make dev

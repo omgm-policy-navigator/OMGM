@@ -4,8 +4,10 @@
 
 - `docker compose -f compose.yaml -f compose.dev.yaml config --quiet`: 통과
 - `docker compose -f compose.yaml -f compose.dev.yaml run --build --rm backend alembic upgrade head`: 통과 (`20260805_0001`)
-- `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest`: 43 passed
+- `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest`: 64 passed (main 병합 후 전체 backend suite)
 - `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check src/app tests`: 통과
+- `docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps frontend npm test`: 1 passed
+- Frontend Docker Lint, typecheck, build: 통과
 - `python scripts/check-doc-links.py`: 통과
 - `git diff --check`: 통과
 
