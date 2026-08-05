@@ -15,6 +15,7 @@ Only `GET /health` is implemented today. All other contracts below are mockable 
 - API response schemas are client DTOs and must not be imported from SQLAlchemy entities.
 - Server state is managed through TanStack Query or an equivalent server-state cache. F0 uses TanStack Query terminology for query keys and invalidation rules.
 - Cross-panel UI state is managed by a dedicated Zustand store or split React Context. Store selectors must prevent chat input changes from rerendering graph and detail panels.
+- Cross-panel UI state stores IDs and view intent only. It must not store copied server payloads such as policy detail, graph projection, conversation responses, evaluations, or evidence arrays.
 - Component-local UI state remains inside the owning component unless another panel explicitly depends on it.
 - Error mocks use the shared error envelope:
 
@@ -56,6 +57,19 @@ Query invalidation rules:
 - Resetting or deleting the session clears session-dependent query cache entries and cross-panel selections.
 - Graph hover, zoom, draft input, and copied-link feedback never invalidate server-state queries.
 
+Required lookup pattern:
+
+```ts
+const activePolicyId = useNavigatorUiStore((state) => state.activePolicyId);
+const policyQuery = useQuery({
+  queryKey: ["policy", activePolicyId],
+  enabled: activePolicyId !== null,
+  queryFn: ({ signal }) => fetchPolicy(activePolicyId, { signal }),
+});
+```
+
+The UI store must contain `activePolicyId`, not `policyQuery.data`. Components derive the displayed server data from the server-state cache.
+
 ## MSW Mock Standard
 
 Frontend implementation phases must use MSW for API mocking rather than plain JSON-only fixtures. The handler set must live in a frontend-owned mock boundary such as `frontend/src/mocks/handlers.ts`.
@@ -69,6 +83,16 @@ Required handler groups:
 - 4xx and 5xx handlers that return the shared error envelope.
 
 Mock response variants must be selected by test setup or scenario configuration, not by changing production API client code.
+
+### Contract SSOT and Type Safety
+
+The source of truth for mock schema shape is `docs/architecture/api-contracts.md` until the backend publishes OpenAPI JSON/YAML. After OpenAPI is available, generated client DTO types become the preferred source.
+
+MSW handlers must return values typed with explicit TypeScript interfaces or generated DTO types. Each handler response should satisfy the same request and response shape as the backend contract. A frontend implementation PR that changes mock response fields must include one of these:
+
+- A matching change to `docs/architecture/api-contracts.md`.
+- A regeneration from the backend OpenAPI contract.
+- A note proving the changed field is frontend-only test data and not part of the API response.
 
 ## Mock Payloads
 
@@ -374,6 +398,39 @@ Each graph node click creates a new `graphClickToken` in cross-panel UI state. A
 
 Implementation phases must pass an `AbortSignal` through fetch-backed API clients. If the selected node changes, pending detail, graph-click, and conversation bootstrap requests should be aborted. If a library cannot cancel a request, completion handlers must compare `graphClickToken` before writing UI state.
 
+Standard hook boundary:
+
+- `usePolicyNodeSelection` owns `AbortController` lifecycle for rapid graph node switching.
+- UI store actions write only `selectedNodeId`, `activePolicyId`, `activePanel`, highlighted IDs, and a monotonic `graphClickToken`.
+- API client functions accept `{ signal?: AbortSignal }`.
+- Components must not start independent graph-click side effects that bypass this hook.
+
+Minimal implementation shape:
+
+```ts
+function usePolicyNodeSelection() {
+  const controllerRef = useRef<AbortController | null>(null);
+  const tokenRef = useRef(0);
+
+  return useCallback(async (nodeId: string, policyId: string) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const token = tokenRef.current + 1;
+    tokenRef.current = token;
+
+    setSelectedNode({ nodeId, policyId, graphClickToken: token });
+    await ensureConversationOrEvidenceTarget(nodeId, { signal: controller.signal });
+
+    if (controller.signal.aborted || token !== tokenRef.current) {
+      return;
+    }
+
+    focusCurrentNodeTarget(nodeId);
+  }, []);
+}
+```
+
 ## Accessibility and Responsive Criteria
 
 - `NavigatorPage` exposes one main landmark and each panel has an accessible name.
@@ -386,3 +443,4 @@ Implementation phases must pass an `AbortSignal` through fetch-backed API client
 - From `768px` to `1199px`, tablet uses a two-pane split layout where chat and graph remain primary and detail appears as a drawer or secondary panel.
 - At `1200px` and above, desktop uses a three-column or pinned split-panel layout where graph, chat, and selected policy detail can be visible together.
 - No horizontal scrolling is required for Korean policy names; long labels wrap or truncate with full text available through accessible text.
+- Mobile tab or drawer switching preserves draft chat input, graph zoom, graph pan, and scroll position. Prefer hiding inactive panels with CSS while removing them from keyboard and screen-reader navigation, or lift only the volatile local state that must survive an unavoidable unmount.

@@ -22,6 +22,10 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added async sequencing, stale-response guards, and `AbortController` expectations for graph node click orchestration.
 - Added MSW as the frontend API mocking standard with success, loading, network error, empty, and error-envelope handler requirements.
 - Expanded responsive layout criteria for mobile, tablet, and desktop breakpoints.
+- Added an explicit rule that Zustand or Context UI stores must keep IDs and view intent only, never copied server cache payloads.
+- Added `usePolicyNodeSelection` as the standard hook boundary for rapid graph node switching, request abortion, and stale-token checks.
+- Clarified that MSW handlers must stay aligned with `docs/architecture/api-contracts.md` or generated OpenAPI DTO types.
+- Added mobile tab/drawer state preservation rules for chat drafts, graph zoom/pan, and scroll position.
 
 ## Deferred
 

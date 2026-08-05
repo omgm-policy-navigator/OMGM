@@ -51,6 +51,8 @@ Zustand is preferred for cross-panel UI state once implementation begins because
 
 `NavigatorPage` may coordinate events, but it should not directly own chat message input, graph viewport state, expanded detail sections, or every pending flag.
 
+Cross-panel UI state must store identifiers and view intent only. It must not copy server cache data into the UI store. For example, the store may contain `selectedNodeId`, `activePolicyId`, `highlightedEvidenceId`, and `activePanel`, but it must not contain a policy detail JSON object, graph node payload list, conversation response, evaluation result, or evidence array. Panels read server data through query hooks using those IDs.
+
 ## Server State
 
 Server state is fetched from backend contracts and cached or invalidated by the frontend:
@@ -72,6 +74,12 @@ Server state is fetched from backend contracts and cached or invalidated by the 
 | `PolicyGraphPanel` | Graph projection | `["policyGraph", activePolicyId]` |
 | `PolicyDetailPanel` | Policy detail and evaluation detail | `["policy", activePolicyId]`, `["evaluation", evaluationId]` |
 | `SessionControl` | Session lifecycle mutations | `["session", "reset"]`, `["session", "delete"]` |
+
+ID-to-query examples:
+
+- `PolicyDetailPanel` reads `activePolicyId` from the UI store, then calls `useQuery({ queryKey: ["policy", activePolicyId], ... })`.
+- `PolicyGraphPanel` reads `activePolicyId`, then calls `useQuery({ queryKey: ["policyGraph", activePolicyId], ... })`.
+- `ChatPanel` reads `selectedNodeId` only to focus the related question. It does not read a copied graph node object from the UI store.
 
 Mutation success rules:
 
@@ -104,6 +112,17 @@ UI state is local browser state and must not be treated as authoritative domain 
 | `PolicyDetailPanel` | Reads `activePolicyId`, `selectedNodeId`, highlighted evidence id | Expanded evidence rows, selected detail tab, copied-link feedback. |
 | `SessionControl` | May clear cross-panel state after reset/delete | Reset confirmation dialog, button pending state. |
 
+Forbidden UI store fields:
+
+- `policyDetail`
+- `policyGraph`
+- `conversationResponse`
+- `evaluationResult`
+- `evidence`
+- raw API response bodies
+
+These belong only to the server-state cache or component-local derived variables.
+
 ## API Mock Contract
 
 Frontend F0 mock contracts are defined in `docs/contracts/frontend-f0-api-mocks.md`.
@@ -111,6 +130,8 @@ Frontend F0 mock contracts are defined in `docs/contracts/frontend-f0-api-mocks.
 The mock contract is intentionally limited to the draft endpoints already described in `docs/architecture/api-contracts.md`. It adds only frontend usage rules, graph node/edge mock shape, MSW handler requirements, loading/error/empty states, and graph-click orchestration. It does not implement backend endpoints or introduce persisted data models.
 
 MSW is the F0 standard for frontend API mocking once implementation begins. Mock handlers must live under a frontend-owned mock boundary such as `frontend/src/mocks/handlers.ts` and intercept the same HTTP paths used by production API clients.
+
+The single source of truth for mock shapes is `docs/architecture/api-contracts.md`, or a generated OpenAPI JSON/YAML file once the backend exposes one. TypeScript interfaces for MSW response bodies must mirror that source. Mock handler changes that add, remove, or rename response fields must update the backend contract or generated API type source in the same PR.
 
 ## Loading, Error, and Empty States
 
@@ -147,6 +168,60 @@ Graph node selection is a user intent with a monotonic request token:
 
 Implementation phases must cancel stale requests with `AbortController` for fetch-backed clients. When a library cannot physically cancel the work, completion handlers must check the latest selected-node token before updating cross-panel UI state.
 
+Standard implementation pattern:
+
+```ts
+type SelectPolicyNodeInput = {
+  nodeId: string;
+  policyId: string;
+  nodeType: "policy" | "condition" | "question" | "evidence";
+};
+
+function usePolicyNodeSelection() {
+  const controllerRef = useRef<AbortController | null>(null);
+  const latestTokenRef = useRef(0);
+  const setNodeSelection = useNavigatorUiStore((state) => state.setNodeSelection);
+  const getSelectedNodeId = useNavigatorUiStore((state) => state.getSelectedNodeId);
+
+  return useCallback(async (input: SelectPolicyNodeInput) => {
+    controllerRef.current?.abort();
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const token = latestTokenRef.current + 1;
+    latestTokenRef.current = token;
+
+    setNodeSelection({
+      selectedNodeId: input.nodeId,
+      activePolicyId: input.policyId,
+      graphClickToken: token,
+    });
+
+    try {
+      await ensureNodeSideEffects(input, { signal: controller.signal });
+
+      const isStale =
+        controller.signal.aborted ||
+        latestTokenRef.current !== token ||
+        getSelectedNodeId() !== input.nodeId;
+
+      if (isStale) {
+        return;
+      }
+
+      focusPanelTarget(input);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      throw error;
+    }
+  }, [getSelectedNodeId, setNodeSelection]);
+}
+```
+
+The hook owns request cancellation for graph-click orchestration. API client functions accept `AbortSignal`; UI store actions only update IDs and tokens.
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -179,6 +254,8 @@ sequenceDiagram
 
 Mobile tab state belongs to cross-panel UI state as `activePanel`; graph zoom and drawer scroll position remain local state.
 
+Mobile panel switching must preserve user work in progress. Do not unmount `ChatPanel` or `PolicyGraphPanel` during tab/drawer changes if it would reset draft answers, focused question state, graph zoom, graph pan, or scroll position. Prefer CSS visibility control such as `display: none` for inactive panels when accessibility semantics are preserved, or lift only the specific volatile state that must survive unmounting. Inactive panels must not remain reachable by keyboard or screen readers.
+
 ## Completion Criteria
 
 - Each screen's API usage is defined.
@@ -188,6 +265,8 @@ Mobile tab state belongs to cross-panel UI state as `activePanel`; graph zoom an
 - Server-state cache keys and cross-panel UI store ownership are defined.
 - Race-condition handling for graph node click orchestration is defined.
 - MSW-based mock expectations are defined.
+- UI store server-data duplication is explicitly prohibited.
+- Mobile tab/drawer panel state preservation is defined.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope

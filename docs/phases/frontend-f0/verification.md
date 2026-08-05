@@ -43,6 +43,15 @@ git diff --check
 
 Result: passed.
 
+After adding the second review follow-ups for ID-only UI store state, `usePolicyNodeSelection`, MSW contract SSOT, and mobile state preservation, these checks were rerun:
+
+```bash
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash
