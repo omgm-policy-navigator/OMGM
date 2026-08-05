@@ -94,3 +94,16 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check s
 ```
 
 Result: initial parallel run failed due Docker engine permission and then port conflicts from starting shared dependencies concurrently. The final verification used elevated Docker access, rebuilt the stale backend image, and ran backend checks sequentially with `--no-deps`.
+
+## Review Follow-up Verification
+
+After adding FSD layer import guardrails, runtime environment validation, `@/*` path aliases, API client defaults, and TanStack Query defaults, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run lint
+cd frontend && npm.cmd run typecheck
+cd frontend && npm.cmd test
+cd frontend && npm.cmd run build
+```
+
+Result: passed. Test and build used elevated filesystem access because esbuild needs normal access to load Vite config in this local environment.

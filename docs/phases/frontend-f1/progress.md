@@ -16,6 +16,11 @@ Completed on branch `frontend-f1-react-query-ui`.
 - Added frontend lint execution to GitHub Actions CI.
 - Updated frontend documentation for lint and `VITE_API_MODE`.
 - Updated phase verification records.
+- Added TypeScript and Vite `@/*` path aliases for the FSD source structure.
+- Added ESLint FSD layer-direction rules for `shared`, `entities`, `features`, and `pages`.
+- Added runtime fail-fast validation for required `VITE_*` environment variables.
+- Added explicit API client error type and mutation/query default options.
+- Configured Vitest env values so tests validate the app without depending on a live backend or local `.env`.
 
 ## Deferred
 

@@ -1,6 +1,11 @@
-import type { HealthResponse } from "../../entities/health/model";
 import { appConfig } from "../config/appConfig";
 import { getJson } from "./client";
+
+type HealthResponse = {
+  status: "ok";
+  service: string;
+  environment: string;
+};
 
 const mockHealthResponse: HealthResponse = {
   status: "ok",

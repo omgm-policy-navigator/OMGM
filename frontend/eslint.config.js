@@ -25,6 +25,70 @@ export default tseslint.config(
     },
   },
   {
+    files: ["src/shared/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/pages/**", "@/features/**", "@/entities/**"],
+              message: "shared must not depend on higher FSD layers.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/entities/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/pages/**", "@/features/**"],
+              message: "entities may depend on shared only, not app/pages/features.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/pages/**"],
+              message: "features may depend on entities/shared only, not app/pages.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/pages/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**"],
+              message: "pages must not depend on app.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test-setup.ts"],
     languageOptions: {
       globals: {

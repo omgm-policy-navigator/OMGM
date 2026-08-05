@@ -1,5 +1,5 @@
-import { HealthStatusPanel } from "../../features/health/HealthStatusPanel";
-import { AppShell } from "../../shared/ui/AppShell";
+import { HealthStatusPanel } from "@/features/health/HealthStatusPanel";
+import { AppShell } from "@/shared/ui/AppShell";
 
 export function NavigatorPage() {
   return (
