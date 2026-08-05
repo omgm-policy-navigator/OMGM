@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from ipaddress import ip_address
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -36,10 +37,22 @@ class AICitation(BaseModel):
     @classmethod
     def validate_public_http_url(cls, value: str) -> str:
         parsed = urlparse(value)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("citation url must be an absolute http or https URL")
-        if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
-            raise ValueError("citation url must not point to a local address")
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("citation url must use http or https")
+        if not parsed.hostname:
+            raise ValueError("citation url must include a host")
+
+        hostname = parsed.hostname.rstrip(".").lower()
+        if hostname == "localhost" or hostname.endswith(".localhost"):
+            raise ValueError("citation url must not point to a local host")
+
+        try:
+            address = ip_address(hostname)
+        except ValueError:
+            return value
+
+        if not address.is_global:
+            raise ValueError("citation url must use a public address")
         return value
 
 

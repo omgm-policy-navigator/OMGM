@@ -14,6 +14,7 @@ Completed on branch `ai-phase-a0`.
 - Added schema contract tests for alias serialization, null `nextQuestion`, unknown fields, and invalid result statuses.
 - Added status-dependent schema invariants for `ANSWERED`, `NEEDS_CONFIRMATION`, `INSUFFICIENT_EVIDENCE`, `LLM_UNAVAILABLE`, and `SAFETY_BLOCKED`.
 - Added citation URL, non-empty identifier, evidence provenance, duplicate citation, and matched/missing condition conflict validation.
+- Strengthened citation URL validation to reject private, loopback, link-local, and localhost IP literals.
 - Kept this branch scoped to AI A0. Analysis D0 raw policy contracts are intentionally not included.
 
 ## Deferred

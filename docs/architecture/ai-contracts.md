@@ -71,7 +71,9 @@ Allowed `resultStatus` values:
 
 `citations` must reference approved sources with `sourceId`, `title`, `url`, `policyVersionId`, and `evidenceId`. `evidenceId` identifies the approved evidence unit, such as a document chunk. Excerpts are optional, capped, and must not include sensitive user facts.
 
-Citation URLs must be absolute `http` or `https` URLs. `javascript:`, local file paths, localhost URLs, and internal administrator URLs must not be exposed. The stored URL should be the canonical public source URL, not a redirect URL.
+Citation URLs must be absolute `http` or `https` URLs. `javascript:`, local file paths, localhost URLs, private IP literals, link-local IP literals, loopback IP literals, and internal administrator URLs must not be exposed. The stored URL should be the canonical public source URL, not a redirect URL.
+
+Schema validation rejects non-public IP literals with Python `ipaddress`. Domain names are not resolved during schema validation; any later server-side fetch, link preview, source canonicalization, or citation verification must validate DNS resolution results immediately before fetching.
 
 `nextQuestion` is either `null` or one follow-up question with `questionId`, `prompt`, and `factKey`.
 

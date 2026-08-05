@@ -61,6 +61,8 @@ Phase 0에는 업로드 기능이 없다. 향후 서류 업로드가 생기면 �
 
 LLM은 SQL 실행, 정책 Rule 수정, 공식 신청 수행, 출처 없는 정책 사실 생성을 수행하지 않는다. RAG 근거가 부족하면 정책 사실을 생성하지 않고 fallback 상태를 반환한다.
 
+AI citation URL은 공개 HTTP(S) 출처만 허용한다. Schema는 사설·loopback·link-local IP literal을 차단하고, 서버가 향후 citation URL을 fetch하는 기능은 DNS 해석 결과도 fetch 직전에 검증해야 한다.
+
 ## 관리자 접근
 
 운영자는 정책 수집 상태, 구조화 검증 상태, 변경 이력, 오류를 확인한다. 민감 사용자 데이터 접근은 최소 권한과 감사 로그를 전제로 한다.

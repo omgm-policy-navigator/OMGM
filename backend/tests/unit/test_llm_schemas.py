@@ -125,35 +125,53 @@ class AIOutputSchemaTests(unittest.TestCase):
             )
 
     def test_citation_url_must_be_public_http_url(self) -> None:
-        with self.assertRaises(ValidationError):
-            AIOutput(
-                answer="공고를 확인했습니다.",
-                resultStatus="ANSWERED",
-                citations=[
-                    {
-                        "sourceId": "doc_1",
-                        "title": "공고",
-                        "url": "javascript:alert(1)",
-                        "policyVersionId": "policy_version_1",
-                        "evidenceId": "chunk_1",
-                    }
-                ],
-            )
+        blocked_urls = [
+            "javascript:alert(1)",
+            "file:///tmp/policy.pdf",
+            "http://localhost/policy/1",
+            "http://service.localhost/policy/1",
+            "http://127.0.0.1/policy/1",
+            "http://10.0.0.1/internal",
+            "http://192.168.0.10/admin",
+            "http://172.16.0.5/document",
+            "http://169.254.169.254/latest/meta-data",
+            "http://[fc00::1]/internal",
+            "http://[::1]/internal",
+        ]
 
-        with self.assertRaises(ValidationError):
-            AIOutput(
-                answer="공고를 확인했습니다.",
-                resultStatus="ANSWERED",
-                citations=[
-                    {
-                        "sourceId": "doc_1",
-                        "title": "공고",
-                        "url": "http://localhost/policy/1",
-                        "policyVersionId": "policy_version_1",
-                        "evidenceId": "chunk_1",
-                    }
-                ],
-            )
+        for url in blocked_urls:
+            with self.subTest(url=url):
+                with self.assertRaises(ValidationError):
+                    AIOutput(
+                        answer="공고를 확인했습니다.",
+                        resultStatus="ANSWERED",
+                        citations=[
+                            {
+                                "sourceId": "doc_1",
+                                "title": "공고",
+                                "url": url,
+                                "policyVersionId": "policy_version_1",
+                                "evidenceId": "chunk_1",
+                            }
+                        ],
+                    )
+
+    def test_citation_url_allows_public_http_domain(self) -> None:
+        output = AIOutput(
+            answer="공고를 확인했습니다.",
+            resultStatus="ANSWERED",
+            citations=[
+                {
+                    "sourceId": "doc_1",
+                    "title": "공고",
+                    "url": "https://example.go.kr/policy/1",
+                    "policyVersionId": "policy_version_1",
+                    "evidenceId": "chunk_1",
+                }
+            ],
+        )
+
+        self.assertEqual(output.citations[0].url, "https://example.go.kr/policy/1")
 
     def test_empty_identifier_fields_are_rejected(self) -> None:
         with self.assertRaises(ValidationError):
