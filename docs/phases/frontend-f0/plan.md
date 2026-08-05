@@ -81,33 +81,45 @@ type NavigatorUiState = {
 
 Code review for frontend implementation must reject UI store fields typed as API response DTOs, arrays of graph nodes from the server, evidence arrays, conversation responses, policy details, or evaluation results.
 
-The guardrail must also be automated. Frontend TypeScript config keeps `strict`, `noImplicitAny`, and `strictNullChecks` enabled. Implementation phases that add ESLint must include restricted import rules that prevent UI store files from importing API DTO modules or generated response types, and prevent components from importing low-level fetch or axios clients directly. Components call feature hooks; hooks call API clients.
+The guardrail must also be automated. Frontend TypeScript config keeps `strict`, `noImplicitAny`, and `strictNullChecks` enabled. Implementation phases that add ESLint must prevent UI store fields from being declared as full API DTO objects, and prevent components from importing low-level fetch or axios clients directly. Components call feature hooks; hooks call API clients.
 
-Example restricted-import intent:
+ESLint rules must be precise enough to allow ID-only type extraction while blocking full DTO storage. For example, `PolicyDetailResponse["policyId"]`, branded ID aliases, or `Pick<PolicySummaryResponse, "policyId">` are acceptable for identifiers. A store field such as `selectedNodeDetail: PolicyDetailResponse`, `graph: PolicyGraphResponse`, or `evaluation: EvaluationResponse` is not acceptable. If this cannot be expressed with `no-restricted-imports` alone, use a custom AST rule for store files that flags properties whose type annotation references full response DTO names or generated response paths.
+
+Example lint intent:
 
 ```js
 {
-  "rules": {
-    "no-restricted-imports": [
-      "error",
-      {
-        "patterns": [
+  "overrides": [
+    {
+      "files": ["frontend/src/**/*.{tsx,jsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
           {
-            "group": ["**/generated/api-types", "**/api/dto/**"],
-            "message": "UI stores must keep IDs and pure UI flags only. Do not import API DTOs into store files."
-          },
-          {
-            "group": ["axios", "**/api/client"],
-            "message": "Components must call feature hooks instead of direct HTTP clients."
+            "patterns": [
+              {
+                "group": ["axios", "**/api/client"],
+                "message": "Components must call feature hooks instead of direct HTTP clients."
+              }
+            ]
           }
         ]
       }
-    ]
+    },
+    {
+      "files": ["frontend/src/**/*store*.ts", "frontend/src/**/*ui-store*.ts"],
+      "rules": {
+        "omgm/no-server-dto-in-ui-store": "error"
+      }
+    }
+  ],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error"
   }
 }
 ```
 
-If the repo adopts file-scoped overrides, the DTO import restriction must apply to store paths such as `frontend/src/**/store*.ts` and `frontend/src/**/ui-store*.ts`; the direct HTTP client restriction must apply to React component files.
+The custom store rule should inspect property signatures inside UI store types. It should reject full response-object property types but allow primitive fields, literal unions, booleans, numbers, action functions, and ID extraction utility types.
 
 ## Server State
 
@@ -212,16 +224,20 @@ const policyDetailMock: PolicyDetailResponse = {
 };
 ```
 
-CI for the implementation phase should include API type generation and TypeScript typecheck. If OpenAPI is not available yet, typed local DTO interfaces must be colocated with the mock handlers and reviewed against `docs/architecture/api-contracts.md`.
+CI for the implementation phase should include API type verification and TypeScript typecheck. If OpenAPI is not available yet, typed local DTO interfaces must be colocated with the mock handlers and reviewed against `docs/architecture/api-contracts.md`.
 
-OpenAPI type sync must be fail-fast in CI once the backend exports OpenAPI. The expected check is:
+OpenAPI type sync must not depend on a live backend server or remote schema URL during ordinary frontend PR CI. The normal frontend CI path uses a repository-committed OpenAPI snapshot, for example `docs/contracts/openapi.json` or `frontend/src/generated/openapi.json`, as the source of truth.
 
-1. Build or start the backend OpenAPI source.
+The expected check is:
+
+1. Read the committed OpenAPI snapshot from the repository.
 2. Generate frontend API types into the committed schema type file, for example `frontend/src/generated/api.schema.d.ts`.
 3. Run a clean diff check.
 4. Run frontend typecheck and tests.
 
 If generated `api.schema.d.ts` differs from the committed file, CI fails and the PR must include the regenerated type file plus any required MSW handler updates. Local-only generation without a CI diff check is not sufficient.
+
+Refreshing the OpenAPI snapshot from a running backend, remote artifact, scheduled job, or manual workflow is a separate workflow from ordinary frontend UI CI. Backend network failure must not block unrelated frontend-only PRs as long as the committed OpenAPI snapshot and generated frontend types are internally consistent.
 
 ## Loading, Error, and Empty States
 
@@ -265,6 +281,29 @@ const policyDetailQuery = useQuery({
   queryKey: ["policy", selectedNodeId],
   queryFn: ({ signal }) => fetchPolicyDetail(selectedNodeId, { signal }),
   enabled: selectedNodeId !== null,
+});
+```
+
+Abort behavior must be covered by an integration test, because lint rules cannot reliably prove that every adapter receives `signal`. The default test template should include rapid selection of the same query family and assert that the first request is aborted or ignored without showing error UI.
+
+```ts
+it("cancels or ignores stale policy detail requests during rapid node selection", async () => {
+  const requests: AbortSignal[] = [];
+
+  server.use(
+    http.get("/api/policies/:policyId", async ({ request }) => {
+      requests.push(request.signal);
+      await delay(100);
+      return HttpResponse.json(policyDetailMock);
+    }),
+  );
+
+  render(<NavigatorPage />);
+  await user.click(screen.getByRole("button", { name: "condition A" }));
+  await user.click(screen.getByRole("button", { name: "condition B" }));
+
+  expect(requests[0].aborted).toBe(true);
+  expect(screen.queryByText(/요청 실패/)).not.toBeInTheDocument();
 });
 ```
 
@@ -397,6 +436,20 @@ const PolicyGraphPanel = memo(function PolicyGraphPanel({
 });
 ```
 
+When a panel must remain mounted only to preserve state, split it into a lightweight state shell and a heavy visible body. The shell may subscribe to `activePanel`; the heavy body should mount or compute only when active.
+
+```tsx
+function PolicyGraphPanelShell({ isActivePanel }: { isActivePanel: boolean }) {
+  const viewportState = useGraphViewportState();
+
+  return (
+    <section hidden={!isActivePanel} aria-hidden={!isActivePanel}>
+      {isActivePanel ? <PolicyGraphBody viewportState={viewportState} /> : null}
+    </section>
+  );
+}
+```
+
 ## Completion Criteria
 
 - Each screen's API usage is defined.
@@ -415,6 +468,10 @@ const PolicyGraphPanel = memo(function PolicyGraphPanel({
 - TypeScript strictness, restricted import linting, and OpenAPI type-sync CI guardrails are specified.
 - TanStack Query requests use `queryFn` signals rather than duplicate manual controllers.
 - Inactive mounted panels skip expensive subscriptions and derived work.
+- OpenAPI type-sync CI uses committed schema snapshots and isolates live backend refresh.
+- UI store linting allows ID utility types while rejecting full response DTO storage.
+- MSW integration tests cover stale request cancellation or ignore behavior.
+- Mobile state shells may stay mounted while heavy panel bodies pause or unmount when inactive.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope

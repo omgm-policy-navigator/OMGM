@@ -104,9 +104,10 @@ Frontend implementation review must reject UI store additions whose type is an A
 This rule must be enforced by compiler and linter configuration when implementation begins:
 
 - `frontend/tsconfig.json` keeps `strict`, `noImplicitAny`, and `strictNullChecks` enabled.
-- Store files must not import generated API response types or DTO modules.
+- Store files must not declare fields as generated API response objects or DTO response objects.
+- ID-only type extraction from DTOs is allowed when it narrows to primitive identifiers, such as `PolicyDetailResponse["policyId"]`.
 - React component files must not import low-level HTTP clients directly; components use feature hooks.
-- ESLint `no-restricted-imports` or an equivalent custom rule should fail PRs that cross these boundaries.
+- ESLint `no-restricted-imports` may handle direct HTTP imports in components, but UI store DTO checks should use a custom AST rule or equivalent typed lint rule so type-only ID utility imports are not blocked unnecessarily.
 
 ## MSW Mock Standard
 
@@ -166,10 +167,32 @@ Before OpenAPI exists, the same handler must use an explicit local `PolicyDetail
 
 CI/CD guardrail once OpenAPI exists:
 
-- Generate `frontend/src/generated/api.schema.d.ts` from backend OpenAPI using `openapi-typescript` or an equivalent tool.
+- Generate `frontend/src/generated/api.schema.d.ts` from a committed OpenAPI snapshot using `openapi-typescript` or an equivalent tool.
 - Fail if generated output differs from the committed file.
 - Run frontend typecheck after generation so MSW handler drift fails fast.
 - Treat manual MSW response changes without regenerated types as incomplete.
+- Keep live backend OpenAPI fetching out of ordinary frontend PR CI. Refreshing the committed OpenAPI snapshot from a running backend, remote artifact, scheduled job, or manual sync workflow is separate so backend network availability does not block UI-only PRs.
+
+## MSW Environment Boundaries
+
+MSW must have separate Node and browser entry points:
+
+- `frontend/src/mocks/handlers.ts`: shared handler definitions only.
+- `frontend/src/mocks/server.ts`: Node/Vitest entry using `setupServer`.
+- `frontend/src/mocks/browser.ts`: local browser development entry using `setupWorker`.
+
+Vitest setup must own the Node server lifecycle:
+
+```ts
+import { afterAll, afterEach, beforeAll } from "vitest";
+import { server } from "./mocks/server";
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+Browser development should start `worker.start()` only from the app's development bootstrap path. Tests must not import `browser.ts`, and production builds must not start MSW.
 
 ## Mock Payloads
 
@@ -485,6 +508,8 @@ useQuery({
 });
 ```
 
+MSW integration tests should cover rapid switching. At minimum, one test should simulate selecting node A and immediately selecting node B, then verify stale node A response is aborted or ignored and no user-facing error is displayed.
+
 Standard hook boundary:
 
 - `usePolicyNodeSelection` owns `AbortController` lifecycle for rapid graph node switching.
@@ -554,3 +579,4 @@ function usePolicyNodeSelection() {
 - Mobile tab or drawer switching preserves draft chat input, graph zoom, graph pan, and scroll position. Prefer hiding inactive panels with CSS while removing them from keyboard and screen-reader navigation, or lift only the volatile local state that must survive an unavoidable unmount.
 - Hidden mobile panels must pause expensive work. A graph rendered in canvas or SVG must stop `requestAnimationFrame`, physics simulation ticks, resize observers that trigger layout work, or heavy redraw timers while the graph tab/drawer is inactive. Paused work resumes only when the panel is visible again.
 - Hidden mobile panels must avoid expensive rerender work. Keep persisted UI state, but use `React.memo`, narrow store selectors, query `enabled` flags, and an `isActivePanel` prop so inactive panels skip graph layout mapping, parsing, canvas redraw, virtual-list measurement, and other heavy derived computations.
+- If display hiding keeps too much work alive, split the panel into a lightweight mounted shell that preserves state and a heavy body that mounts, subscribes, animates, or computes only while active.

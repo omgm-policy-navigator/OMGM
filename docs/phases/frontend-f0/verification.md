@@ -71,6 +71,16 @@ git diff --check
 
 Result: passed.
 
+After adding the fifth review follow-ups for OpenAPI snapshot-based CI isolation, precise UI-store lint targeting, MSW Node/browser entry separation, rapid-switch abort integration tests, and mobile shell/body render separation, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run typecheck
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash

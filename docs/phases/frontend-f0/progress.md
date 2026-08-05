@@ -34,6 +34,11 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added compiler, restricted import lint, and OpenAPI type-sync CI guardrails for future implementation phases.
 - Clarified TanStack Query cancellation must use `queryFn` `signal` instead of duplicate manual controllers.
 - Added inactive mounted-panel rerender guardrails using `React.memo`, narrow selectors, query `enabled`, and `isActivePanel`.
+- Isolated OpenAPI type-sync CI from live backend availability by requiring committed schema snapshots for ordinary frontend PR checks.
+- Refined UI store lint guidance so ID-only utility type extraction is allowed while full response DTO storage is blocked.
+- Added MSW `handlers.ts`, `server.ts`, and `browser.ts` environment boundaries and Vitest lifecycle requirements.
+- Added an MSW integration-test expectation for rapid node selection cancellation or stale-response ignoring.
+- Added a lightweight shell/heavy body pattern for mobile panels that need state preservation without background render cost.
 
 ## Deferred
 
