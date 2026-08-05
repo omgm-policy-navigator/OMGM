@@ -69,6 +69,7 @@ class AIOutput(BaseModel):
 
     answer: str = Field(min_length=1, max_length=2000)
     result_status: AIResultStatus = Field(alias="resultStatus")
+    is_fallback: bool = False
     matched_conditions: list[AIConditionReference] = Field(default_factory=list, alias="matchedConditions")
     missing_conditions: list[AIConditionReference] = Field(default_factory=list, alias="missingConditions")
     citations: list[AICitation] = Field(default_factory=list)
