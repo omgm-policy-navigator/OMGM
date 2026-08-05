@@ -152,6 +152,6 @@ Default Ollama generation settings:
 - Temperature: `0.1`
 - Timeout: `30` seconds
 
-Runtime health checks report `READY`, `MODEL_NOT_INSTALLED`, or `UNAVAILABLE`. Provider failures are contained inside the LLM boundary and must not make the backend process unhealthy by themselves.
+Runtime health checks report `READY`, `MODEL_NOT_INSTALLED`, or `UNAVAILABLE`. Provider failures are contained inside the LLM boundary and must not make the backend process unhealthy by themselves. `create_available_llm_provider` falls back to the template provider when the configured provider is not ready.
 
-Ollama JSON responses are parsed and validated as `AIOutput`. Invalid JSON or schema violations are treated as provider failures, not as eligibility evidence. The LLM runtime must not log prompts, raw sensitive user facts, or full raw model responses.
+Ollama uses an explicit async `httpx.Timeout` with the configured timeout value. Ollama JSON responses are extracted from pure JSON, fenced JSON, or surrounding explanatory text and then validated as `AIOutput`. Invalid JSON or schema violations are treated as provider failures, not as eligibility evidence. The LLM runtime must not log prompts, raw sensitive user facts, or full raw model responses.

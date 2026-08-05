@@ -22,6 +22,9 @@ class FakeLLMProvider:
     async def health(self) -> LLMHealth:
         return LLMHealth(status=LLMHealthStatus.READY, provider=self.provider_name, model=self.model)
 
+    async def check_health(self) -> bool:
+        return True
+
     async def generate(self, request: LLMRequest) -> AIOutput:
         self.requests.append(request)
         return AIOutput.model_validate(deepcopy(self.output.model_dump(by_alias=True)))
@@ -35,6 +38,9 @@ class TemplateLLMProvider:
 
     async def health(self) -> LLMHealth:
         return LLMHealth(status=LLMHealthStatus.READY, provider=self.provider_name, model=self.model)
+
+    async def check_health(self) -> bool:
+        return True
 
     async def generate(self, request: LLMRequest) -> AIOutput:
         _ = request

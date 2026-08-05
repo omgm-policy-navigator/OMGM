@@ -13,6 +13,9 @@ Implemented on branch `ai-a1-local-llm-runtime`.
 - Added `FakeLLMProvider` for deterministic replacement in tests.
 - Added `TemplateLLMProvider` returning the safe `LLM_UNAVAILABLE` fallback without inventing policy facts.
 - Added provider factory selection through `LLM_PROVIDER`.
+- Added health-based fallback selection through `create_available_llm_provider`.
+- Added robust JSON extraction for pure JSON, fenced JSON, and text-wrapped JSON responses.
+- Added runtime-checkable provider protocol health compatibility through `check_health`.
 - Added tests for provider swapping, health states, model missing handling, timeout handling, connection failure handling, and JSON contract validation.
 
 ## Deferred

@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-import json
+import logging
 from typing import Any
 
 import httpx
-from pydantic import ValidationError
 
+from app.llm.json_parser import parse_ai_output_json
 from app.llm.providers import (
     LLMHealth,
     LLMHealthStatus,
-    LLMInvalidJSONError,
     LLMModelNotInstalledError,
     LLMRequest,
     LLMTimeoutError,
     LLMUnavailableError,
 )
 from app.llm.schemas import AIOutput
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaLLMProvider:
@@ -33,7 +34,15 @@ class OllamaLLMProvider:
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.temperature = temperature
-        self._client = client
+        self._owns_client = client is None
+        self._client = client or httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(timeout_seconds),
+        )
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self._client.aclose()
 
     async def health(self) -> LLMHealth:
         try:
@@ -42,12 +51,16 @@ class OllamaLLMProvider:
             return LLMHealth(status=LLMHealthStatus.UNAVAILABLE, provider=self.provider_name, model=self.model)
 
         if self.model not in models:
+            logger.warning("Ollama model is not installed", extra={"model": self.model})
             return LLMHealth(
                 status=LLMHealthStatus.MODEL_NOT_INSTALLED,
                 provider=self.provider_name,
                 model=self.model,
             )
         return LLMHealth(status=LLMHealthStatus.READY, provider=self.provider_name, model=self.model)
+
+    async def check_health(self) -> bool:
+        return (await self.health()).status == LLMHealthStatus.READY
 
     async def generate(self, request: LLMRequest) -> AIOutput:
         payload: dict[str, Any] = {
@@ -73,14 +86,9 @@ class OllamaLLMProvider:
             raise LLMUnavailableError("Ollama generation failed.") from exc
 
         raw_output = response.get("response")
-        if not isinstance(raw_output, str) or not raw_output.strip():
-            raise LLMInvalidJSONError("Ollama response did not include JSON text.")
-
-        try:
-            decoded = json.loads(raw_output)
-            return AIOutput.model_validate(decoded)
-        except (json.JSONDecodeError, ValidationError) as exc:
-            raise LLMInvalidJSONError("Ollama response did not match AIOutput JSON contract.") from exc
+        if not isinstance(raw_output, str):
+            raise LLMUnavailableError("Ollama response did not include text output.")
+        return parse_ai_output_json(raw_output)
 
     async def _installed_models(self) -> set[str]:
         try:
@@ -96,29 +104,11 @@ class OllamaLLMProvider:
         return {model["name"] for model in models if isinstance(model, dict) and isinstance(model.get("name"), str)}
 
     async def _get(self, path: str) -> dict[str, Any]:
-        async with self._client_context() as client:
-            response = await client.get(path)
-            response.raise_for_status()
-            return response.json()
+        response = await self._client.get(path)
+        response.raise_for_status()
+        return response.json()
 
     async def _post(self, path: str, json_payload: dict[str, Any]) -> dict[str, Any]:
-        async with self._client_context() as client:
-            response = await client.post(path, json=json_payload)
-            response.raise_for_status()
-            return response.json()
-
-    def _client_context(self) -> httpx.AsyncClient:
-        if self._client is not None:
-            return _BorrowedAsyncClient(self._client)
-        return httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout_seconds)
-
-
-class _BorrowedAsyncClient:
-    def __init__(self, client: httpx.AsyncClient) -> None:
-        self.client = client
-
-    async def __aenter__(self) -> httpx.AsyncClient:
-        return self.client
-
-    async def __aexit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
-        return None
+        response = await self._client.post(path, json=json_payload)
+        response.raise_for_status()
+        return response.json()
