@@ -129,7 +129,8 @@ def _verify_checksums(directory: Path) -> None:
         path = directory / filename.strip()
         if not path.is_file():
             raise PolicySeedError(f"Checksummed policy seed file is missing: {filename.strip()}")
-        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        normalized_bytes = path.read_bytes().replace(b"\r\n", b"\n")
+        actual = hashlib.sha256(normalized_bytes).hexdigest()
         if actual != expected:
             raise PolicySeedError(f"Policy seed checksum mismatch: {filename.strip()}")
 

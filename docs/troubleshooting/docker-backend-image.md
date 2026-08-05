@@ -38,3 +38,9 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps frontend n
 ```
 
 `--build`가 붙은 첫 실행은 현재 Dockerfile과 lockfile을 이미지에 반영한다. 이후 동일 이미지의 명령은 소스 볼륨 또는 빌드된 이미지 기준으로 실행된다.
+
+## CI에서만 policy seed 테스트가 실패하는 경우
+
+Windows 작업 트리는 CSV를 CRLF로 checkout할 수 있고 GitHub Actions의 Linux 작업 트리는 LF로 checkout한다. 원시 bytes 체크섬은 같은 CSV 내용도 서로 다른 파일로 판단한다.
+
+Policy seed 로더는 체크섬 계산 전에 CRLF를 LF로 정규화한다. `SHA256SUMS`를 갱신할 때도 LF 정규화 bytes를 기준으로 계산해야 하며, 실제 셀 내용 변경은 계속 탐지한다.

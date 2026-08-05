@@ -56,3 +56,15 @@ def test_changed_seed_file_is_rejected(tmp_path: Path) -> None:
         assert "checksum mismatch" in str(exc)
     else:
         raise AssertionError("changed seed file should be rejected")
+
+
+def test_seed_checksums_are_portable_across_line_endings(tmp_path: Path) -> None:
+    copied_seed = tmp_path / "policy-seed"
+    copytree(SEED_DIRECTORY, copied_seed)
+    for path in copied_seed.iterdir():
+        if path.name != "SHA256SUMS":
+            path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+    catalog = load_policy_seed(copied_seed)
+
+    assert len(catalog.policies) == 38
