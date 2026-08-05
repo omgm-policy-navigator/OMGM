@@ -404,3 +404,29 @@ Saved policy and notification contracts are intentionally not fixed in B0. They 
 ## Mock Contract Rules
 
 Mocks must preserve the response envelopes, status strings, and null handling defined here. Mock data must be synthetic and must not include real personal data or real application records.
+
+### `GET /ready`
+
+Returns process readiness and verifies that PostgreSQL accepts a simple query. This endpoint is intended for local and container readiness checks; it does not expose connection strings or database error details.
+
+Response `200`:
+
+```json
+{
+  "status": "ok",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "ok"
+}
+```
+
+Response `503` when PostgreSQL cannot be reached:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "unavailable"
+}
+```

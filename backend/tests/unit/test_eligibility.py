@@ -2,8 +2,8 @@ import unittest
 
 from app.modules.eligibility.rules import (
     Condition,
-    EvaluationState,
     EligibilityStatus,
+    EvaluationState,
     detect_conflict,
     evaluate_conditions,
     mark_stale,

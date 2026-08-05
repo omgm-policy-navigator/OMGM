@@ -82,3 +82,9 @@ Backend tests are grouped as:
 - `backend/tests/fixtures`: non-sensitive samples only.
 
 Any API contract change must update `docs/architecture/api-contracts.md` in the same PR. Any backend ownership change must update this document and `docs/architecture/module-boundaries.md` if repository-level boundaries change.
+
+## Phase B1 Database Baseline
+
+Phase B1 introduces SQLAlchemy async engine setup in `app/db/session.py`, Alembic migration wiring, and a database-backed readiness endpoint. No persistence entities are introduced in this phase; the initial migration is an empty baseline so future schema phases can build on a verified migration path.
+
+`GET /health` remains a process health check. `GET /ready` performs a PostgreSQL `select 1` through the configured async engine and returns `503` without raw database error details when the connection is unavailable.

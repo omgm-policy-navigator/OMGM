@@ -49,7 +49,8 @@ async def asgi_request(app, method: str, path: str, body: dict[str, Any] | None 
             raise
 
     status = next(message["status"] for message in messages if message["type"] == "http.response.start")
-    response_body = b"".join(message.get("body", b"") for message in messages if message["type"] == "http.response.body")
+    body_messages = (message.get("body", b"") for message in messages if message["type"] == "http.response.body")
+    response_body = b"".join(body_messages)
     return status, json.loads(response_body)
 
 
