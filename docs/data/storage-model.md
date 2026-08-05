@@ -20,6 +20,8 @@ MVP 기준 PostgreSQL은 다음 데이터 영역을 관리한다.
 MVP 실행 기준 데이터는 `backend/data/policy-seed/`에 저장한다. 현재 기준본은 정책 38개, 질문 49개, Rule 133개, 관계 24개, RAG 문서 38개다.
 
 - 백엔드는 시작 시 CSV ID 중복, 참조 무결성, 공식 URL 형식, 정책별 RAG 문서 존재 여부를 검증한다.
+- 질문 option은 UI `label`과 사용자 사실/Rule 비교용 canonical `value`를 분리한다. Rule의 결정형 계산 가능 여부는 `evaluation_mode`로 명시한다.
+- CSV header, enum 필드, boolean, ISO 날짜와 신청 기간 순서를 시작 시 fail-fast로 검증한다.
 - `SHA256SUMS`는 기준본 11개 파일의 저장소 내 변경을 검증한다.
 - CSV는 읽기 전용이며 API 요청 중 변경하지 않는다.
 - 사용자 사실 및 평가 template CSV는 스키마 참고용 빈 파일이며 개인정보를 저장하지 않는다.

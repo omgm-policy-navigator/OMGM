@@ -34,7 +34,7 @@ LLM 출력은 `app.llm.AIOutput` 계약을 따른다. 근거가 부족하면 `IN
 
 ## 근거 없는 생성 방지
 
-출처 URL과 근거 문구가 없는 조건은 확정 판정 근거로 사용하지 않는다. `OFFICIAL_THRESHOLD`, `OFFICIAL_PERIOD`, `ANNOUNCEMENT_THRESHOLD` 등 placeholder가 포함된 Rule은 공식 확인 필요로 분류하고 결정형 계산에서 제외한다. 설명은 판정 결과를 바꾸지 않는다.
+출처 URL과 근거 문구가 없는 조건은 확정 판정 근거로 사용하지 않는다. Rule의 명시적 `evaluation_mode`가 `OFFICIAL_CONFIRMATION_REQUIRED`이면 기대값 문자열과 무관하게 결정형 계산에서 제외한다. 설명은 판정 결과를 바꾸지 않는다.
 
 ## 정책 버전과 판정 연결
 

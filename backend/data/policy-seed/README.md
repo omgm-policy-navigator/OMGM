@@ -23,8 +23,14 @@
 2. 공공임대는 단지·회차별 모집공고에 따라 조건이 달라집니다.
 3. 대출 금리·한도·소득·자산 기준은 접수일과 금융기관 심사에 따라 달라질 수 있습니다.
 4. 서울시 사업은 예산 소진, 연도별 공고, 시범사업 종료·개편 가능성이 있습니다.
-5. `OFFICIAL_THRESHOLD`, `ANNOUNCEMENT_THRESHOLD`, `OFFICIAL_PERIOD` 값은 운영 시 공식 원문 수집기로 치환해야 합니다.
+5. `evaluation_mode=OFFICIAL_CONFIRMATION_REQUIRED` Rule은 공식 기준 확인 전 결정형 판정에서 제외합니다.
 6. CSV는 Excel 한글 깨짐 방지를 위해 UTF-8 BOM으로 저장했습니다.
+
+## 질문과 Rule 값 계약
+
+- 질문 선택지는 `{"label":"혼인신고 완료","value":"MARRIED"}` 형태이며 UI에는 `label`, 사용자 사실과 Rule 비교에는 `value`를 사용합니다.
+- `show_condition`은 `condition_key`, `operator`, `value` 세 필드를 정확히 사용하며 `value`도 canonical value입니다.
+- Rule의 `evaluation_mode`가 `DETERMINISTIC`인 경우에만 구조화된 사용자 사실과 비교합니다.
 
 ## 권장 적재 순서
 category → policy → question → policy_rule → policy_relation → policy_document

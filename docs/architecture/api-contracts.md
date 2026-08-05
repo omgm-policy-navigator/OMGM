@@ -266,7 +266,11 @@ Response `201`:
       "prompt": "거주 지역을 확인해 주세요.",
       "answerType": "single_select",
       "required": true,
-      "options": ["서울", "경기", "인천"]
+      "options": [
+        {"label": "서울", "value": "SEOUL"},
+        {"label": "경기", "value": "GYEONGGI"},
+        {"label": "인천", "value": "INCHEON"}
+      ]
     }
   ]
 }
@@ -284,7 +288,7 @@ Request:
     {
       "questionId": "q_region",
       "factKey": "region",
-      "value": "서울",
+      "value": "SEOUL",
       "confirmed": true
     }
   ]
