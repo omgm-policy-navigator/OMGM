@@ -121,6 +121,13 @@ Example lint intent:
 
 The custom store rule should inspect property signatures inside UI store types. It should reject full response-object property types but allow primitive fields, literal unions, booleans, numbers, action functions, and ID extraction utility types.
 
+Guardrail rules must not be bypassable through inline comments or `any` casts. Frontend implementation CI should run ESLint with `--report-unused-disable-directives --max-warnings=0`; for critical custom rules, use `--no-inline-config` in the dedicated guardrail job or a separate script that scans store files for `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, and `as any`. If a rare exception is needed, it must be a named allowlist entry in the lint rule configuration, not an inline suppression in product code.
+
+```bash
+npm run lint -- --report-unused-disable-directives --max-warnings=0
+npm run lint:guardrails -- --no-inline-config
+```
+
 ## Server State
 
 Server state is fetched from backend contracts and cached or invalidated by the frontend:
@@ -239,6 +246,21 @@ If generated `api.schema.d.ts` differs from the committed file, CI fails and the
 
 Refreshing the OpenAPI snapshot from a running backend, remote artifact, scheduled job, or manual workflow is a separate workflow from ordinary frontend UI CI. Backend network failure must not block unrelated frontend-only PRs as long as the committed OpenAPI snapshot and generated frontend types are internally consistent.
 
+Two workflows are required once OpenAPI is available:
+
+| Workflow | Trigger | Source | Behavior |
+| --- | --- | --- | --- |
+| PR check | Pull requests that touch frontend source, frontend config, package files, API snapshot, or mock files | Committed OpenAPI snapshot | Generate types, diff-check generated files, run typecheck/tests. Does not fetch a live backend URL. |
+| Contract sync | Scheduled, manual dispatch, or backend contract merge event | Latest backend OpenAPI artifact or running backend in the sync job only | Compare latest OpenAPI to committed snapshot and create an update PR when changed. |
+
+The contract sync workflow may use an action such as `peter-evans/create-pull-request` to update the OpenAPI snapshot, generated TypeScript schema, and any required mock fixture adjustments. Failures in the sync workflow should alert maintainers but must not block unrelated UI-only PRs.
+
+Frontend CI should use path filtering and dependency caching:
+
+- Use `paths` or `dorny/paths-filter` so heavy frontend guardrail jobs run when `frontend/src/**`, `frontend/package*.json`, `frontend/tsconfig.json`, frontend lint config, mock files, or OpenAPI snapshot/generated schema files change.
+- Docs-only changes such as `docs/**` and `*.md` may run documentation checks without running heavy frontend build jobs, unless the docs change is in an API contract path that the PR explicitly wants to validate.
+- Cache npm dependencies by `frontend/package-lock.json`.
+
 ## Loading, Error, and Empty States
 
 Each screen must define these states before implementation:
@@ -306,6 +328,10 @@ it("cancels or ignores stale policy detail requests during rapid node selection"
   expect(screen.queryByText(/요청 실패/)).not.toBeInTheDocument();
 });
 ```
+
+When Vitest runs tests in parallel, MSW must be initialized per test environment so handlers do not leak between files. `frontend/src/mocks/server.ts` owns only the `setupServer(...handlers)` export. The Vitest setup file for each worker calls `server.listen`, `server.resetHandlers`, and `server.close`. Tests that override handlers must reset them in `afterEach`, and scenario-specific handlers must not mutate shared handler arrays.
+
+If parallel execution still causes request interference, prefer Vitest pool isolation such as forks or per-file setup over disabling all parallelism by default. A serial fallback is acceptable only for a small test group that proves it cannot be isolated.
 
 Standard implementation pattern:
 
@@ -472,6 +498,10 @@ function PolicyGraphPanelShell({ isActivePanel }: { isActivePanel: boolean }) {
 - UI store linting allows ID utility types while rejecting full response DTO storage.
 - MSW integration tests cover stale request cancellation or ignore behavior.
 - Mobile state shells may stay mounted while heavy panel bodies pause or unmount when inactive.
+- Critical lint and type guardrails define suppression controls for `eslint-disable`, `@ts-ignore`, and `as any`.
+- Contract sync has a separate scheduled/manual/update-PR workflow from ordinary PR checks.
+- Frontend guardrail CI uses path filtering and npm dependency caching.
+- MSW Node server lifecycle is isolated for parallel Vitest workers and resets handlers after each test.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope

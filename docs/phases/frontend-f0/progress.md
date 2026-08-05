@@ -39,6 +39,10 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added MSW `handlers.ts`, `server.ts`, and `browser.ts` environment boundaries and Vitest lifecycle requirements.
 - Added an MSW integration-test expectation for rapid node selection cancellation or stale-response ignoring.
 - Added a lightweight shell/heavy body pattern for mobile panels that need state preservation without background render cost.
+- Added suppression-control guardrails for `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, and `as any`.
+- Added separate PR-check and contract-sync workflow responsibilities for OpenAPI snapshot drift.
+- Added CI path filtering and npm cache guidance to avoid heavy frontend jobs on unrelated docs-only changes.
+- Added MSW parallel test isolation requirements for Vitest worker environments.
 
 ## Deferred
 

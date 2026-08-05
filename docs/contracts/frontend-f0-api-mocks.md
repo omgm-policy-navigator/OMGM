@@ -108,6 +108,7 @@ This rule must be enforced by compiler and linter configuration when implementat
 - ID-only type extraction from DTOs is allowed when it narrows to primitive identifiers, such as `PolicyDetailResponse["policyId"]`.
 - React component files must not import low-level HTTP clients directly; components use feature hooks.
 - ESLint `no-restricted-imports` may handle direct HTTP imports in components, but UI store DTO checks should use a custom AST rule or equivalent typed lint rule so type-only ID utility imports are not blocked unnecessarily.
+- Critical guardrails must fail on inline suppression. Dedicated guardrail lint jobs should use `--no-inline-config` or scan affected files for `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, and `as any`. Exceptions must be named allowlist entries reviewed in config, not inline comments.
 
 ## MSW Mock Standard
 
@@ -172,6 +173,9 @@ CI/CD guardrail once OpenAPI exists:
 - Run frontend typecheck after generation so MSW handler drift fails fast.
 - Treat manual MSW response changes without regenerated types as incomplete.
 - Keep live backend OpenAPI fetching out of ordinary frontend PR CI. Refreshing the committed OpenAPI snapshot from a running backend, remote artifact, scheduled job, or manual sync workflow is separate so backend network availability does not block UI-only PRs.
+- Add a scheduled or manually dispatched contract-sync workflow that fetches the latest backend OpenAPI, compares it with the committed snapshot, and opens an update PR when drift is detected. The update PR should include the snapshot, generated API types, and any mock updates needed for typecheck.
+- Use path filtering so docs-only PRs do not pay for heavy frontend CI unless they change API contract snapshots or frontend guardrail docs that the PR explicitly wants to validate.
+- Cache npm dependencies by `frontend/package-lock.json`.
 
 ## MSW Environment Boundaries
 
@@ -193,6 +197,14 @@ afterAll(() => server.close());
 ```
 
 Browser development should start `worker.start()` only from the app's development bootstrap path. Tests must not import `browser.ts`, and production builds must not start MSW.
+
+Parallel test guardrails:
+
+- `server.listen`, `server.resetHandlers`, and `server.close` run from the Vitest setup file loaded in each test environment.
+- Tests may override handlers with `server.use`, but must rely on `afterEach(server.resetHandlers)` to remove overrides.
+- Shared `handlers` arrays are immutable during tests.
+- If Vitest uses worker threads or forks, each worker must create its own MSW server instance through the setup file.
+- If a specific network-heavy suite cannot be isolated, only that suite may opt into serial execution; global serial execution is not the default.
 
 ## Mock Payloads
 

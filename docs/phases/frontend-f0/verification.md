@@ -81,6 +81,16 @@ git diff --check
 
 Result: passed.
 
+After adding the sixth review follow-ups for OpenAPI snapshot sync PR workflows, inline suppression controls, CI path filtering/caching, and MSW parallel test isolation, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run typecheck
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash
