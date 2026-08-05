@@ -5,7 +5,7 @@ from http import HTTPStatus
 from app.api.health import health_payload
 from app.core.config import AppConfig
 from app.core.errors import AppError
-from app.main import create_app
+from app.main import create_app, error_payload
 
 
 class AppTests(unittest.TestCase):
@@ -29,6 +29,6 @@ class AppTests(unittest.TestCase):
 
     def test_error_payload_serializes_to_json(self) -> None:
         error = AppError("X", "safe message", HTTPStatus.BAD_REQUEST)
-        body = json.dumps({"error": {"code": error.code, "message": error.public_message}})
+        body = json.dumps(error_payload(error.code, error.public_message))
 
         self.assertIn("safe message", body)

@@ -75,6 +75,8 @@ make pipeline-sample
 - [사용자 시나리오](docs/product/user-scenarios.md)
 - [MVP 범위](docs/product/mvp-scope.md)
 - [시스템 개요](docs/architecture/system-overview.md)
+- [백엔드 아키텍처](docs/architecture/backend.md)
+- [API 계약](docs/architecture/api-contracts.md)
 - [모듈 경계](docs/architecture/module-boundaries.md)
 - [데이터 소유권](docs/architecture/data-ownership.md)
 - [RAG와 자격판정 흐름](docs/architecture/rag-and-eligibility-flow.md)

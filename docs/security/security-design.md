@@ -37,6 +37,14 @@ Phase 0에는 인증을 구현하지 않는다. 향후 비밀번호는 평문 �
 
 입력값 검증, 인증과 인가 분리, 객체 수준 접근 제어, 과도한 데이터 응답 방지, 요청 크기 제한, 업로드 형식·크기 제한, 구조화된 오류 응답, Rate Limit, 최소 CORS, 민감한 오류 상세정보 비노출을 적용한다.
 
+## 익명 세션 보안
+
+로그인 없는 MVP의 익명 세션 ID는 서버가 생성하고 `anonymous_session` HttpOnly Cookie로만 전달한다. 프론트엔드는 세션 ID를 직접 생성, 저장, 로깅, JSON body 전달하지 않는다.
+
+운영 환경 쿠키는 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age=86400`을 기본으로 한다. 로컬 HTTP 개발 환경은 `APP_ENV=local`에서만 `Secure`를 생략할 수 있다.
+
+쿠키 기반 POST, PATCH, PUT, DELETE 요청은 CORS와 별도로 `Origin`을 허용된 프론트엔드 origin과 비교해야 한다. 익명 세션 삭제는 서버 세션과 연결된 대화, 사용자 사실, 판정 데이터를 즉시 접근 불가 상태로 만들고 B0 계약에서는 hard delete로 처리한다.
+
 ## 업로드 보안
 
 Phase 0에는 업로드 기능이 없다. 향후 서류 업로드가 생기면 파일 형식, 크기, 보관 기간, 악성 파일 검사, 접근 권한을 먼저 설계한다.
@@ -44,6 +52,8 @@ Phase 0에는 업로드 기능이 없다. 향후 서류 업로드가 생기면 �
 ## 로그 보안
 
 로그는 JSON 구조를 사용한다. 토큰, 비밀번호, API 키, 암호화 키, 주민등록 관련 정보, 소득·자산 원문 값을 기록하지 않는다.
+
+예상하지 못한 서버 예외는 stack trace와 제한된 진단 정보만 기록한다. 허용되는 요청 메타데이터는 HTTP method, route path, request ID 또는 trace ID, 예외 type이다. request body 전체, 쿠키, 세션 ID, Authorization header, query parameter 전체, 사용자 사실 원문은 로그에 남기지 않는다.
 
 ## AI·RAG 보안
 

@@ -1,7 +1,8 @@
 import unittest
 
-from app.eligibility.rules import (
+from app.modules.eligibility.rules import (
     Condition,
+    EvaluationState,
     EligibilityStatus,
     detect_conflict,
     evaluate_conditions,
@@ -13,14 +14,15 @@ class EligibilityTests(unittest.TestCase):
     def test_missing_required_information_needs_confirmation(self) -> None:
         result = evaluate_conditions([Condition("income", "lte", 70_000_000)], {})
 
-        self.assertEqual(result.status, EligibilityStatus.NEEDS_CONFIRMATION)
+        self.assertEqual(result.eligibility_status, EligibilityStatus.NEEDS_CONFIRMATION)
+        self.assertEqual(result.evaluation_state, EvaluationState.ACTIVE)
         self.assertEqual(result.needs_confirmation, ("income",))
         self.assertEqual(result.unsatisfied, ())
 
     def test_failed_required_condition_is_ineligible(self) -> None:
         result = evaluate_conditions([Condition("income", "lte", 70_000_000)], {"income": 80_000_000})
 
-        self.assertEqual(result.status, EligibilityStatus.INELIGIBLE)
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_INELIGIBLE)
         self.assertEqual(result.unsatisfied, ("income",))
 
     def test_all_required_conditions_satisfied(self) -> None:
@@ -32,7 +34,7 @@ class EligibilityTests(unittest.TestCase):
             {"marital_status": "newlywed", "income": 60_000_000},
         )
 
-        self.assertEqual(result.status, EligibilityStatus.ELIGIBLE)
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
 
     def test_conflicting_answer_is_detected(self) -> None:
         conflicts = detect_conflict({"marital_status": "before_registration"}, {"marital_status": "registered"})
