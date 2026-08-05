@@ -6,6 +6,8 @@ from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.config import AppConfig
 from app.db.session import get_db
 from app.main import create_app
@@ -84,7 +86,7 @@ class HealthApiTests(unittest.TestCase):
     def test_readiness_returns_unavailable_without_leaking_database_error(self) -> None:
         app = create_app(make_test_config())
         session = AsyncMock()
-        session.execute.side_effect = RuntimeError("db unavailable on 10.0.0.8:5432 as marry_policy")
+        session.execute.side_effect = SQLAlchemyError("db unavailable on 10.0.0.8:5432 as marry_policy")
 
         async def override_get_db() -> AsyncIterator[AsyncMock]:
             yield session
@@ -99,7 +101,7 @@ class HealthApiTests(unittest.TestCase):
         self.assertEqual(body["status"], "not_ready")
         self.assertEqual(body["database"], "unavailable")
         self.assertNotIn("10.0.0.8", json.dumps(body))
-        self.assertIn("DB readiness check failed", logs.output[0])
+        self.assertIn("DB readiness probe failed with SQLAlchemyError", logs.output[0])
 
     def test_readiness_returns_timeout_when_database_ping_times_out(self) -> None:
         app = create_app(make_test_config())
@@ -115,11 +117,11 @@ class HealthApiTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_get_db
 
-        with self.assertLogs("app.api.health", level="ERROR") as logs:
+        with self.assertLogs("app.api.health", level="WARNING") as logs:
             status, headers, body = asyncio.run(asgi_get(app, "/health/ready"))
 
         self.assertEqual(status, HTTPStatus.SERVICE_UNAVAILABLE)
         self.assertEqual(headers["cache-control"], NO_CACHE_VALUE)
         self.assertEqual(body["status"], "not_ready")
         self.assertEqual(body["database"], "timeout")
-        self.assertIn("DB readiness check timed out", logs.output[0])
+        self.assertIn("DB readiness probe timed out", logs.output[0])

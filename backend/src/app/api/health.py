@@ -3,6 +3,7 @@ import asyncio
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import AppConfig
@@ -45,12 +46,17 @@ async def readiness(request: Request, db: AsyncSession = DB_SESSION_DEPENDENCY) 
     try:
         await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=READINESS_TIMEOUT_SECONDS)
     except TimeoutError:
-        logger.error("DB readiness check timed out", exc_info=True)
+        logger.warning("DB readiness probe timed out", extra={"timeout_seconds": READINESS_TIMEOUT_SECONDS})
         payload["status"] = "not_ready"
         payload["database"] = "timeout"
         return readiness_response(status.HTTP_503_SERVICE_UNAVAILABLE, payload)
+    except SQLAlchemyError:
+        logger.error("DB readiness probe failed with SQLAlchemyError", exc_info=True)
+        payload["status"] = "not_ready"
+        payload["database"] = "unavailable"
+        return readiness_response(status.HTTP_503_SERVICE_UNAVAILABLE, payload)
     except Exception:
-        logger.error("DB readiness check failed", exc_info=True)
+        logger.error("DB readiness probe failed", exc_info=True)
         payload["status"] = "not_ready"
         payload["database"] = "unavailable"
         return readiness_response(status.HTTP_503_SERVICE_UNAVAILABLE, payload)
