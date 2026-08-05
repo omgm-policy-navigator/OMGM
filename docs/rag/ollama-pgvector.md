@@ -21,7 +21,7 @@ RAG 결과는 승인된 공식 근거를 제공할 뿐 정책 자격 후보나 �
 
 Rule Engine은 구조화된 정책 규칙과 사용자 사실을 비교해 `LIKELY_ELIGIBLE`, `LIKELY_INELIGIBLE`, `NEEDS_CONFIRMATION` 같은 신청 가능성 상태를 계산한다. 정책 버전 변경, 답변 충돌, 미평가 상태는 별도 evaluation state로 관리한다.
 
-LLM은 조건 후보 추출 보조, 검색 질의 보정, 판정 결과 설명 생성에 사용한다. LLM 응답만으로 신청 가능 여부를 확정하지 않는다.
+LLM은 조건 후보 추출 보조, 검색 질의 보정, 행정 용어 설명, 판정 결과 요약 생성에 사용한다. LLM 응답만으로 신청 가능 여부를 확정하지 않는다. AI 출력과 fallback은 [AI 계약](../architecture/ai-contracts.md)을 따른다.
 
 ## 보안 기준
 

@@ -45,6 +45,6 @@ uv run alembic upgrade head
 - `app/core`: configuration, logging, lifespan, and common errors.
 - `app/db`: SQLAlchemy async engine/session setup and Alembic integration.
 - `app/modules`: feature module boundaries. `app/modules/eligibility` owns the Rule Engine.
-- `app/llm`: Ollama/LLM boundary helpers.
+- `app/llm`: AI response schemas and Ollama/LLM boundary helpers.
 
-See [Backend Architecture](../docs/architecture/backend.md) and [API Contracts](../docs/architecture/api-contracts.md) for detailed ownership and HTTP contracts.
+See [Backend Architecture](../docs/architecture/backend.md), [API Contracts](../docs/architecture/api-contracts.md), and [AI Contracts](../docs/architecture/ai-contracts.md) for detailed ownership and HTTP/AI contracts.
