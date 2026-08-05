@@ -27,9 +27,18 @@ class AIOutputSchemaTests(unittest.TestCase):
 
         self.assertEqual(
             set(payload),
-            {"answer", "resultStatus", "matchedConditions", "missingConditions", "citations", "nextQuestion"},
+            {
+                "answer",
+                "resultStatus",
+                "is_fallback",
+                "matchedConditions",
+                "missingConditions",
+                "citations",
+                "nextQuestion",
+            },
         )
         self.assertEqual(payload["resultStatus"], "ANSWERED")
+        self.assertEqual(payload["is_fallback"], False)
         self.assertEqual(payload["matchedConditions"][0]["conditionId"], "region")
         self.assertEqual(payload["citations"][0]["policyVersionId"], "policy_version_1")
         self.assertEqual(payload["citations"][0]["evidenceId"], "chunk_1")

@@ -15,6 +15,7 @@ Implemented on branch `ai-a1-local-llm-runtime`.
 - Added provider factory selection through `LLM_PROVIDER`.
 - Added health-based fallback selection through `create_available_llm_provider`.
 - Added robust JSON extraction for pure JSON, fenced JSON, and text-wrapped JSON responses.
+- Added `RobustLLMManager` with fallback metadata and a static safety-net response when both primary and fallback providers fail.
 - Added runtime-checkable provider protocol health compatibility through `check_health`.
 - Added tests for provider swapping, health states, model missing handling, timeout handling, connection failure handling, and JSON contract validation.
 

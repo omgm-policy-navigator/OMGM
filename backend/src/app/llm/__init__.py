@@ -3,6 +3,7 @@
 from app.llm.factory import create_available_llm_provider, create_llm_provider
 from app.llm.fake import FakeLLMProvider, TemplateLLMProvider
 from app.llm.json_parser import parse_ai_output_json
+from app.llm.manager import RobustLLMManager, static_safety_output
 from app.llm.ollama import OllamaLLMProvider
 from app.llm.providers import (
     LLMError,
@@ -40,8 +41,10 @@ __all__ = [
     "LLMTimeoutError",
     "LLMUnavailableError",
     "OllamaLLMProvider",
+    "RobustLLMManager",
     "TemplateLLMProvider",
     "create_available_llm_provider",
     "create_llm_provider",
     "parse_ai_output_json",
+    "static_safety_output",
 ]

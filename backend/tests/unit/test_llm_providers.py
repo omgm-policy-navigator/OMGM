@@ -18,6 +18,7 @@ from app.llm import (
     LLMTimeoutError,
     LLMUnavailableError,
     OllamaLLMProvider,
+    RobustLLMManager,
     TemplateLLMProvider,
     create_available_llm_provider,
     create_llm_provider,
@@ -228,3 +229,55 @@ class LLMAvailableFactoryTests(unittest.IsolatedAsyncioTestCase):
             provider = await create_available_llm_provider(config)
 
         self.assertIsInstance(provider, TemplateLLMProvider)
+
+
+class RobustLLMManagerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_manager_returns_primary_output_without_fallback_metadata(self) -> None:
+        primary = FakeLLMProvider(output=AIOutput.model_validate(answered_output()))
+        manager = RobustLLMManager(primary_provider=primary, fallback_provider=TemplateLLMProvider())
+
+        result = await manager.generate(LLMRequest(prompt="Return JSON."))
+
+        self.assertEqual(result.result_status, AIResultStatus.ANSWERED)
+        self.assertFalse(result.is_fallback)
+
+    async def test_manager_marks_fallback_output_when_primary_fails(self) -> None:
+        class FailingProvider:
+            async def health(self) -> LLMHealth:
+                return LLMHealth(status=LLMHealthStatus.UNAVAILABLE, provider="failing", model="none")
+
+            async def check_health(self) -> bool:
+                return False
+
+            async def generate(self, request: LLMRequest) -> AIOutput:
+                _ = request
+                raise LLMUnavailableError("host=internal.example user=secret")
+
+        manager = RobustLLMManager(primary_provider=FailingProvider(), fallback_provider=TemplateLLMProvider())
+
+        result = await manager.generate(LLMRequest(prompt="Return JSON."))
+
+        self.assertEqual(result.result_status, AIResultStatus.LLM_UNAVAILABLE)
+        self.assertTrue(result.is_fallback)
+        self.assertNotIn("internal.example", result.answer)
+        self.assertNotIn("secret", result.answer)
+
+    async def test_manager_returns_static_safety_net_when_fallback_also_fails(self) -> None:
+        class FailingProvider:
+            async def health(self) -> LLMHealth:
+                return LLMHealth(status=LLMHealthStatus.UNAVAILABLE, provider="failing", model="none")
+
+            async def check_health(self) -> bool:
+                return False
+
+            async def generate(self, request: LLMRequest) -> AIOutput:
+                _ = request
+                raise RuntimeError("sensitive backend detail")
+
+        manager = RobustLLMManager(primary_provider=FailingProvider(), fallback_provider=FailingProvider())
+
+        result = await manager.generate(LLMRequest(prompt="Return JSON."))
+
+        self.assertEqual(result.result_status, AIResultStatus.LLM_UNAVAILABLE)
+        self.assertTrue(result.is_fallback)
+        self.assertNotIn("sensitive backend detail", result.answer)

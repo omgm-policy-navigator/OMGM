@@ -14,7 +14,7 @@ cd backend
 uv run pytest
 ```
 
-Result: passed. 56 tests passed.
+Result: passed. 59 tests passed.
 
 ```bash
 cd backend
@@ -45,7 +45,7 @@ Result: passed. No new migrations were introduced in A1.
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest
 ```
 
-Result: passed. 56 tests passed in the Linux backend container.
+Result: passed. 59 tests passed in the Linux backend container.
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check src/app tests
@@ -73,5 +73,5 @@ Result: passed.
 
 ## Notes
 
-- JSON output mode and text-wrapped JSON extraction are validated with mocked Ollama responses because the local `qwen3:4b` model is not installed in this environment.
+- JSON output mode, text-wrapped JSON extraction, fallback metadata, and static safety-net fallback are validated with mocked provider responses because the local `qwen3:4b` model is not installed in this environment.
 - A1 does not add API routes or database migrations.
