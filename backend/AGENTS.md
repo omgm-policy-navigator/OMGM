@@ -18,7 +18,7 @@ The package root is `backend/src/app`. The Phase B0 folder contract maps to this
 - Analysis modules must not depend on FastAPI routers or SQLAlchemy sessions.
 - API response schemas and persistence entities must remain separate types.
 - Rule Engine uses structured policy rules and user facts only.
-- RAG finds policy candidates and evidence. It does not decide final eligibility.
+- RAG retrieves approved evidence for policies already selected or evaluated by structured policy metadata and the Rule Engine. It does not create policy eligibility candidates.
 - LLM code may normalize language, assist extraction, adjust search queries, and draft explanations. It must not create final eligibility status.
 - Graph projection derives display relationships from stored policy and evaluation data. It does not own policy source data.
 - Data pipeline code must not be imported into request handling.
@@ -27,8 +27,9 @@ The package root is `backend/src/app`. The Phase B0 folder contract maps to this
 
 - Anonymous sessions own browser-session identity and temporary conversation state until account identity exists.
 - User fact modules own normalized answers, fact versions, and conflict markers.
-- Policy records and source documents are owned by the data pipeline and policy persistence modules.
-- Evaluation records are owned by eligibility modules and reference policy version plus user fact version.
+- Data Pipeline owns raw API payloads, raw HTML/PDF, extraction candidates, review-pending data, and source hashes before publication.
+- Backend Policy modules own approved and published `policy`, `policy_version`, `policy_rule`, `policy_document`, and service read models.
+- Evaluation records are owned by eligibility modules and reference `policy_version` plus user fact version.
 
 ## Development Rules
 

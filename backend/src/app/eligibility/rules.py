@@ -6,13 +6,18 @@ from typing import Any
 
 
 class EligibilityStatus(StrEnum):
-    ELIGIBLE = "ELIGIBLE"
-    INELIGIBLE = "INELIGIBLE"
+    LIKELY_ELIGIBLE = "LIKELY_ELIGIBLE"
     NEEDS_CONFIRMATION = "NEEDS_CONFIRMATION"
+    AVAILABLE_LATER = "AVAILABLE_LATER"
+    LIKELY_INELIGIBLE = "LIKELY_INELIGIBLE"
+    OFFICIAL_CONFIRMATION_REQUIRED = "OFFICIAL_CONFIRMATION_REQUIRED"
+
+
+class EvaluationState(StrEnum):
+    ACTIVE = "ACTIVE"
     STALE = "STALE"
     CONFLICTED = "CONFLICTED"
     NOT_EVALUATED = "NOT_EVALUATED"
-    POLICY_UNAVAILABLE = "POLICY_UNAVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -25,7 +30,8 @@ class Condition:
 
 @dataclass(frozen=True)
 class EvaluationResult:
-    status: EligibilityStatus
+    eligibility_status: EligibilityStatus
+    evaluation_state: EvaluationState = EvaluationState.ACTIVE
     satisfied: tuple[str, ...] = ()
     unsatisfied: tuple[str, ...] = ()
     needs_confirmation: tuple[str, ...] = ()
@@ -49,10 +55,16 @@ def evaluate_conditions(conditions: list[Condition], answers: dict[str, Any]) ->
             unsatisfied.append(condition.field)
 
     if needs_confirmation:
-        return EvaluationResult(EligibilityStatus.NEEDS_CONFIRMATION, tuple(satisfied), tuple(unsatisfied), tuple(needs_confirmation))
+        return EvaluationResult(
+            EligibilityStatus.NEEDS_CONFIRMATION,
+            EvaluationState.ACTIVE,
+            tuple(satisfied),
+            tuple(unsatisfied),
+            tuple(needs_confirmation),
+        )
     if unsatisfied:
-        return EvaluationResult(EligibilityStatus.INELIGIBLE, tuple(satisfied), tuple(unsatisfied), ())
-    return EvaluationResult(EligibilityStatus.ELIGIBLE, tuple(satisfied), (), ())
+        return EvaluationResult(EligibilityStatus.LIKELY_INELIGIBLE, EvaluationState.ACTIVE, tuple(satisfied), tuple(unsatisfied), ())
+    return EvaluationResult(EligibilityStatus.LIKELY_ELIGIBLE, EvaluationState.ACTIVE, tuple(satisfied), (), ())
 
 
 def mark_stale(current_policy_version: str, evaluated_policy_version: str) -> bool:

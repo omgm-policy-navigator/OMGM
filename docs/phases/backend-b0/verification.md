@@ -66,3 +66,17 @@ cd backend && .venv/bin/python -m ruff check src/app tests
 ```
 
 Result: failed because pytest and Ruff are not installed in the backend virtual environment.
+
+## Review Fix Verification
+
+After addressing the B0 contract review, the same applicable checks were rerun:
+
+```bash
+docker compose -f compose.yaml config
+cd backend && .venv/bin/python -m unittest discover -s tests
+git diff --check
+./scripts/verify-structure.sh
+python3 scripts/check-doc-links.py
+```
+
+Result: passed.

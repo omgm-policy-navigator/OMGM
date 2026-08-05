@@ -34,7 +34,7 @@ backend/
 | Rule Engine | `app/eligibility` | Structured policy rules, normalized user facts | Use LLM text to decide final status, generate natural-language explanations |
 | Business features | `app/modules` | `app/core`, `app/db` repositories, `app/eligibility`, `app/llm` through explicit module functions | Create broad layered folders without real implementation |
 | LLM/Ollama boundary | `app/llm` | `app/core` config, HTTP client library when introduced | Decide eligibility, persist raw sensitive facts, bypass policy evidence |
-| RAG | Future `app/modules/rag` | verified document chunks, embeddings, metadata filters, `app/llm` query helpers | Invent policies or make final eligibility decisions |
+| RAG | Future `app/modules/rag` | approved document chunks for policies selected by metadata and Rule Engine, embeddings, metadata filters, `app/llm` query helpers | Create policy eligibility candidates, invent policies, or make final eligibility decisions |
 | Graph projection | Future `app/modules/graph` | policy metadata, relationships, evaluation summaries | Own source policy data or mutate eligibility results |
 
 ## Backend Feature Mapping
@@ -50,8 +50,8 @@ backend/
 | Eligibility evaluation | `app/eligibility` now, future module facade under `app/modules/evaluations` | Rule core implemented, API contract only |
 | RAG evidence retrieval | Future `app/modules/rag` | Mock API contract only |
 | Policy graph projection | Future `app/modules/graph` | Mock API contract only |
-| Saved policies | Future `app/modules/saved_policies` | Mock API contract only |
-| Notifications | Future `app/modules/notifications` | Mock API contract only |
+| Saved policies | Future `app/modules/saved_policies` | Deferred until retention and identity rules are decided |
+| Notifications | Future `app/modules/notifications` | Deferred until channel, permission, and retention rules are decided |
 
 ## Database Access Rules
 
@@ -60,12 +60,16 @@ backend/
 3. Persistence code belongs behind repository-like functions in the owning module or shared `app/db` helpers once SQLAlchemy is introduced.
 4. API response schemas are explicit DTOs. They are not SQLAlchemy entities.
 5. Analysis modules accept plain Python data structures or typed DTOs, not FastAPI `Request` objects or SQLAlchemy `Session` objects.
-6. RAG can read document chunks and vector search results through persistence interfaces, but it cannot write final evaluation status.
+6. Policy candidates are selected through policy metadata and structured rules. RAG can read approved document chunks and vector search results for already selected or evaluated policies, but it cannot create candidates or write final evaluation status.
 7. Null, absent, or unverified facts are represented as unknown and excluded from deterministic calculation coverage.
 
 ## Ownership Boundaries
 
-Anonymous sessions own anonymous identifiers and temporary session state. User fact modules own normalized answers, source, confirmation state, fact version, and conflict state. Policy data is owned by the policy data pipeline and policy persistence modules. Eligibility owns evaluation records that reference immutable policy versions and user fact versions.
+Anonymous sessions are server-generated and transported only through HttpOnly, Secure, SameSite cookies. The frontend must not read, create, or submit session IDs in JSON bodies.
+
+User fact modules own normalized answers, source, confirmation state, fact version, and conflict state. The Data Pipeline owns raw API payloads, raw HTML/PDF, extraction candidates, review-pending data, and source hashes before publication. Backend Policy modules own approved and published `policy`, `policy_version`, `policy_rule`, `policy_document`, and service read models.
+
+Eligibility owns evaluation records that reference immutable `policy_version` rows and user fact versions. The MVP uses an explicit `policy_version` concept from the start so stale evaluations can be detected without treating `verified_at` or source hashes as ad hoc versions.
 
 The frontend owns browser display state only. It does not own policy source data, user fact normalization, eligibility decisions, RAG evidence, or graph projection logic.
 

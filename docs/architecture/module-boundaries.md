@@ -76,11 +76,11 @@
 
 ## `backend/src/app/eligibility`
 
-책임: 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 판정 상태 계산.
+책임: 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 신청 가능성 상태 계산.
 
-입력: 구조화 정책 규칙, 사용자 사실, 정책 버전.
+입력: 구조화 정책 규칙, 사용자 사실, `policy_version`.
 
-출력: `ELIGIBLE`, `INELIGIBLE`, `NEEDS_CONFIRMATION`, `STALE` 등 판정 결과.
+출력: `LIKELY_ELIGIBLE`, `LIKELY_INELIGIBLE`, `NEEDS_CONFIRMATION` 등 신청 가능성 결과와 별도 evaluation state.
 
 금지 의존성: LLM 응답 문자열 기반 최종 판정, 자연어 설명 생성, HTTP 직접 처리.
 

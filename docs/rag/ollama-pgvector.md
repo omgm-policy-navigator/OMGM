@@ -13,13 +13,13 @@ Ollama는 로컬 LLM과 임베딩 모델 실행 환경이다. pgvector는 Postgr
 
 ## RAG 흐름
 
-사용자 질문을 정규화하고, 정책 메타데이터 필터와 문서 청크 검색을 함께 사용한다. 검색 결과는 원문 출처, 청크, 정책 버전과 연결한다.
+사용자 질문을 정규화하고, 선택 분야·정책 메타데이터·구조화 Rule로 선정된 정책에 대해 문서 청크 검색을 사용한다. 검색 결과는 원문 출처, 청크, `policy_version`과 연결한다.
 
-RAG 결과는 후보와 근거를 제공할 뿐 최종 자격 상태를 결정하지 않는다.
+RAG 결과는 승인된 공식 근거를 제공할 뿐 정책 자격 후보나 최종 자격 상태를 결정하지 않는다.
 
 ## Rule Engine과 LLM 경계
 
-Rule Engine은 구조화된 정책 규칙과 사용자 사실을 비교해 `ELIGIBLE`, `INELIGIBLE`, `NEEDS_CONFIRMATION`, `STALE`을 계산한다.
+Rule Engine은 구조화된 정책 규칙과 사용자 사실을 비교해 `LIKELY_ELIGIBLE`, `LIKELY_INELIGIBLE`, `NEEDS_CONFIRMATION` 같은 신청 가능성 상태를 계산한다. 정책 버전 변경, 답변 충돌, 미평가 상태는 별도 evaluation state로 관리한다.
 
 LLM은 조건 후보 추출 보조, 검색 질의 보정, 판정 결과 설명 생성에 사용한다. LLM 응답만으로 신청 가능 여부를 확정하지 않는다.
 
