@@ -14,6 +14,7 @@ npm run dev
 
 ```bash
 cd frontend
+npm run lint
 npm test
 npm run typecheck
 npm run build
@@ -21,4 +22,6 @@ npm run build
 
 ## 환경변수
 
-루트 `.env.example`의 `VITE_API_BASE_URL`, `VITE_SSE_BASE_URL`을 사용합니다. 브라우저에 노출되므로 서버 Secret을 `VITE_*` 변수에 넣지 않습니다.
+루트 `.env.example`의 `VITE_API_BASE_URL`, `VITE_SSE_BASE_URL`, `VITE_API_MODE`를 사용합니다. 브라우저에 노출되므로 서버 Secret을 `VITE_*` 변수에 넣지 않습니다.
+
+`VITE_API_MODE=mock`은 개발 초기 화면에서 synthetic Health 응답을 표시합니다. 실제 백엔드 Health Check를 호출하려면 `VITE_API_MODE=live`를 사용합니다.
