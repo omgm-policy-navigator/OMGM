@@ -428,10 +428,10 @@ Response `200`:
 
 ```json
 {
-  "status": "ok",
+  "status": "ready",
   "service": "omgm-backend",
   "environment": "local",
-  "database": "ok"
+  "database": "connected"
 }
 ```
 

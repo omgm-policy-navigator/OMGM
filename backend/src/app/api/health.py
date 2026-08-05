@@ -1,10 +1,17 @@
-from fastapi import APIRouter, Request, status
+import asyncio
+
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import AppConfig
-from app.db.session import check_database
+from app.db.session import get_db
+
+READINESS_TIMEOUT_SECONDS = 2.0
 
 router = APIRouter(tags=["health"])
+DB_SESSION_DEPENDENCY = Depends(get_db)
 
 
 def health_payload(config: AppConfig) -> dict[str, str]:
@@ -26,19 +33,20 @@ def health(request: Request) -> dict[str, str]:
 
 
 @router.get("/health/ready")
-async def readiness(request: Request) -> JSONResponse:
+async def readiness(request: Request, db: AsyncSession = DB_SESSION_DEPENDENCY) -> JSONResponse:
     payload = health_payload(request.app.state.config)
     try:
-        await check_database()
+        await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=READINESS_TIMEOUT_SECONDS)
     except Exception:
         payload["status"] = "not_ready"
         payload["database"] = "unavailable"
         return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload)
 
-    payload["database"] = "ok"
+    payload["status"] = "ready"
+    payload["database"] = "connected"
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload)
 
 
 @router.get("/ready")
-async def ready(request: Request) -> JSONResponse:
-    return await readiness(request)
+async def ready(request: Request, db: AsyncSession = DB_SESSION_DEPENDENCY) -> JSONResponse:
+    return await readiness(request, db)

@@ -14,7 +14,7 @@ cd backend
 uv run pytest
 ```
 
-Result: passed. 21 tests passed.
+Result: passed. 22 tests passed.
 
 ```bash
 cd backend
@@ -53,7 +53,7 @@ Result: passed. Baseline migration `20260805_0001` enables the pgvector `vector`
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest
 ```
 
-Result: passed. 21 tests passed in the Linux backend container.
+Result: passed. 22 tests passed in the Linux backend container.
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check src/app tests
@@ -67,7 +67,7 @@ Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/live
 Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/ready
 ```
 
-Result: passed. `/health/live` returned `200` with `status: ok`; `/health/ready` returned `200` with `database: ok`.
+Result: passed. `/health/live` returned `200` with `status: ok`; `/health/ready` returned `200` with `status: ready` and `database: connected`.
 
 ```bash
 git diff --check
