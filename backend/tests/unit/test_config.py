@@ -20,6 +20,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.database_url, TEST_DATABASE_URL)
         self.assertEqual(config.database_pool_size, 5)
         self.assertEqual(config.database_max_overflow, 10)
+        self.assertEqual(config.llm_provider, "ollama")
+        self.assertEqual(config.ollama_generation_model, "qwen3:4b")
+        self.assertEqual(config.llm_temperature, 0.1)
+        self.assertEqual(config.llm_timeout_seconds, 30)
 
     def test_missing_database_url_raises_configuration_error(self) -> None:
         with patch.dict(os.environ, {"DATABASE_URL": ""}, clear=True):
@@ -38,5 +42,15 @@ class ConfigTests(unittest.TestCase):
 
     def test_invalid_pool_size_raises_configuration_error(self) -> None:
         with patch.dict(os.environ, {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_POOL_SIZE": "0"}, clear=True):
+            with self.assertRaises(ConfigurationError):
+                AppConfig.from_env()
+
+    def test_invalid_llm_provider_raises_configuration_error(self) -> None:
+        with patch.dict(os.environ, {"DATABASE_URL": TEST_DATABASE_URL, "LLM_PROVIDER": "remote"}, clear=True):
+            with self.assertRaises(ConfigurationError):
+                AppConfig.from_env()
+
+    def test_invalid_llm_temperature_raises_configuration_error(self) -> None:
+        with patch.dict(os.environ, {"DATABASE_URL": TEST_DATABASE_URL, "LLM_TEMPERATURE": "3"}, clear=True):
             with self.assertRaises(ConfigurationError):
                 AppConfig.from_env()

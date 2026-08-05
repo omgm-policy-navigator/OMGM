@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.errors import ConfigurationError
 
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+VALID_LLM_PROVIDERS = {"ollama", "fake", "template"}
 
 
 class AppConfig(BaseSettings):
@@ -19,9 +20,11 @@ class AppConfig(BaseSettings):
     database_url: str
     database_pool_size: int = Field(default=5, ge=1)
     database_max_overflow: int = Field(default=10, ge=0)
+    llm_provider: str = "ollama"
     ollama_base_url: str = "http://localhost:11434"
     ollama_generation_model: str = "qwen3:4b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
+    llm_temperature: float = Field(default=0.1, ge=0, le=2)
     llm_timeout_seconds: int = Field(default=30, gt=0)
 
     @field_validator("log_level")
@@ -32,7 +35,15 @@ class AppConfig(BaseSettings):
             raise ValueError("LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
         return log_level
 
-    @field_validator("app_env", "backend_host", "database_url")
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_llm_provider(cls, value: str) -> str:
+        provider = value.strip().lower()
+        if provider not in VALID_LLM_PROVIDERS:
+            raise ValueError("LLM_PROVIDER must be one of ollama, fake, template.")
+        return provider
+
+    @field_validator("app_env", "backend_host", "database_url", "ollama_base_url", "ollama_generation_model")
     @classmethod
     def validate_required_text(cls, value: str) -> str:
         stripped = value.strip()
