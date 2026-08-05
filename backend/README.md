@@ -29,9 +29,9 @@ API 문서는 실행 후 `http://localhost:8000/docs`에서 확인합니다.
 - `app/core`: 설정, 로깅, lifespan, 공통 오류.
 - `app/db`: DB 세션과 persistence 설정 경계.
 - `app/modules`: 기능 모듈 경계. `app/modules/eligibility`가 Rule Engine과 평가 도메인 로직을 소유합니다.
-- `app/llm`: Ollama/LLM 호출 경계.
+- `app/llm`: AI 출력 Schema와 Ollama/LLM 호출 경계.
 
-상세 책임과 API 초안은 [Backend Architecture](../docs/architecture/backend.md)와 [API Contracts](../docs/architecture/api-contracts.md)를 확인합니다.
+상세 책임과 API/AI 초안은 [Backend Architecture](../docs/architecture/backend.md), [API Contracts](../docs/architecture/api-contracts.md), [AI Contracts](../docs/architecture/ai-contracts.md)를 확인합니다.
 
 ## 테스트
 
