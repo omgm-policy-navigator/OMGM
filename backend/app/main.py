@@ -8,7 +8,13 @@ from app.core.lifespan import lifespan
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
-    app = FastAPI(title="나만 결혼해? Backend", lifespan=lifespan)
+    app = FastAPI(
+        title="나만 결혼해? Backend",
+        lifespan=lifespan,
+        docs_url="/",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
     app.include_router(api_router)
     if config is not None:
         app.state.config = config

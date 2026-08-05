@@ -12,7 +12,7 @@
 
 테스트 범위: 렌더링, 환경변수 로딩, 타입 검사, 빌드.
 
-## `backend/src/app/api`
+## `backend/app/api`
 
 책임: FastAPI 라우터, Health Check, REST/SSE 경계, 안전한 오류 응답.
 
@@ -26,7 +26,7 @@
 
 테스트 범위: 앱 로딩, Health Check, 오류 응답 구조.
 
-## `backend/src/app/core`
+## `backend/app/core`
 
 책임: 설정 로딩, 구조화 로그, 공통 오류, lifespan.
 
@@ -38,7 +38,7 @@
 
 테스트 범위: 기본 설정, 잘못된 포트, 잘못된 로그 레벨.
 
-## `backend/src/app/eligibility`
+## `backend/app/eligibility`
 
 책임: 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 판정 상태 계산.
 

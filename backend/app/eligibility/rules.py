@@ -49,9 +49,19 @@ def evaluate_conditions(conditions: list[Condition], answers: dict[str, Any]) ->
             unsatisfied.append(condition.field)
 
     if needs_confirmation:
-        return EvaluationResult(EligibilityStatus.NEEDS_CONFIRMATION, tuple(satisfied), tuple(unsatisfied), tuple(needs_confirmation))
+        return EvaluationResult(
+            EligibilityStatus.NEEDS_CONFIRMATION,
+            tuple(satisfied),
+            tuple(unsatisfied),
+            tuple(needs_confirmation),
+        )
     if unsatisfied:
-        return EvaluationResult(EligibilityStatus.INELIGIBLE, tuple(satisfied), tuple(unsatisfied), ())
+        return EvaluationResult(
+            EligibilityStatus.INELIGIBLE,
+            tuple(satisfied),
+            tuple(unsatisfied),
+            (),
+        )
     return EvaluationResult(EligibilityStatus.ELIGIBLE, tuple(satisfied), (), ())
 
 

@@ -2,7 +2,7 @@
 set -eu
 
 test ! -d src
-test -d backend/src/app
+test -d backend/app
 test -d backend/tests
 test -d frontend/src
 test -d data-pipeline/src/policy_pipeline

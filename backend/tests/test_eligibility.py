@@ -18,7 +18,10 @@ class EligibilityTests(unittest.TestCase):
         self.assertEqual(result.unsatisfied, ())
 
     def test_failed_required_condition_is_ineligible(self) -> None:
-        result = evaluate_conditions([Condition("income", "lte", 70_000_000)], {"income": 80_000_000})
+        result = evaluate_conditions(
+            [Condition("income", "lte", 70_000_000)],
+            {"income": 80_000_000},
+        )
 
         self.assertEqual(result.status, EligibilityStatus.INELIGIBLE)
         self.assertEqual(result.unsatisfied, ("income",))
@@ -35,7 +38,10 @@ class EligibilityTests(unittest.TestCase):
         self.assertEqual(result.status, EligibilityStatus.ELIGIBLE)
 
     def test_conflicting_answer_is_detected(self) -> None:
-        conflicts = detect_conflict({"marital_status": "before_registration"}, {"marital_status": "registered"})
+        conflicts = detect_conflict(
+            {"marital_status": "before_registration"},
+            {"marital_status": "registered"},
+        )
 
         self.assertEqual(conflicts, ("marital_status",))
 

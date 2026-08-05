@@ -6,11 +6,8 @@ FastAPI 기반 모듈러 모놀리스 백엔드입니다. 대화 오케스트레
 
 ```bash
 cd backend
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv sync --extra dev
+uv run uvicorn app.main:app --reload
 ```
 
 Health Check:
@@ -19,14 +16,13 @@ Health Check:
 curl http://localhost:8000/health
 ```
 
-API 문서는 실행 후 `http://localhost:8000/docs`에서 확인합니다.
+Swagger 문서는 실행 후 `http://localhost:8000/`에서 확인합니다.
 
 ## 테스트
 
 ```bash
 cd backend
-source .venv/bin/activate
-python -m unittest discover
+uv run pytest
 ```
 
 ## 환경변수

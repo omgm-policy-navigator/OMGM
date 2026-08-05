@@ -7,7 +7,7 @@
 ## 폴더 책임
 
 - `frontend/`: React Web UI와 브라우저 상태. 챗봇 패널, 정책 그래프, 정책 상세, 내 정책, 저장 정책, 알림 상태, 확인 필요 정보 입력, 판정 결과와 정책 근거 표시를 담당한다.
-- `backend/`: FastAPI 모듈러 모놀리스. API, REST/SSE 경계, 대화 오케스트레이션, 질문 엔진, 정책 조회, Rule Engine, RAG, 그래프 Projection, 저장 정책, 알림, 사용자 사실 정보, 판정 결과 관리를 담당한다.
+- `backend/`: FastAPI 모듈러 모놀리스. `backend/app` 아래 API, REST/SSE 경계, 대화 오케스트레이션, 질문 엔진, 정책 조회, Rule Engine, RAG, 그래프 Projection, 저장 정책, 알림, 사용자 사실 정보, 판정 결과 관리를 담당한다.
 - `data-pipeline/`: 정책 수집, 원문 보존, 파싱, 정규화, 조건 후보 추출, 문서 청크, 임베딩 준비, 관리자 검수 전 데이터 품질 확인을 담당한다.
 - `infra/`: Docker Compose, PostgreSQL, pgvector, Ollama, 초기화 스크립트, 로컬 인프라 실행 문서를 담당한다.
 - `docs/`: 제품, 아키텍처, 도메인, 데이터, RAG, 보안, 개발 추적, ADR, troubleshooting 기준을 담당한다.

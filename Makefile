@@ -51,9 +51,7 @@ dev-down:
 setup: setup-backend setup-pipeline setup-frontend
 
 setup-backend:
-	cd backend && python3.11 -m venv .venv
-	cd backend && . .venv/bin/activate && python -m pip install --upgrade pip
-	cd backend && . .venv/bin/activate && python -m pip install -e .
+	cd backend && UV_CACHE_DIR=../.uv-cache uv sync --extra dev
 
 setup-pipeline:
 	cd data-pipeline && python3.11 -m venv .venv
@@ -64,7 +62,7 @@ setup-frontend:
 	cd frontend && npm install
 
 backend-run:
-	cd backend && . .venv/bin/activate && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+	cd backend && UV_CACHE_DIR=../.uv-cache uv run uvicorn app.main:app --reload
 
 frontend-run:
 	cd frontend && npm run dev
@@ -78,7 +76,7 @@ pipeline-sample:
 test: test-backend test-pipeline test-frontend typecheck-frontend build-frontend
 
 test-backend:
-	cd backend && . .venv/bin/activate && python -m unittest discover
+	cd backend && UV_CACHE_DIR=../.uv-cache uv run pytest
 
 test-pipeline:
 	cd data-pipeline && . .venv/bin/activate && python -m unittest discover
@@ -121,7 +119,7 @@ verify:
 	$(MAKE) compose-config
 	$(MAKE) env-check
 	$(MAKE) test
-	backend/.venv/bin/python scripts/check-doc-links.py
+	python3 scripts/check-doc-links.py
 
 clean:
 	rm -rf frontend/dist frontend/tsconfig.tsbuildinfo
