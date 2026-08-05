@@ -255,11 +255,57 @@ Two workflows are required once OpenAPI is available:
 
 The contract sync workflow may use an action such as `peter-evans/create-pull-request` to update the OpenAPI snapshot, generated TypeScript schema, and any required mock fixture adjustments. Failures in the sync workflow should alert maintainers but must not block unrelated UI-only PRs.
 
+Contract sync failures must page the owning maintainers through the team's configured notification channel. Slack, Discord, email, or a GitHub issue fallback are acceptable; silent scheduled failures are not. The alert must identify the backend source ref, failing step, generated diff status when available, and whether an update PR was created.
+
+Example failure hook intent:
+
+```yaml
+- name: Notify contract sync failure
+  if: failure()
+  uses: rtCamp/action-slack-notify@v2
+  env:
+    SLACK_WEBHOOK: ${{ secrets.CONTRACT_SYNC_SLACK_WEBHOOK }}
+    SLACK_TITLE: OpenAPI contract sync failed
+    SLACK_MESSAGE: >
+      Backend OpenAPI sync failed. Check the workflow logs and resolve
+      frontend snapshot drift before merging dependent API/UI changes.
+```
+
+If chat notification secrets are unavailable, the workflow must create or update a tracked GitHub issue assigned to backend and frontend owners.
+
 Frontend CI should use path filtering and dependency caching:
 
 - Use `paths` or `dorny/paths-filter` so heavy frontend guardrail jobs run when `frontend/src/**`, `frontend/package*.json`, `frontend/tsconfig.json`, frontend lint config, mock files, or OpenAPI snapshot/generated schema files change.
 - Docs-only changes such as `docs/**` and `*.md` may run documentation checks without running heavy frontend build jobs, unless the docs change is in an API contract path that the PR explicitly wants to validate.
 - Cache npm dependencies by `frontend/package-lock.json`.
+
+Local developer feedback should catch cheap failures before CI. Once lint tooling exists, add Husky and lint-staged as a lightweight pre-commit layer:
+
+- Run staged-file ESLint and formatting checks on changed frontend files.
+- Run fast guardrail scans for UI store DTO storage and inline suppression in changed files.
+- Avoid full production build, Docker, backend, or network-dependent OpenAPI sync in pre-commit.
+- Keep full `typecheck`, tests, OpenAPI snapshot diff, and build in CI because hooks can be skipped.
+
+Example intent:
+
+```json
+{
+  "scripts": {
+    "prepare": "husky",
+    "lint:staged": "lint-staged",
+    "guardrails:staged": "node scripts/check-frontend-guardrails.mjs --staged"
+  },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx}": [
+      "eslint --max-warnings=0",
+      "node scripts/check-frontend-guardrails.mjs --files"
+    ],
+    "frontend/tsconfig.json": ["npm --prefix frontend run typecheck"]
+  }
+}
+```
+
+The pre-commit hook improves DX but does not replace CI; CI remains authoritative.
 
 ## Loading, Error, and Empty States
 
@@ -502,6 +548,8 @@ function PolicyGraphPanelShell({ isActivePanel }: { isActivePanel: boolean }) {
 - Contract sync has a separate scheduled/manual/update-PR workflow from ordinary PR checks.
 - Frontend guardrail CI uses path filtering and npm dependency caching.
 - MSW Node server lifecycle is isolated for parallel Vitest workers and resets handlers after each test.
+- Contract sync failures alert backend and frontend owners through chat/email or issue fallback.
+- Local Husky/lint-staged pre-commit guardrails are specified for fast staged-file feedback.
 - F0 status and verification are recorded in this phase folder.
 
 ## Out of Scope

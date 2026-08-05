@@ -174,8 +174,26 @@ CI/CD guardrail once OpenAPI exists:
 - Treat manual MSW response changes without regenerated types as incomplete.
 - Keep live backend OpenAPI fetching out of ordinary frontend PR CI. Refreshing the committed OpenAPI snapshot from a running backend, remote artifact, scheduled job, or manual sync workflow is separate so backend network availability does not block UI-only PRs.
 - Add a scheduled or manually dispatched contract-sync workflow that fetches the latest backend OpenAPI, compares it with the committed snapshot, and opens an update PR when drift is detected. The update PR should include the snapshot, generated API types, and any mock updates needed for typecheck.
+- Add failure notification for the contract-sync workflow. Use Slack, Discord, email, or a GitHub issue fallback so backend/frontend owners know when snapshot drift cannot be resolved automatically.
 - Use path filtering so docs-only PRs do not pay for heavy frontend CI unless they change API contract snapshots or frontend guardrail docs that the PR explicitly wants to validate.
 - Cache npm dependencies by `frontend/package-lock.json`.
+
+Failure notification must include:
+
+- Workflow run URL.
+- Backend OpenAPI source ref or artifact id.
+- Whether the failure happened during fetch, compare, type generation, typecheck, or update PR creation.
+- Owner group expected to act next.
+
+## Local Pre-Commit Guardrails
+
+Once ESLint/MSW/OpenAPI implementation begins, configure Husky and lint-staged for fast local checks:
+
+- Staged frontend TypeScript files run ESLint with `--max-warnings=0`.
+- Staged UI store files run the guardrail scan that blocks full API response DTO storage and inline suppressions.
+- Staged mock handler or generated schema files run the fastest available type contract check.
+- Pre-commit must not fetch live backend OpenAPI or require Docker/network.
+- Developers may bypass hooks in emergencies, so CI remains the source of truth.
 
 ## MSW Environment Boundaries
 

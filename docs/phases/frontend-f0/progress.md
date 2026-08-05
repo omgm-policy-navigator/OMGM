@@ -43,6 +43,8 @@ Completed on branch `frontend-f0-screen-state-contracts`.
 - Added separate PR-check and contract-sync workflow responsibilities for OpenAPI snapshot drift.
 - Added CI path filtering and npm cache guidance to avoid heavy frontend jobs on unrelated docs-only changes.
 - Added MSW parallel test isolation requirements for Vitest worker environments.
+- Added contract sync failure alerting requirements for Slack, Discord, email, or GitHub issue fallback.
+- Added local Husky/lint-staged pre-commit guardrails for fast staged-file frontend feedback without network coupling.
 
 ## Deferred
 

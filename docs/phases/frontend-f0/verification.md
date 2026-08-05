@@ -91,6 +91,16 @@ git diff --check
 
 Result: passed.
 
+After adding the seventh review follow-ups for contract-sync failure alerting and local Husky/lint-staged pre-commit guardrails, these checks were rerun:
+
+```bash
+cd frontend && npm.cmd run typecheck
+python scripts\check-doc-links.py
+git diff --check
+```
+
+Result: passed.
+
 ## Additional Attempts
 
 ```bash
