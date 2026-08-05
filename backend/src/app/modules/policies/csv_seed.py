@@ -66,6 +66,11 @@ class EvaluationMode(StrEnum):
     OFFICIAL_CONFIRMATION_REQUIRED = "OFFICIAL_CONFIRMATION_REQUIRED"
 
 
+class RuleReviewStatus(StrEnum):
+    APPROVED = "APPROVED"
+    DRAFT = "DRAFT"
+
+
 class ShowOperator(StrEnum):
     EQ = "EQ"
     NE = "NE"
@@ -111,6 +116,7 @@ REQUIRED_COLUMNS = {
         "question_id",
         "source_text",
         "evaluation_mode",
+        "review_status",
     },
     "04_question.csv": {
         "id",
@@ -201,6 +207,7 @@ class PolicyRule:
     question_id: str
     source_text: str
     evaluation_mode: EvaluationMode
+    review_status: RuleReviewStatus
 
     @property
     def requires_official_confirmation(self) -> bool:
@@ -239,7 +246,9 @@ class PolicySeedCatalog:
         return tuple(
             rule
             for rule in self.rules
-            if rule.policy_id == policy_id and rule.evaluation_mode is EvaluationMode.DETERMINISTIC
+            if rule.policy_id == policy_id
+            and rule.evaluation_mode is EvaluationMode.DETERMINISTIC
+            and rule.review_status is RuleReviewStatus.APPROVED
         )
 
     def confirmation_required_rules(self, policy_id: str) -> tuple[PolicyRule, ...]:
@@ -445,7 +454,9 @@ def _require_references(catalog: PolicySeedCatalog) -> None:
         if question.condition_key != rule.condition_key:
             raise PolicySeedError(f"Rule {rule.id} condition_key does not match question {question.id}")
         expected = _expected_option_values(rule)
-        if rule.evaluation_mode is EvaluationMode.DETERMINISTIC and question.options and expected is not None:
+        if rule.evaluation_mode is EvaluationMode.DETERMINISTIC and rule.review_status is not RuleReviewStatus.APPROVED:
+            raise PolicySeedError(f"Deterministic rule {rule.id} must be APPROVED")
+        if rule.review_status is RuleReviewStatus.APPROVED and question.options and expected is not None:
             available = {option.value for option in question.options}
             if not expected <= available:
                 raise PolicySeedError(f"Rule {rule.id} expected value is not reachable from question options")
@@ -495,6 +506,9 @@ def load_policy_seed(directory: Path) -> PolicySeedCatalog:
             source_text=row["source_text"],
             evaluation_mode=_require_enum(
                 EvaluationMode, row["evaluation_mode"], f"rule {row['id']}.evaluation_mode"
+            ),
+            review_status=_require_enum(
+                RuleReviewStatus, row["review_status"], f"rule {row['id']}.review_status"
             ),
         )
         for row in _read_rows(directory, "03_policy_rule.csv")

@@ -7,7 +7,13 @@ from shutil import copytree
 
 import pytest
 
-from app.modules.policies.csv_seed import EvaluationMode, PolicySeedError, RuleOperator, load_policy_seed
+from app.modules.policies.csv_seed import (
+    EvaluationMode,
+    PolicySeedError,
+    RuleOperator,
+    RuleReviewStatus,
+    load_policy_seed,
+)
 
 SEED_DIRECTORY = Path(__file__).resolve().parents[2] / "data" / "policy-seed"
 
@@ -94,6 +100,8 @@ def test_confirmation_mode_is_explicit_and_not_inferred_from_placeholder_name() 
 
     assert len(deterministic) == 102
     assert len(confirmation_required) == 31
+    assert all(rule.review_status is RuleReviewStatus.APPROVED for rule in deterministic)
+    assert all(rule.review_status is RuleReviewStatus.DRAFT for rule in confirmation_required)
     application_period_rule = next(
         rule for rule in catalog.rules if rule.expected_value == "APPLICATION_PERIOD"
     )
@@ -156,6 +164,18 @@ def test_unsupported_enum_value_is_rejected(tmp_path: Path) -> None:
     _rewrite_csv(seed, "03_policy_rule.csv", mutate)
 
     with pytest.raises(PolicySeedError, match="rule 1.operator has unsupported value"):
+        load_policy_seed(seed)
+
+
+def test_draft_rule_cannot_enter_deterministic_evaluation(tmp_path: Path) -> None:
+    seed = _copy_seed(tmp_path)
+
+    def mutate(rows: list[dict[str, str]]) -> None:
+        rows[0]["review_status"] = "DRAFT"
+
+    _rewrite_csv(seed, "03_policy_rule.csv", mutate)
+
+    with pytest.raises(PolicySeedError, match="Deterministic rule 1 must be APPROVED"):
         load_policy_seed(seed)
 
 

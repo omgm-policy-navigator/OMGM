@@ -26,6 +26,8 @@ RAG는 구조화 메타데이터와 Rule Engine으로 이미 선정 또는 평�
 
 현재 입력은 `08_policy_document.csv`의 38개 문서다. `embedding`은 아직 생성하지 않으며, 문서 DTO는 추후 청크·임베딩 단계의 입력으로만 사용한다. 요약 문서이므로 상세 기준 확인이 필요한 답변은 반드시 `source_url`의 공식 안내를 함께 제시한다.
 
+현재 RAG 검색 API와 vector repository는 구현되지 않았다. 따라서 빈 vector를 조회하는 런타임 경로도 없다. 후속 검색 API는 embedding 준비 여부를 먼저 확인하고, 준비되지 않았으면 vector 검색을 실행하지 않은 채 `INSUFFICIENT_EVIDENCE`와 빈 citations를 반환해야 한다. CSV 요약문을 vector 검색 결과인 것처럼 간주하지 않는다.
+
 ## LLM의 역할과 한계
 
 LLM은 질문 이해, 조건 추출 보조, 행정 용어 설명, Rule 결과 요약, RAG 근거 기반 답변 생성에 사용할 수 있다. 정책 문서는 명령이 아닌 데이터로 취급한다. LLM 응답 문자열만으로 자격을 확정하지 않는다.

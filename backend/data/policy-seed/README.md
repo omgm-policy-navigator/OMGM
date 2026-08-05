@@ -31,6 +31,9 @@
 - 질문 선택지는 `{"label":"혼인신고 완료","value":"MARRIED"}` 형태이며 UI에는 `label`, 사용자 사실과 Rule 비교에는 `value`를 사용합니다.
 - `show_condition`은 `condition_key`, `operator`, `value` 세 필드를 정확히 사용하며 `value`도 canonical value입니다.
 - Rule의 `evaluation_mode`가 `DETERMINISTIC`인 경우에만 구조화된 사용자 사실과 비교합니다.
+- 결정형 Rule은 `review_status=APPROVED`여야 하며, 공식 확인 필요 Rule은 `DRAFT`로 격리합니다.
+
+수동 원문 확인과 Seed 갱신 절차는 [정책 Seed 운영 가이드](../../../docs/data/policy-seed-operations.md)를 따릅니다.
 
 ## 권장 적재 순서
 category → policy → question → policy_rule → policy_relation → policy_document

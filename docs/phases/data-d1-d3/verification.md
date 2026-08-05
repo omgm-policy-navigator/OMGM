@@ -4,7 +4,7 @@
 
 - `docker compose -f compose.yaml -f compose.dev.yaml config --quiet`: 통과
 - `docker compose -f compose.yaml -f compose.dev.yaml run --build --rm backend alembic upgrade head`: 통과 (`20260805_0001`)
-- `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest`: 73 passed (CSV 도메인 계약과 Windows CRLF/Linux LF 호환 회귀 테스트 포함)
+- `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend pytest`: 74 passed (Rule 승인 격리, CSV 도메인 계약과 Windows CRLF/Linux LF 호환 회귀 테스트 포함)
 - `docker compose -f compose.yaml -f compose.dev.yaml run --rm backend ruff check src/app tests`: 통과
 - `docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps frontend npm test`: 1 passed
 - Frontend Docker Lint, typecheck, build: 통과
