@@ -1,0 +1,50 @@
+﻿id,category_id,condition_key,question_text,answer_type,options,priority,parent_question_id,show_condition
+1,1,RESIDENCE_REGION,현재 주민등록상 거주지는 어디인가요?,SINGLE_SELECT,"[""서울"",""경기"",""인천"",""기타"",""잘 모르겠어요""]",1,,
+2,1,MARRIAGE_STATUS,현재 혼인 상태는 어떻게 되나요?,SINGLE_SELECT,"[""결혼 예정"",""혼인신고 완료"",""사실혼"",""한부모"",""해당 없음""]",2,,
+3,3,MARRIAGE_REGISTRATION_DATE,혼인신고일은 언제인가요?,DATE,,3,,
+4,1,RESIDENCE_DURATION_DAYS,서울에 연속으로 거주한 기간은 얼마나 되나요?,NUMBER,,4,1,"{""condition_key"":""RESIDENCE_REGION"",""operator"":""EQ"",""value"":""서울""}"
+5,1,HOME_OWNERSHIP,부부 두 분 모두 무주택인가요?,SINGLE_SELECT,"[""예"",""아니오"",""잘 모르겠어요""]",5,,
+6,1,HOUSEHOLD_INCOME,부부합산 연소득 또는 최근 소득자료를 입력할 수 있나요?,MONEY,,6,,
+7,1,HOUSEHOLD_ASSET,부부합산 순자산 규모를 알고 있나요?,MONEY,,7,,
+8,1,CURRENT_HOUSING_TYPE,현재 주거 형태는 무엇인가요?,SINGLE_SELECT,"[""전세"",""월세"",""자가"",""가족과 거주"",""기타""]",8,,
+9,1,RENT_CONTRACT_STATUS,전·월세 계약은 어느 단계인가요?,SINGLE_SELECT,"[""계약 전"",""계약 예정"",""계약 완료"",""해당 없음""]",9,,
+10,3,WEDDING_STATUS,결혼식 준비 상태는 어떻게 되나요?,SINGLE_SELECT,"[""미정"",""예정"",""장소 예약 완료"",""예식 완료""]",10,,
+11,5,PREGNANCY_OR_POSTPARTUM,현재 임신·출산 단계는 어떻게 되나요?,SINGLE_SELECT,"[""임신 준비"",""임신 중"",""출산 후"",""해당 없음""]",11,,
+12,5,CHILD_COUNT,자녀는 몇 명인가요?,NUMBER,,12,,
+13,5,CHILD_BIRTH_DATE,자녀의 출생일 또는 출산예정일은 언제인가요?,DATE,,13,11,"{""condition_key"":""PREGNANCY_OR_POSTPARTUM"",""operator"":""IN"",""value"":[""임신 중"",""출산 후""]}"
+20,1,RELATED_POLICY_USED,이미 신청하거나 지원받은 관련 정책이 있나요?,MULTI_SELECT,"[""서울시 임차보증금 이자지원"",""반환보증료 지원"",""공공예식장 비품비"",""결혼·살림비"",""없음"",""잘 모르겠어요""]",20,,
+21,1,GUARANTEE_PROVIDER,가입한 전세보증금 반환보증 기관은 어디인가요?,SINGLE_SELECT,"[""HF"",""HUG"",""SGI"",""미가입"",""잘 모르겠어요""]",21,9,"{""condition_key"":""RENT_CONTRACT_STATUS"",""operator"":""EQ"",""value"":""계약 완료""}"
+22,1,GUARANTEE_FEE_PAID,반환보증 보증료를 이미 납부했나요?,BOOLEAN,"[""예"",""아니오""]",22,21,"{""condition_key"":""GUARANTEE_PROVIDER"",""operator"":""IN"",""value"":[""HF"",""HUG"",""SGI""]}"
+23,1,HOUSING_COST_EXISTS,현재 월세나 전세대출 이자를 부담하고 있나요?,BOOLEAN,"[""예"",""아니오""]",23,,
+24,1,SUBSCRIPTION_ANNOUNCEMENT,신청하려는 공공주택의 모집공고가 열려 있나요?,SINGLE_SELECT,"[""예"",""아니오"",""잘 모르겠어요""]",24,,
+25,2,HOME_PURCHASE_STATUS,주택 구입 계획 또는 매매계약이 있나요?,SINGLE_SELECT,"[""계획 없음"",""검토 중"",""계약 예정"",""계약 완료""]",25,,
+26,3,SEOUL_LIVING_CONNECTION,본인·예비배우자 또는 부모 중 서울 거주·생활권에 해당하는 사람이 있나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",26,,
+27,3,VENUE_AVAILABILITY,희망하는 공공예식장과 날짜를 확인했나요?,BOOLEAN,"[""예"",""아니오""]",27,10,"{""condition_key"":""WEDDING_STATUS"",""operator"":""IN"",""value"":[""예정"",""장소 예약 완료""]}"
+28,3,APPLICATION_BEFORE_EVENT,예식일 전 신청기한을 지킬 수 있나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",28,10,"{""condition_key"":""WEDDING_STATUS"",""operator"":""EQ"",""value"":""장소 예약 완료""}"
+29,3,EXPENSE_RECEIPT_EXISTS,결혼·살림 관련 지출 영수증을 보관하고 있나요?,BOOLEAN,"[""예"",""아니오""]",29,,
+30,3,WEDDING_DATE,예식 예정일은 언제인가요?,DATE,,30,10,"{""condition_key"":""WEDDING_STATUS"",""operator"":""IN"",""value"":[""예정"",""장소 예약 완료""]}"
+31,4,TAX_YEAR,확인하려는 연말정산 귀속연도는 언제인가요?,NUMBER,,31,,
+32,4,PREVIOUSLY_CLAIMED,혼인세액공제를 이전에 적용받은 적이 있나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",32,,
+33,5,CHILD_AGE,자녀의 현재 나이는 몇 세인가요?,NUMBER,,33,12,"{""condition_key"":""CHILD_COUNT"",""operator"":""GT"",""value"":0}"
+34,4,TAX_DEPENDENT,해당 자녀가 기본공제 대상인가요?,SINGLE_SELECT,"[""예"",""아니오"",""잘 모르겠어요""]",34,12,"{""condition_key"":""CHILD_COUNT"",""operator"":""GT"",""value"":0}"
+35,5,BIRTH_OR_ADOPTION,이번 과세기간에 출산 또는 입양 신고가 있었나요?,SINGLE_SELECT,"[""출산"",""입양"",""없음""]",35,,
+36,4,RENT_PAYMENT_EXISTS,본인 명의로 월세를 지급하고 있나요?,BOOLEAN,"[""예"",""아니오""]",36,,
+37,4,RENT_CONTRACT_ADDRESS_MATCH,주민등록 주소와 임대차계약서 주소가 일치하나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",37,36,"{""condition_key"":""RENT_PAYMENT_EXISTS"",""operator"":""EQ"",""value"":""예""}"
+38,4,SUBSCRIPTION_SAVINGS_PAYMENT,주택청약종합저축에 납입하고 있나요?,BOOLEAN,"[""예"",""아니오""]",38,,
+39,5,EMPLOYMENT_STATUS,본인 또는 배우자의 근로 형태는 무엇인가요?,MULTI_SELECT,"[""근로자"",""1인 자영업자"",""프리랜서"",""플랫폼 노동자"",""소상공인 근로자"",""기타""]",39,,
+40,4,EMPLOYER_ALLOWANCE,회사에서 출산·보육수당을 받고 있나요?,BOOLEAN,"[""예"",""아니오""]",40,39,"{""condition_key"":""EMPLOYMENT_STATUS"",""operator"":""CONTAINS"",""value"":""근로자""}"
+41,5,OWN_CARD_AVAILABLE,본인 명의의 지원 가능 신용·체크카드가 있나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",41,,
+42,5,MOTHER_APPLICANT,산모 본인이 신청하나요?,BOOLEAN,"[""예"",""아니오""]",42,,
+43,5,CHILD_BIRTH_REGISTERED,출생신고를 완료했나요?,BOOLEAN,"[""예"",""아니오""]",43,11,"{""condition_key"":""PREGNANCY_OR_POSTPARTUM"",""operator"":""EQ"",""value"":""출산 후""}"
+44,5,CHILD_NATIONALITY_OR_RESIDENCY,출생아의 주민등록·국적 요건을 확인했나요?,SINGLE_SELECT,"[""충족"",""미충족"",""잘 모르겠어요""]",44,43,"{""condition_key"":""CHILD_BIRTH_REGISTERED"",""operator"":""EQ"",""value"":""예""}"
+45,5,CHILD_AGE_MONTHS,자녀의 월령은 몇 개월인가요?,NUMBER,,45,12,"{""condition_key"":""CHILD_COUNT"",""operator"":""GT"",""value"":0}"
+46,5,CHILDCARE_TYPE,현재 주된 양육 방식은 무엇인가요?,SINGLE_SELECT,"[""가정양육"",""어린이집"",""유치원"",""친인척 돌봄"",""민간돌봄""]",46,,
+47,5,CARE_GAP,맞벌이·질병·취업준비 등으로 양육공백이 있나요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",47,,
+48,5,CARE_PROVIDER,주된 돌봄 제공자는 누구인가요?,SINGLE_SELECT,"[""부모"",""조부모·친인척"",""공공 아이돌보미"",""민간 돌보미"",""어린이집""]",48,,
+49,5,HOME_VISIT_CONSENT,간호사 또는 건강관리사의 가정방문 상담을 희망하나요?,BOOLEAN,"[""예"",""아니오""]",49,,
+50,5,SERVICE_NEEDED,산후 건강관리사의 방문 서비스가 필요한가요?,BOOLEAN,"[""예"",""아니오""]",50,11,"{""condition_key"":""PREGNANCY_OR_POSTPARTUM"",""EQ"":""출산 후""}"
+51,5,PREGNANCY_CONFIRMED,의료기관에서 임신확인을 받았나요?,BOOLEAN,"[""예"",""아니오""]",51,11,"{""condition_key"":""PREGNANCY_OR_POSTPARTUM"",""operator"":""EQ"",""value"":""임신 중""}"
+52,5,HEALTH_INSURANCE_ELIGIBLE,국민건강보험 가입자 또는 피부양자인가요?,BOOLEAN,"[""예"",""아니오"",""잘 모르겠어요""]",52,,
+53,5,SPOUSE_GAVE_BIRTH,배우자가 최근 출산했나요?,BOOLEAN,"[""예"",""아니오""]",53,,
+54,5,LEAVE_DAYS,배우자 출산으로 쉬거나 소득활동을 중단한 일수는 며칠인가요?,NUMBER,,54,53,"{""condition_key"":""SPOUSE_GAVE_BIRTH"",""operator"":""EQ"",""value"":""예""}"
+55,5,APPLICATION_PERIOD_OPEN,현재 해당 연도 모집기간인가요?,SINGLE_SELECT,"[""예"",""아니오"",""잘 모르겠어요""]",55,,

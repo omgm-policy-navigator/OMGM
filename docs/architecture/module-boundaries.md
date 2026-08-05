@@ -86,21 +86,27 @@
 
 테스트 범위: 정보 부족, 필수 조건 불충족, 충족, 답변 충돌, 정책 버전 변경.
 
+## `backend/src/app/modules/policies`
+
+책임: `backend/data/policy-seed`의 검수된 CSV를 읽기 전용으로 로딩하고 ID·참조·URL·RAG 문서 연결을 검증한다.
+
+출력: Policy Seed Catalog, 결정형 평가 가능 Rule, 공식 확인 필요 Rule, RAG 문서 DTO.
+
+금지 의존성: FastAPI Router, SQLAlchemy Session, 외부 원문 수집, CSV 변경.
+
 ## 향후 백엔드 기능 모듈
 
-`conversation`, `questions`, `policies`, `rag`, `graph`, `saved_policies`, `notifications`는 실제 구현이 시작될 때 생성한다. Phase 0에서는 빈 폴더를 미리 만들지 않는다.
+`conversation`, `questions`, `rag`, `graph`, `saved_policies`, `notifications`는 실제 구현이 시작될 때 생성한다. `policies`는 CSV 기준 데이터 로딩 구현이 시작되어 생성되었다.
 
-## `data-pipeline/`
+## `backend/data/policy-seed/`
 
-책임: 정책 수집, 파싱, 정규화, 조건 후보 추출, 청크, 임베딩 준비, 검수 상태 준비.
+책임: 관리자 검수를 마친 MVP 정책 CSV 기준본. 별도 수집·정규화 실행 과정 없이 백엔드가 직접 읽는다.
 
-입력: 원천 정책 데이터, 샘플 JSON, 환경변수.
+입력: 저장소 변경으로 승인된 CSV 파일.
 
-출력: 내부 정책 모델 후보, 청크 후보, 임베딩 저장 대상.
+출력: 정책·질문·Rule·관계·RAG 문서 기준 데이터.
 
-금지 의존성: 프론트엔드 코드, API 요청 처리 경로, 최종 사용자 응답 생성.
-
-테스트 범위: 설정 로딩, 샘플 입력 처리.
+금지 사항: 개인정보 저장, 런타임 변경, placeholder 기준을 확정값으로 해석.
 
 ## `infra/`
 

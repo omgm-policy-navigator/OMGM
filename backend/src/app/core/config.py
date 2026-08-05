@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.errors import ConfigurationError
 
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+DEFAULT_POLICY_SEED_DIR = Path(__file__).resolve().parents[3] / "data" / "policy-seed"
 
 
 class AppConfig(BaseSettings):
@@ -23,6 +26,7 @@ class AppConfig(BaseSettings):
     ollama_generation_model: str = "qwen3:4b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
     llm_timeout_seconds: int = Field(default=30, gt=0)
+    policy_seed_dir: Path = DEFAULT_POLICY_SEED_DIR
 
     @field_validator("log_level")
     @classmethod

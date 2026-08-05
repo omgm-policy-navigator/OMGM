@@ -2,7 +2,7 @@
 
 ## Contract Status
 
-This document is the Phase B0 backend API draft. Only `GET /health` is implemented. Other endpoints define mockable contracts so frontend, backend, and data-pipeline work can proceed without sharing internal entities.
+This document is the Phase B0 backend API draft. Only `GET /health` is implemented. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog is an internal backend input and is not an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 

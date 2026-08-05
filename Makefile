@@ -1,8 +1,8 @@
 SHELL := /bin/sh
 
-.PHONY: help check-env env-check dev dev-logs dev-down setup setup-backend setup-pipeline setup-frontend \
-	backend-run frontend-run pipeline-run pipeline-sample \
-	test test-backend test-pipeline test-frontend typecheck-frontend build-frontend \
+.PHONY: help check-env env-check dev dev-logs dev-down setup setup-backend setup-frontend \
+	backend-run frontend-run \
+	test test-backend test-frontend typecheck-frontend build-frontend \
 	docker-up docker-build docker-infra-up docker-down docker-ps docker-logs compose-config \
 	health verify clean
 
@@ -12,11 +12,10 @@ help:
 	@printf "%s\n" "  dev-logs          Follow logs for every local service"
 	@printf "%s\n" "  dev-down          Stop the local development stack"
 	@printf "%s\n" "  env-check         Verify local env files are not tracked"
-	@printf "%s\n" "  setup             Install backend, data-pipeline, and frontend dependencies"
+	@printf "%s\n" "  setup             Install backend and frontend dependencies"
 	@printf "%s\n" "  backend-run       Run FastAPI backend on port 8000"
 	@printf "%s\n" "  frontend-run      Run Vite frontend on port 5173"
-	@printf "%s\n" "  pipeline-sample   Run policy pipeline with sample data"
-	@printf "%s\n" "  test              Run backend, pipeline, frontend test/typecheck/build"
+	@printf "%s\n" "  test              Run backend and frontend test/typecheck/build"
 	@printf "%s\n" "  docker-up         Build and run the full local stack"
 	@printf "%s\n" "  docker-infra-up   Run PostgreSQL/pgvector and Ollama only"
 	@printf "%s\n" "  docker-down       Stop local Docker Compose stack"
@@ -32,7 +31,6 @@ check-env:
 env-check:
 	@git check-ignore -q .env
 	@git check-ignore -q backend/.venv/
-	@git check-ignore -q data-pipeline/.venv/
 	@git check-ignore -q frontend/node_modules/
 	@git check-ignore -q frontend/dist/
 	@git check-ignore -q frontend/tsconfig.tsbuildinfo
@@ -48,17 +46,12 @@ dev-logs:
 dev-down:
 	docker compose down
 
-setup: setup-backend setup-pipeline setup-frontend
+setup: setup-backend setup-frontend
 
 setup-backend:
 	cd backend && python3.11 -m venv .venv
 	cd backend && . .venv/bin/activate && python -m pip install --upgrade pip
 	cd backend && . .venv/bin/activate && python -m pip install -e .
-
-setup-pipeline:
-	cd data-pipeline && python3.11 -m venv .venv
-	cd data-pipeline && . .venv/bin/activate && python -m pip install --upgrade pip
-	cd data-pipeline && . .venv/bin/activate && python -m pip install -e .
 
 setup-frontend:
 	cd frontend && npm install
@@ -69,19 +62,10 @@ backend-run:
 frontend-run:
 	cd frontend && npm run dev
 
-pipeline-run:
-	cd data-pipeline && . .venv/bin/activate && python -m policy_pipeline.main
-
-pipeline-sample:
-	cd data-pipeline && . .venv/bin/activate && python -m policy_pipeline.main --sample ../sample-data/sample-policy.json
-
-test: test-backend test-pipeline test-frontend typecheck-frontend build-frontend
+test: test-backend test-frontend typecheck-frontend build-frontend
 
 test-backend:
 	cd backend && . .venv/bin/activate && python -m unittest discover
-
-test-pipeline:
-	cd data-pipeline && . .venv/bin/activate && python -m unittest discover
 
 test-frontend:
 	cd frontend && npm test
@@ -125,4 +109,4 @@ verify:
 
 clean:
 	rm -rf frontend/dist frontend/tsconfig.tsbuildinfo
-	find backend data-pipeline -type d -name __pycache__ -prune -exec rm -rf {} +
+	find backend -type d -name __pycache__ -prune -exec rm -rf {} +
