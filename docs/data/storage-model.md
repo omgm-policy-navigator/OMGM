@@ -15,6 +15,15 @@ MVP 기준 PostgreSQL은 다음 데이터 영역을 관리한다.
 
 실제 테이블명과 필드는 기존 데이터 설계 문서가 확인되면 그 정의를 우선한다. Phase 0에서는 이름을 구현 계약으로 확정하지 않는다.
 
+## 정책 수집 파일 데이터
+
+데이터 파이프라인의 원문과 가공 산출물은 서로 다른 저장 루트를 사용한다.
+
+- Raw: 수집 당시의 immutable bytes와 JSON sidecar metadata. 원문 해시, 수집 시각, 출처 구분, 검수 상태를 보존한다.
+- Processed: Raw를 참조해 생성한 텍스트, 정규화 결과, 조건 후보, 청크, 임베딩 준비 산출물. Raw를 덮어쓰지 않는다.
+
+필드, 상태, 출처 판정과 경로 계약은 [Raw Policy Schema](raw-policy-schema.md)를 따른다. 실제 원문 파일은 Git과 샘플 데이터에서 제외한다.
+
 ## pgvector 검색 데이터
 
 pgvector는 PostgreSQL 확장으로 다음 데이터를 관리한다.

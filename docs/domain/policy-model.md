@@ -57,4 +57,4 @@ LLM으로 추출한 조건 후보는 검증 전까지 확정 판정 규칙으로
 
 ## 변경 탐지
 
-최소 변경 탐지 값은 원문 해시다. 다음 Phase에서 URL별 수집 주기, 해시 생성 범위, 구조화 조건 diff 기준을 확정해야 한다.
+최소 변경 탐지 값은 원문 해시다. D0에서 원문 해시는 수집해 보존한 exact bytes 전체의 SHA-256으로 확정했다. URL별 수집 주기와 구조화 조건 diff 기준은 후속 Phase에서 정한다. Raw 메타데이터와 저장 기준은 [Raw Policy Schema](../data/raw-policy-schema.md)를 따른다.

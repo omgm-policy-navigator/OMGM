@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omgm.local/schemas/raw-policy.schema.json",
+  "title": "OMGM Raw Policy Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "collection_id",
+    "raw_policy_id",
+    "source_authority",
+    "source_format",
+    "source_url",
+    "publisher",
+    "collected_at",
+    "content_sha256",
+    "media_type",
+    "collector",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "collection_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
+    },
+    "raw_policy_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
+    },
+    "source_authority": {
+      "enum": ["OFFICIAL", "SECONDARY"]
+    },
+    "source_format": {
+      "enum": ["API_JSON", "HTML", "PDF", "DOCUMENT", "TEXT"]
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://[^?#]+$"
+    },
+    "publisher": { "type": "string", "minLength": 1 },
+    "collected_at": { "type": "string", "format": "date-time" },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "media_type": { "type": "string", "minLength": 1 },
+    "original_filename": { "type": ["string", "null"] },
+    "collector": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": [
+        "COLLECTED",
+        "EXTRACTED",
+        "REVIEWING",
+        "APPROVED",
+        "REJECTED",
+        "OUTDATED"
+      ]
+    },
+    "status_updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "not": { "const": "COLLECTED" } } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["status_updated_at"],
+        "properties": { "status_updated_at": { "type": "string" } }
+      }
+    }
+  ]
+}
