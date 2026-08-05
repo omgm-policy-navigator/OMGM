@@ -33,7 +33,7 @@ backend/
 | Database sessions and persistence setup | `app/db` | SQLAlchemy/Alembic when introduced, `app/core` config | Expose SQLAlchemy sessions to analysis modules as a required dependency |
 | Rule Engine and eligibility evaluation | `app/modules/eligibility` | Structured policy rules, normalized user facts | Use LLM text to decide final status, generate natural-language explanations |
 | Business features | `app/modules` | `app/core`, `app/db` repositories, sibling modules through explicit module functions, `app/llm` | Create broad layered folders without real implementation |
-| LLM/Ollama boundary | `app/llm` | `app/core` config, HTTP client library when introduced | Decide eligibility, persist raw sensitive facts, bypass policy evidence |
+| LLM/Ollama boundary | `app/llm` | `app/core` config, AI output schemas, HTTP client library when introduced | Decide eligibility, persist raw sensitive facts, bypass policy evidence |
 | RAG | Future `app/modules/rag` | approved document chunks for policies selected by metadata and Rule Engine, embeddings, metadata filters, `app/llm` query helpers | Create policy eligibility candidates, invent policies, or make final eligibility decisions |
 | Graph projection | Future `app/modules/graph` | policy metadata, relationships, evaluation summaries | Own source policy data or mutate eligibility results |
 
@@ -48,6 +48,7 @@ backend/
 | Question engine and user facts | Future `app/modules/user_facts` | Mock API contract only |
 | Policy catalog and detail lookup | Future `app/modules/policies` | Mock API contract only |
 | Eligibility evaluation | `app/modules/eligibility` | Rule core implemented, API contract only |
+| AI output contract | `app/llm` | Pydantic schema implemented, behavior contract documented |
 | RAG evidence retrieval | Future `app/modules/rag` | Mock API contract only |
 | Policy graph projection | Future `app/modules/graph` | Mock API contract only |
 | Saved policies | Future `app/modules/saved_policies` | Deferred until retention and identity rules are decided |
