@@ -38,6 +38,42 @@
 
 테스트 범위: 기본 설정, 잘못된 포트, 잘못된 로그 레벨.
 
+## `backend/src/app/db`
+
+책임: 데이터베이스 세션 설정, migration 연결, persistence helper, 트랜잭션 경계의 공통 기준.
+
+입력: 설정값, repository 호출.
+
+출력: 데이터베이스 연결과 persistence 결과.
+
+금지 의존성: FastAPI Router 직접 참조, 분석 모듈에 SQLAlchemy Session 강제 전달, 프론트엔드 또는 파이프라인 코드 참조.
+
+테스트 범위: 설정 로딩, migration 연결, repository contract.
+
+## `backend/src/app/modules`
+
+책임: 대화, 질문, 정책 조회, RAG, 그래프 Projection, 저장 정책, 알림, 사용자 사실, 판정 결과 같은 기능 모듈의 소유 경계.
+
+입력: API DTO, 저장소 조회 결과, Rule Engine 결과, LLM/RAG 보조 결과.
+
+출력: API 응답 DTO에 매핑 가능한 module result.
+
+금지 의존성: 기능 없는 대량 폴더 생성, SQL을 라우터로 유출, API 응답 Schema와 DB Entity 직접 공유.
+
+테스트 범위: 기능별 unit test, API와 DB를 분리한 contract test.
+
+## `backend/src/app/llm`
+
+책임: Ollama 호출, LLM timeout 설정 적용, 질문 이해 보조, 검색 질의 보정, 설명 생성 보조에 필요한 DTO와 client 경계.
+
+입력: 최소화된 prompt DTO, 정책 근거 요약, 설정값.
+
+출력: 구조화 후보 또는 설명 초안.
+
+금지 의존성: 최종 자격 상태 결정, 금융·소득·자산 원천 거래 직접 전달, 정책 근거 없는 생성.
+
+테스트 범위: timeout/config 적용, fake client contract, 민감정보 최소화.
+
 ## `backend/src/app/eligibility`
 
 책임: 정책 규칙과 사용자 사실 비교, 충족·불충족·확인 필요 조건 계산, 판정 상태 계산.
