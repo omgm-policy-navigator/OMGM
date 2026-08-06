@@ -1,6 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from http import HTTPStatus
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,12 +9,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
+from app.modules.questions.engine import (
+    dependent_fact_keys,
+    next_questions,
+    progress,
+    question_for_fact,
+    supported_category,
+)
+from app.modules.questions.mappers import facts_to_dict, question_to_response
+from app.modules.questions.schemas import (
+    AnswerConflictResponse,
+    NextQuestionsResponse,
+    QuestionProgressResponse,
+    QuestionResponse,
+    SelectCategoryRequest,
+    SelectCategoryResponse,
+    SubmitAnswersRequest,
+    SubmitAnswersResponse,
+)
 from app.modules.sessions.schemas import CreateSessionResponse, SessionResponse, UpsertUserFactRequest, UserFactResponse
 from app.modules.sessions.security import validate_unsafe_origin
 from app.modules.sessions.service import (
     cleanup_expired_sessions,
     create_or_get_session,
     delete_current_session,
+    delete_session_facts_by_keys,
     list_session_facts,
     require_session,
     upsert_session_fact,
@@ -80,6 +100,59 @@ async def reject_client_session_injection(request: Request) -> None:
         reject_session_identifier()
 
 
+def require_category_code(category_code: str | None) -> str:
+    if category_code is None:
+        raise AppError(
+            "VALIDATION_ERROR",
+            "A session category must be selected first.",
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+    return category_code
+
+
+def validate_category_code(category_code: str) -> str:
+    normalized = category_code.strip().lower()
+    if not supported_category(normalized):
+        raise AppError(
+            "VALIDATION_ERROR",
+            "Category is not supported by the question engine.",
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+    return normalized
+
+
+def conflict_question_response(question: QuestionResponse, fact_key: str) -> QuestionResponse:
+    question.is_conflict_resolution = True
+    question.conflict_reason = f"Submitted answer conflicts with the existing confirmed fact for {fact_key}."
+    return question
+
+
+def detect_answer_conflicts(
+    category_code: str,
+    existing_facts: dict[str, Any],
+    submitted_facts: dict[str, Any],
+) -> list[AnswerConflictResponse]:
+    conflicts: list[AnswerConflictResponse] = []
+    combined = dict(existing_facts)
+    combined.update(submitted_facts)
+    for fact_key, submitted_value in submitted_facts.items():
+        if fact_key not in existing_facts or existing_facts[fact_key] == submitted_value:
+            continue
+        if dependent_fact_keys(category_code, fact_key):
+            continue
+        question = question_for_fact(category_code, fact_key, combined)
+        question_response = question_to_response(question) if question else None
+        conflicts.append(
+            AnswerConflictResponse(
+                factKey=fact_key,
+                existingValue=existing_facts[fact_key],
+                submittedValue=submitted_value,
+                question=conflict_question_response(question_response, fact_key) if question_response else None,
+            )
+        )
+    return conflicts
+
+
 @router.post("", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
     request: Request,
@@ -130,6 +203,21 @@ async def delete_session(
     return response
 
 
+@router.post("/category", response_model=SelectCategoryResponse)
+async def select_category(
+    payload: SelectCategoryRequest,
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> SelectCategoryResponse:
+    validate_unsafe_origin(request, allowed_origins(config))
+    category_code = validate_category_code(payload.category_code)
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    session.selected_category_code = category_code
+    await db.commit()
+    return SelectCategoryResponse(categoryCode=category_code)
+
+
 @router.get("/facts", response_model=list[UserFactResponse])
 async def get_facts(
     request: Request,
@@ -177,4 +265,77 @@ async def put_fact(
         source=fact.source,
         confirmed=fact.confirmed,
         updatedAt=fact.updated_at,
+    )
+
+
+@router.get("/questions/next", response_model=NextQuestionsResponse)
+async def get_next_questions(
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> NextQuestionsResponse:
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    category_code = require_category_code(session.selected_category_code)
+    facts = facts_to_dict(await list_session_facts(db, session))
+    _answered, _total, complete = progress(category_code, facts)
+    await db.commit()
+    return NextQuestionsResponse(
+        categoryCode=category_code,
+        items=[question_to_response(question) for question in next_questions(category_code, facts)],
+        complete=complete,
+    )
+
+
+@router.post("/answers", response_model=SubmitAnswersResponse)
+async def submit_answers(
+    payload: SubmitAnswersRequest,
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> SubmitAnswersResponse:
+    validate_unsafe_origin(request, allowed_origins(config))
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    category_code = require_category_code(session.selected_category_code)
+    current_facts = await list_session_facts(db, session)
+    existing_facts = facts_to_dict(current_facts)
+    submitted_facts = {answer.fact_key: answer.value for answer in payload.answers}
+    conflicts = detect_answer_conflicts(category_code, existing_facts, submitted_facts)
+    if conflicts:
+        await db.commit()
+        return SubmitAnswersResponse(status="conflicted", stored=[], conflicts=conflicts, nextQuestions=[])
+
+    stored: list[str] = []
+    invalidated: set[str] = set()
+    for answer in payload.answers:
+        changed = answer.fact_key in existing_facts and existing_facts[answer.fact_key] != answer.value
+        stale_fact_keys = dependent_fact_keys(category_code, answer.fact_key) if changed else set()
+        await upsert_session_fact(db, session, answer.fact_key, answer.value, "question_engine", answer.confirmed, None)
+        await delete_session_facts_by_keys(db, session, stale_fact_keys)
+        invalidated.update(stale_fact_keys)
+        stored.append(answer.fact_key)
+    merged_facts = dict(existing_facts)
+    merged_facts.update(submitted_facts)
+    for fact_key in invalidated:
+        merged_facts.pop(fact_key, None)
+    follow_ups = [question_to_response(question) for question in next_questions(category_code, merged_facts)]
+    await db.commit()
+    return SubmitAnswersResponse(status="stored", stored=stored, conflicts=[], nextQuestions=follow_ups)
+
+
+@router.get("/questions/progress", response_model=QuestionProgressResponse)
+async def get_question_progress(
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> QuestionProgressResponse:
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    category_code = require_category_code(session.selected_category_code)
+    facts = facts_to_dict(await list_session_facts(db, session))
+    answered, total, complete = progress(category_code, facts)
+    await db.commit()
+    return QuestionProgressResponse(
+        categoryCode=category_code,
+        answeredRequired=answered,
+        totalRequired=total,
+        complete=complete,
     )
