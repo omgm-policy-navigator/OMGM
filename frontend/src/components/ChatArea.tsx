@@ -1,4 +1,4 @@
-import { Send, Sparkles } from "lucide-react";
+import { RefreshCcw, Send, Sparkles } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import chatbotImage from "../assets/wedding-chatbot.svg";
 import { categories, type PolicyCategory } from "../data/policies";
@@ -6,9 +6,11 @@ import { appConfig } from "../shared/config/appConfig";
 import {
   createEvaluations,
   createSession,
+  deleteSession,
   getNextQuestions,
   getSessionGraph,
   selectCategory,
+  sendChatMessage,
   submitAnswer,
   type QuestionResponse,
   type SessionGraphResponse,
@@ -20,6 +22,8 @@ type ChatMessage = {
   text: string;
   time: string;
 };
+
+const CHAT_STORAGE_KEY = "omgm.chatbot.conversations.v1";
 
 const categoryMessages: Record<string, ChatMessage[]> = {
   housing: [
@@ -288,19 +292,56 @@ function fallbackMessages(category: PolicyCategory) {
   return categoryMessages[category.id] ?? categoryMessages.housing;
 }
 
+function readStoredMessages(): Record<string, ChatMessage[]> {
+  try {
+    const raw = window.localStorage?.getItem(CHAT_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, ChatMessage[]>).map(([categoryId, messages]) => [
+        categoryId,
+        messages.filter((message) => !/^(주거|대출|웨딩|세제 혜택|출산\/육아).*(실제 질문 엔진|질문 흐름)/.test(message.text)),
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredMessages(messagesByCategory: Record<string, ChatMessage[]>) {
+  try {
+    window.localStorage?.setItem(CHAT_STORAGE_KEY, JSON.stringify(messagesByCategory));
+  } catch {
+    return;
+  }
+}
+
+function clearStoredMessages() {
+  try {
+    window.localStorage?.removeItem(CHAT_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
 export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, onGraphChange }: ChatAreaProps) {
   const selectedCategory = categories.find(({ id }) => id === selectedCategoryId) ?? categories[0];
   const isLiveMode = appConfig.apiMode === "live";
+  const initialStoredMessages = useRef(readStoredMessages());
   const messageId = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const loadedCategoryIds = useRef(new Set<string>());
-  const [messagesByCategory, setMessagesByCategory] = useState<Record<string, ChatMessage[]>>(() => ({
-    [selectedCategory.id]: fallbackMessages(selectedCategory),
-  }));
+  const loadedCategoryIds = useRef(new Set(Object.keys(initialStoredMessages.current)));
+  const [messagesByCategory, setMessagesByCategory] = useState<Record<string, ChatMessage[]>>(() => initialStoredMessages.current);
   const [draft, setDraft] = useState("");
   const [activeQuestionsByCategory, setActiveQuestionsByCategory] = useState<Record<string, QuestionResponse | null>>({});
   const [loading, setLoading] = useState(false);
   const [liveIssuesByCategory, setLiveIssuesByCategory] = useState<Record<string, string | null>>({});
+  const [sessionResetNonce, setSessionResetNonce] = useState(0);
   const messages = messagesByCategory[selectedCategory.id] ?? fallbackMessages(selectedCategory);
   const activeQuestion = activeQuestionsByCategory[selectedCategory.id] ?? null;
   const liveIssue = liveIssuesByCategory[selectedCategory.id] ?? null;
@@ -320,6 +361,10 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   }, []);
 
   useEffect(() => {
+    writeStoredMessages(messagesByCategory);
+  }, [messagesByCategory]);
+
+  useEffect(() => {
     const controller = new AbortController();
     const categoryId = selectedCategory.id;
 
@@ -335,9 +380,6 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
         const [questions, graph] = await Promise.all([shouldInitializeConversation ? getNextQuestions(controller.signal) : Promise.resolve(null), getSessionGraph(selectedCategory.backendCategoryCode, controller.signal)]);
         onGraphChange(graph);
         if (questions) {
-          const intro = selectedCategory.liveNote
-            ? `${selectedCategory.label} 화면은 실제 백엔드의 ${selectedCategory.backendCategoryCode} 질문 흐름에 임시 연결되어 있어요.`
-            : `${selectedCategory.label} 주제의 실제 질문 엔진을 연결했어요.`;
           const nextQuestion = questions.items[0] ?? null;
           setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
           setMessagesByCategory((current) => ({
@@ -346,7 +388,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
               {
                 id: `live-intro-${categoryId}`,
                 from: "bot",
-                text: nextQuestion ? `${intro}\n${formatQuestion(nextQuestion)}` : `${intro}\n현재 추가 질문이 없습니다. 우측 그래프에서 정책 연결을 확인해보세요.`,
+                text: nextQuestion ? formatQuestion(nextQuestion) : "현재 추가 질문이 없습니다. 궁금한 내용을 입력하면 연결된 정책 기준으로 답변해드릴게요.",
                 time: messageTime(),
               },
             ],
@@ -376,7 +418,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
     setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: null }));
     setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: null }));
     return () => controller.abort();
-  }, [isLiveMode, onGraphChange, selectedCategory]);
+  }, [isLiveMode, onGraphChange, selectedCategory, sessionResetNonce]);
 
   useEffect(() => {
     if (typeof messagesEndRef.current?.scrollIntoView === "function") {
@@ -403,8 +445,21 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
     setDraft("");
     appendMessage(selectedCategory.id, "user", answerText);
 
-    if (!isLiveMode || !activeQuestion) {
-      appendMessage(selectedCategory.id, "bot", "현재 자유 입력형 챗봇 API는 아직 노출되어 있지 않아 실제 저장 없이 화면 대화만 표시됩니다.");
+    if (!isLiveMode) {
+      appendMessage(selectedCategory.id, "bot", "현재 실제 답변을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!activeQuestion) {
+      setLoading(true);
+      try {
+        const response = await sendChatMessage(answerText);
+        appendMessage(selectedCategory.id, "bot", response.answer || "연결된 정책 기준으로 답변할 내용을 찾지 못했습니다.");
+      } catch {
+        appendMessage(selectedCategory.id, "bot", "추가 질문 답변 중 문제가 발생했습니다. 백엔드 실행 상태를 확인해 주세요.");
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -442,6 +497,27 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
     }
   }
 
+  async function handleNewSession() {
+    setLoading(true);
+    try {
+      if (isLiveMode) {
+        await deleteSession();
+      }
+    } catch {
+      // 세션 쿠키가 없거나 이미 만료된 경우에도 화면 상태는 새로 시작한다.
+    } finally {
+      loadedCategoryIds.current.clear();
+      setMessagesByCategory({});
+      setActiveQuestionsByCategory({});
+      setLiveIssuesByCategory({});
+      setDraft("");
+      clearStoredMessages();
+      onGraphChange(null);
+      setSessionResetNonce((value) => value + 1);
+      setLoading(false);
+    }
+  }
+
   return (
     <section id="chat" className="flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-brand-border bg-white shadow-card" aria-label="챗봇 대화 영역">
       <header className="border-b border-brand-border p-6">
@@ -450,8 +526,20 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
             <h2 className="text-h3">정책 챗봇</h2>
             <p className="mt-1 text-body-sm text-text-secondary">주제를 선택하면 꼭 필요한 질문만 드려요.</p>
           </div>
-          <div className="hidden h-12 w-12 items-center justify-center rounded-xl bg-brand-surface text-brand-primary sm:flex">
-            <Sparkles size={22} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void handleNewSession();
+              }}
+              className="flex h-10 items-center gap-2 rounded-lg border border-brand-border bg-white px-3 text-caption text-text-secondary transition hover:border-brand-primary hover:text-brand-primary"
+            >
+              <RefreshCcw size={15} />
+              새 세션
+            </button>
+            <div className="hidden h-12 w-12 items-center justify-center rounded-xl bg-brand-surface text-brand-primary sm:flex">
+              <Sparkles size={22} />
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { getJson, postJson } from "./client";
+import { deleteJson, getJson, postJson } from "./client";
 
 export type QuestionOption = {
   label: string;
@@ -80,8 +80,31 @@ export type SessionGraphResponse = {
   truncated: boolean;
 };
 
+export type AIExplanationResponse = {
+  policyId: string | null;
+  eligibilityStatus: string;
+  evaluationState: string | null;
+  aiStatus: string;
+  answer: string;
+  citations: Array<{
+    sourceId: string;
+    policyId: string;
+    title: string;
+    url: string;
+    sourceLabel: string;
+    evidenceId: string;
+    excerpt: string | null;
+    sourceLocation: string | null;
+    similarity: number | null;
+  }>;
+};
+
 export function createSession(signal?: AbortSignal) {
   return postJson<{ status: string }>("/api/v1/session", undefined, { signal });
+}
+
+export function deleteSession(signal?: AbortSignal) {
+  return deleteJson("/api/v1/session", { signal });
 }
 
 export function selectCategory(categoryCode: string, signal?: AbortSignal) {
@@ -116,4 +139,8 @@ export function createEvaluations(signal?: AbortSignal) {
 export function getSessionGraph(categoryCode: string, signal?: AbortSignal) {
   const params = new URLSearchParams({ category: categoryCode, max_nodes: "18" });
   return getJson<SessionGraphResponse>(`/api/v1/session/graph?${params.toString()}`, { signal });
+}
+
+export function sendChatMessage(message: string, signal?: AbortSignal) {
+  return postJson<AIExplanationResponse>("/api/chat", { message }, { signal });
 }
