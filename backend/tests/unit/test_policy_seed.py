@@ -61,7 +61,43 @@ def test_reviewed_seed_loads_as_a_linked_catalog() -> None:
     assert len(catalog.rules) == 133
     assert len(catalog.relations) == 24
     assert len(catalog.rag_documents()) == 38
+    assert len(catalog.embedding_seed()) == 38
     assert {document.policy_id for document in catalog.rag_documents()} == set(catalog.policies)
+    assert {chunk.policy_id for chunk in catalog.embedding_seed()} == set(catalog.policies)
+
+
+def test_embedding_seed_chunks_preserve_source_provenance_and_hashes() -> None:
+    catalog = load_policy_seed(SEED_DIRECTORY)
+
+    for chunk in catalog.embedding_seed():
+        assert chunk.source_url.startswith(("http://", "https://"))
+        assert chunk.source_location
+        assert len(chunk.content_hash) == 64
+        assert hashlib.sha256(chunk.content.encode("utf-8")).hexdigest() == chunk.content_hash
+
+
+def test_chunk_with_changed_content_is_rejected(tmp_path: Path) -> None:
+    seed = _copy_seed(tmp_path)
+
+    def mutate(rows: list[dict[str, str]]) -> None:
+        rows[0]["content"] = "검수되지 않은 변경 내용"
+
+    _rewrite_csv(seed, "10_policy_document_chunk.csv", mutate)
+
+    with pytest.raises(PolicySeedError, match="content hash does not match content"):
+        load_policy_seed(seed)
+
+
+def test_chunk_source_url_must_match_its_document(tmp_path: Path) -> None:
+    seed = _copy_seed(tmp_path)
+
+    def mutate(rows: list[dict[str, str]]) -> None:
+        rows[0]["source_url"] = "https://example.go.kr/wrong-source"
+
+    _rewrite_csv(seed, "10_policy_document_chunk.csv", mutate)
+
+    with pytest.raises(PolicySeedError, match="source URL does not match document"):
+        load_policy_seed(seed)
 
 
 def test_question_options_expose_labels_and_canonical_values() -> None:

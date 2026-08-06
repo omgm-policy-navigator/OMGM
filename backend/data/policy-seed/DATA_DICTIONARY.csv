@@ -9,3 +9,7 @@ question,options,"label과 canonical value를 갖는 JSON 객체 배열"
 question,show_condition,"condition_key, operator, value를 갖는 조건부 질문 JSON 객체"
 policy_relation,relation_type,"BEFORE, AFTER, RELATED, ALTERNATIVE, CONFLICT, REEVALUATE_AFTER"
 policy_document,embedding,pgvector 적재 전에는 빈 값; 임베딩 파이프라인에서 생성
+policy_document_chunk,source_location,원문 내 제목·조항·문단·표 행 위치
+policy_document_chunk,quality_status,"APPROVED, REVIEW_REQUIRED; APPROVED만 임베딩 입력 허용"
+policy_document_chunk,content_hash,Chunk content UTF-8 bytes의 SHA-256
+policy_document_chunk,embedding,실제 임베딩 생성 전에는 빈 값

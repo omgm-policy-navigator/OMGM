@@ -57,3 +57,9 @@ LLM 출력은 `app.llm.AIOutput` 계약을 따른다. 근거가 부족하면 `IN
 ## 정책 변경 처리
 
 원문 해시, `policy_version`, 조건 버전 변경을 감지한다. 변경된 조건에 필요한 정보만 다시 묻고, 변경 전후 판정 근거를 추적한다.
+
+## D4 문서 가공 경계
+
+정책 문서는 제목·조항·문단과 표 행 경계를 보존해 Chunk로 분리한다. 신청 대상, 신청 기간, 신청 방법, 제출 서류, 혜택, 문의 같은 의미 유형이 한 문장 안에 둘 이상 섞이면 `REVIEW_REQUIRED`로 표시하며 임베딩 입력에서 제외한다. 연락처 Chunk도 개인정보·불필요한 업무 연락처 검수를 위해 기본 `REVIEW_REQUIRED`로 둔다.
+
+모든 Chunk는 `policy_id`, `document_id`, `source_url`, `source_location`, `content_hash`를 포함한다. 표는 헤더를 각 행 값과 결합해 행별 Chunk로 만든다. D4는 임베딩 입력 Seed까지만 생성하며 벡터 생성, pgvector 적재와 검색 API는 구현하지 않는다.

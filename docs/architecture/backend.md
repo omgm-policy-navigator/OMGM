@@ -34,7 +34,7 @@ backend/
 | Rule Engine and eligibility evaluation | `app/modules/eligibility` | Structured policy rules, normalized user facts | Use LLM text to decide final status, generate natural-language explanations |
 | Business features | `app/modules` | `app/core`, `app/db` repositories, sibling modules through explicit module functions, `app/llm` | Create broad layered folders without real implementation |
 | LLM/Ollama boundary | `app/llm` | `app/core` config, AI output schemas, HTTP client library when introduced | Decide eligibility, persist raw sensitive facts, bypass policy evidence |
-| RAG | Future `app/modules/rag` | approved document chunks for policies selected by metadata and Rule Engine, embeddings, metadata filters, `app/llm` query helpers | Create policy eligibility candidates, invent policies, or make final eligibility decisions |
+| RAG | `app/modules/rag` processing; retrieval deferred | approved documents and pure processing DTOs | Create policy eligibility candidates, invent policies, make final eligibility decisions, or access SQLAlchemy from processing code |
 | Graph projection | Future `app/modules/graph` | policy metadata, relationships, evaluation summaries | Own source policy data or mutate eligibility results |
 
 ## Backend Feature Mapping
@@ -49,6 +49,7 @@ backend/
 | Policy catalog and detail lookup | Future `app/modules/policies` | Mock API contract only |
 | Eligibility evaluation | `app/modules/eligibility` | Rule core implemented, API contract only |
 | AI output contract | `app/llm` | Pydantic schema implemented, behavior contract documented |
+| RAG document processing | `app/modules/rag` | D4 chunking, quality review, and embedding seed implemented |
 | RAG evidence retrieval | Future `app/modules/rag` | Mock API contract only |
 | Policy graph projection | Future `app/modules/graph` | Mock API contract only |
 | Saved policies | Future `app/modules/saved_policies` | Deferred until retention and identity rules are decided |

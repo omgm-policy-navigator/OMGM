@@ -6,6 +6,7 @@
 규칙 수: 133개
 질문 수: 49개
 관계 수: 24개
+RAG Chunk 수: 38개
 
 ## 파일
 - 01_category.csv: 5개 정책 분야
@@ -17,6 +18,7 @@
 - 07_policy_relation.csv: 선후·대안·충돌·재평가 관계
 - 08_policy_document.csv: RAG용 정책 개요 문서
 - 09_policy_flat.csv: 빠른 MVP·분석용 통합 파일
+- 10_policy_document_chunk.csv: 검수된 RAG Chunk와 임베딩 입력 Seed
 
 ## 중요 주의사항
 1. 이 데이터는 MVP Seed Data이며 공식 자격 판정을 대체하지 않습니다.
@@ -25,6 +27,7 @@
 4. 서울시 사업은 예산 소진, 연도별 공고, 시범사업 종료·개편 가능성이 있습니다.
 5. `evaluation_mode=OFFICIAL_CONFIRMATION_REQUIRED` Rule은 공식 기준 확인 전 결정형 판정에서 제외합니다.
 6. CSV는 Excel 한글 깨짐 방지를 위해 UTF-8 BOM으로 저장했습니다.
+7. Chunk는 `source_url`과 `source_location`을 반드시 가지며 `APPROVED` 행만 임베딩 입력으로 사용합니다.
 
 ## 질문과 Rule 값 계약
 
@@ -36,7 +39,7 @@
 수동 원문 확인과 Seed 갱신 절차는 [정책 Seed 운영 가이드](../../../docs/data/policy-seed-operations.md)를 따릅니다.
 
 ## 권장 적재 순서
-category → policy → question → policy_rule → policy_relation → policy_document
+category → policy → question → policy_rule → policy_relation → policy_document → policy_document_chunk
 
 ## 추천 MVP 판정 방식
 - required=true 규칙 실패: LIKELY_INELIGIBLE
