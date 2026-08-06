@@ -17,6 +17,8 @@ type GraphPoint = {
   y: number;
 };
 
+type BackendNodeType = "USER" | "CATEGORY" | "POLICY" | "CONDITION" | "ACTION";
+
 const nodeTypes = {
   policyNode: PolicyNode,
 };
@@ -55,38 +57,132 @@ type PolicyGraphProps = {
   sessionGraph: SessionGraphResponse | null;
 };
 
+const factLabels: Record<string, string> = {
+  region: "거주 지역",
+  marital_status: "혼인 상태",
+  household_income_range: "소득 구간",
+  housing_status: "주택 보유",
+  lease_type: "계약 유형",
+  marriage_registered: "혼인신고",
+  marriage_registration_date: "혼인신고일",
+  loan_purpose: "대출 목적",
+  pregnancy_status: "임신/출산",
+  has_child: "자녀 여부",
+  child_age_months: "자녀 개월 수",
+  education_topic: "상담 주제",
+};
+
+const valueLabels: Record<string, string> = {
+  Seoul: "서울",
+  Gyeonggi: "경기",
+  Incheon: "인천",
+  Busan: "부산",
+  National: "전국",
+  engaged: "예비부부",
+  newlywed: "신혼부부",
+  married: "기혼",
+  single: "미혼",
+  unknown: "미확인",
+  under_50m: "5천만 미만",
+  "50m_to_80m": "5천만-8천만",
+  "80m_to_120m": "8천만-1억2천",
+  over_120m: "1억2천 초과",
+  no_home: "무주택",
+  own_home: "주택 소유",
+  jeonse: "전세",
+  monthly_rent: "월세",
+  purchase: "매매",
+  true: "예",
+  false: "아니오",
+  housing: "주거",
+  wedding: "웨딩",
+  settlement: "정착",
+};
+
+function normalizeBackendType(type: string): BackendNodeType | "UNKNOWN" {
+  const normalized = type.toUpperCase();
+  if (normalized === "USER" || normalized === "CATEGORY" || normalized === "POLICY" || normalized === "CONDITION" || normalized === "ACTION") {
+    return normalized;
+  }
+  return "UNKNOWN";
+}
+
+function labelValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "미확인";
+  }
+  if (typeof value === "boolean") {
+    return value ? "예" : "아니오";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "string") {
+    return valueLabels[value] ?? value;
+  }
+  return JSON.stringify(value);
+}
+
+function categoryLabel(categoryCode: unknown, fallback: string) {
+  if (typeof categoryCode !== "string") {
+    return fallback;
+  }
+  return categories.find(({ backendCategoryCode }) => backendCategoryCode === categoryCode)?.label ?? fallback;
+}
+
+function displayLabelForBackendNode(node: SessionGraphNode) {
+  const type = normalizeBackendType(node.type);
+  if (type === "USER") {
+    return "우리 부부";
+  }
+  if (type === "CATEGORY") {
+    return categoryLabel(node.data.categoryCode, node.label);
+  }
+  if (type === "CONDITION") {
+    const factKey = typeof node.data.factKey === "string" ? node.data.factKey : node.label;
+    const factLabel = factLabels[factKey] ?? factKey;
+    return node.data.value === undefined ? factLabel : `${factLabel}\n${labelValue(node.data.value)}`;
+  }
+  if (type === "ACTION") {
+    return "신청 단계 확인";
+  }
+  return node.label;
+}
+
 function iconForBackendNode(node: SessionGraphNode) {
-  if (node.type === "user") {
+  const type = normalizeBackendType(node.type);
+  if (type === "USER") {
     return UserRound;
   }
-  if (node.type === "category") {
+  if (type === "CATEGORY") {
     const categoryCode = typeof node.data.categoryCode === "string" ? node.data.categoryCode : "";
     const category = categories.find(({ backendCategoryCode }) => backendCategoryCode === categoryCode);
     return category?.icon ?? FolderTree;
   }
-  if (node.type === "policy") {
+  if (type === "POLICY") {
     return Landmark;
   }
-  if (node.type === "condition") {
+  if (type === "CONDITION") {
     return ListChecks;
   }
-  if (node.type === "action") {
+  if (type === "ACTION") {
     return FileCheck2;
   }
   return CircleHelp;
 }
 
 function variantForBackendNode(type: string): GraphNodeData["variant"] {
-  if (type === "user") {
+  const normalized = normalizeBackendType(type);
+  if (normalized === "USER") {
     return "central";
   }
-  if (type === "category") {
+  if (normalized === "CATEGORY") {
     return "category";
   }
-  if (type === "condition") {
+  if (normalized === "CONDITION") {
     return "condition";
   }
-  if (type === "action") {
+  if (normalized === "ACTION") {
     return "action";
   }
   return "policy";
@@ -96,29 +192,80 @@ function descriptionForBackendNode(node: SessionGraphNode) {
   if (typeof node.data.description === "string") {
     return node.data.description;
   }
-  if (node.type === "policy") {
+  const type = normalizeBackendType(node.type);
+  if (type === "POLICY") {
     const status = typeof node.data.eligibilityStatus === "string" ? `자격 상태: ${node.data.eligibilityStatus}` : "세션 답변을 기준으로 평가된 정책입니다.";
     const score = typeof node.data.recommendationScore === "number" ? `추천 점수: ${node.data.recommendationScore}` : null;
     return [status, score].filter(Boolean).join(" / ");
   }
-  if (node.type === "condition") {
+  if (type === "CONDITION") {
     const factKey = typeof node.data.factKey === "string" ? node.data.factKey : "condition";
-    return `확인 조건: ${factKey}`;
+    const factLabel = factLabels[factKey] ?? factKey;
+    return `확인 조건: ${factLabel}`;
   }
   return "백엔드 세션 그래프에서 전달된 노드입니다.";
 }
 
 function statusForBackendNode(node: SessionGraphNode): PolicyNodeData["status"] {
-  if (node.type !== "policy") {
+  if (normalizeBackendType(node.type) !== "POLICY") {
     return "recommended";
   }
-  if (node.data.eligibilityStatus === "eligible") {
+  if (node.data.eligibilityStatus === "LIKELY_ELIGIBLE" || node.data.eligibilityStatus === "eligible") {
     return "eligible";
   }
-  if (node.data.evaluationState === "complete") {
+  if (node.data.evaluationState === "ACTIVE" || node.data.evaluationState === "complete") {
     return "recommended";
   }
   return "checking";
+}
+
+function spreadY(index: number, total: number, centerY: number, spacing: number) {
+  return centerY + (index - (total - 1) / 2) * spacing;
+}
+
+function countNodesByType(nodes: SessionGraphNode[]) {
+  return nodes.reduce((counts, node) => {
+    const type = normalizeBackendType(node.type);
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+    return counts;
+  }, new Map<BackendNodeType | "UNKNOWN", number>());
+}
+
+function layoutLiveNode(graphNode: SessionGraphNode, index: number, total: number): GraphPoint {
+  const type = normalizeBackendType(graphNode.type);
+
+  if (type === "USER") {
+    return { x: 80, y: 280 };
+  }
+  if (type === "CATEGORY") {
+    return { x: 280, y: 280 };
+  }
+  if (type === "POLICY") {
+    return { x: 520, y: spreadY(index, total, 250, 120) };
+  }
+  if (type === "CONDITION") {
+    return { x: 280, y: spreadY(index, total, 500, 88) };
+  }
+  if (type === "ACTION") {
+    return { x: 780, y: spreadY(index, total, 250, 120) };
+  }
+  return { x: 520, y: spreadY(index, total, 500, 96) };
+}
+
+function edgeStyleForType(edgeType: string): Edge["style"] {
+  if (edgeType === "MATCHES") {
+    return { stroke: designTokens.color.graph.edge, strokeWidth: 1.6 };
+  }
+  if (edgeType === "MISSING_CONDITION") {
+    return { stroke: "#D99B2B", strokeDasharray: "6 5", strokeWidth: 1.4 };
+  }
+  if (edgeType === "FAILED_CONDITION") {
+    return { stroke: "#C05A4B", strokeDasharray: "4 4", strokeWidth: 1.4 };
+  }
+  if (edgeType === "NEXT_ACTION") {
+    return { stroke: "#5F9F73", strokeDasharray: "8 5", strokeWidth: 1.4 };
+  }
+  return { stroke: designTokens.color.graph.edge, strokeWidth: 1 };
 }
 
 export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphProps) {
@@ -126,25 +273,19 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
 
   const { nodes, edges } = useMemo(() => {
     if (sessionGraph && sessionGraph.nodes.length > 0) {
-      const centerIndex = sessionGraph.nodes.findIndex((node) => node.type === "user");
-      const orderedNodes = centerIndex >= 0 ? [sessionGraph.nodes[centerIndex], ...sessionGraph.nodes.filter((_, index) => index !== centerIndex)] : sessionGraph.nodes;
-      const center: GraphPoint = { x: 350, y: 250 };
-      const radius = 230;
-      const liveNodes: Node<GraphNodeData>[] = orderedNodes.map((graphNode, index) => {
-        const isCenter = index === 0 && graphNode.type === "user";
-        const angle = (Math.PI * 2 * Math.max(index - 1, 0)) / Math.max(orderedNodes.length - 1, 1) - Math.PI / 2;
+      const totalByType = countNodesByType(sessionGraph.nodes);
+      const indexByType = new Map<BackendNodeType | "UNKNOWN", number>();
+      const liveNodes: Node<GraphNodeData>[] = sessionGraph.nodes.map((graphNode) => {
+        const type = normalizeBackendType(graphNode.type);
+        const typeIndex = indexByType.get(type) ?? 0;
+        indexByType.set(type, typeIndex + 1);
         return {
           id: graphNode.id,
           type: "policyNode",
-          position: isCenter
-            ? center
-            : {
-                x: center.x + Math.cos(angle) * radius,
-                y: center.y + Math.sin(angle) * radius,
-              },
+          position: layoutLiveNode(graphNode, typeIndex, totalByType.get(type) ?? 1),
           data: {
             id: graphNode.id,
-            label: graphNode.label,
+            label: displayLabelForBackendNode(graphNode),
             description: descriptionForBackendNode(graphNode),
             icon: iconForBackendNode(graphNode),
             status: statusForBackendNode(graphNode),
@@ -170,10 +311,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             targetHandle: getOppositeHandle(sourceHandle),
             type: "straight",
             animated: false,
-            style: {
-              stroke: designTokens.color.graph.edge,
-              strokeWidth: 0.85,
-            },
+            style: edgeStyleForType(edge.type),
           };
         });
 
@@ -246,7 +384,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
       <header className="z-10 border-b border-brand-border bg-white/90 p-6 backdrop-blur">
         <h2 className="text-h3">맞춤 정책 그래프</h2>
         <p className="mt-1 text-body-sm text-text-secondary">
-          {sessionGraph ? `${selectedCategory.label} 세션 그래프 ${sessionGraph.nodeCount}개 노드를 표시합니다.` : "정책 노드를 클릭하면 자격 근거와 다음 단계를 확인할 수 있어요."}
+          {sessionGraph ? `${selectedCategory.label} 정책과 확인 조건을 연결해 표시합니다.` : "정책 노드를 클릭하면 자격 근거와 다음 단계를 확인할 수 있어요."}
         </p>
       </header>
 
@@ -288,14 +426,22 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
   const Icon = data.icon;
   const isCentral = data.variant === "central";
   const isPolicy = data.variant === "policy";
+  const isCondition = data.variant === "condition";
+  const isAction = data.variant === "action";
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-full text-center shadow-card ${
+      className={`relative flex text-center shadow-card ${
         isCentral
-          ? "h-[120px] w-[120px] border-2 border-brand-primary bg-white text-text-primary"
-          : `h-[100px] w-[100px] cursor-pointer border border-brand-border text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
-              isPolicy ? "bg-brand-surface" : "bg-white"
+          ? "h-[112px] w-[112px] flex-col items-center justify-center rounded-full border-2 border-brand-primary bg-white text-text-primary"
+          : `min-h-[72px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
+              isPolicy
+                ? "w-[178px] border-brand-primary bg-brand-surface"
+                : isCondition
+                  ? "w-[148px] border-brand-border bg-white"
+                  : isAction
+                    ? "w-[150px] border-brand-border bg-brand-surface-container"
+                    : "w-[142px] border-brand-border bg-white"
             }`
       }`}
     >
@@ -305,8 +451,8 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
       {handlePositions.map(({ id, position }) => (
         <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
       ))}
-      <Icon size={isCentral ? 30 : 24} className="mb-2 text-brand-primary" />
-      <span className={`${isCentral ? "text-caption" : "px-2 text-[11px] font-medium leading-4"}`}>{data.label}</span>
+      <Icon size={isCentral ? 30 : 22} className={`${isCentral ? "mb-2" : "shrink-0"} text-brand-primary`} />
+      <span className={`${isCentral ? "text-caption" : "whitespace-pre-line text-[12px] font-medium leading-4"}`}>{data.label}</span>
     </div>
   );
 }
