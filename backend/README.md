@@ -23,6 +23,12 @@ Run the API locally:
 uv run uvicorn app.main:app --reload
 ```
 
+After PostgreSQL migration and `qwen3-embedding:0.6b` installation in Ollama, reindex approved active RAG chunks:
+
+```bash
+uv run python -m app.modules.rag.reindex
+```
+
 Health and readiness:
 
 ```bash
@@ -46,7 +52,7 @@ uv run alembic upgrade head
 - `app/api`: FastAPI routers, REST/SSE boundaries, and safe error responses.
 - `app/core`: configuration, logging, lifespan, and common errors.
 - `app/db`: SQLAlchemy async engine/session setup and Alembic integration.
-- `app/modules`: feature module boundaries. `app/modules/eligibility` owns the Rule Engine.
+- `app/modules`: feature module boundaries. `eligibility` owns the Rule Engine and `rag` owns embedding/indexing and policy-scoped retrieval.
 - `app/modules/policies`: read-only policy CSV validation and catalog access.
 - `app/llm`: AI response schemas and Ollama/LLM boundary helpers.
 - `data/policy-seed`: reviewed policy, question, rule, relation, and RAG document CSVs.

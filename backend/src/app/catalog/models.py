@@ -5,10 +5,18 @@ from enum import StrEnum
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import UserDefinedType
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class Vector1024(UserDefinedType):
+    cache_ok = True
+
+    def get_col_spec(self, **kw: object) -> str:
+        return "vector(1024)"
 
 
 
@@ -100,6 +108,43 @@ class PolicyDocument(Base):
     document_hash: Mapped[str] = mapped_column(String(80), nullable=False)
 
     policy: Mapped[Policy] = relationship(back_populates="documents")
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunk"
+    __table_args__ = (
+        UniqueConstraint("document_id", "source_location", "content_hash", name="uq_document_chunk_source"),
+        Index("ix_document_chunk_policy_filters", "policy_id", "document_status", "trust_level", "policy_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    policy_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    policy_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    document_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    trust_level: Mapped[str] = mapped_column(String(30), nullable=False)
+    document_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    chunk_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(220), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_location: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class DocumentChunkEmbedding(Base):
+    __tablename__ = "document_chunk_embedding"
+    __table_args__ = (UniqueConstraint("chunk_id", "model", name="uq_chunk_embedding_model"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chunk_id: Mapped[str] = mapped_column(ForeignKey("document_chunk.id", ondelete="CASCADE"), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector1024(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class PolicyRelation(Base):

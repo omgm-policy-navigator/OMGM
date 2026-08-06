@@ -173,3 +173,9 @@ Phase A2 adds the `app.modules.user_facts` prompt and strict output contract. Th
 Each candidate contains `factKey`, `value`, `confidence`, `isAmbiguous`, and a short user-supported `evidence` phrase. Unknown keys, extra fields, duplicate keys, blank values, and confidence outside `0..1` invalidate the complete model response. Missing facts are omitted rather than inferred or converted to `false` or `0`.
 
 Backend code requires confirmation when confidence is below `0.8`, the evidence phrase is not present in the normalized user text, the candidate is ambiguous, or it differs from an existing confirmed fact. Duplicate confirmed facts for one key are rejected instead of being resolved by input order. Reviewed candidates expose `raw_value` and `requires_normalization=true` so downstream code cannot mistake free-form model text for a canonical domain value. A2 returns candidate and conflict-review DTOs only; it adds no API, persistence, eligibility calculation, or `user_fact` table.
+
+## Phase A3-A4 Embedding and Retrieval
+
+A3 uses `qwen3-embedding:0.6b` with a fixed 1024-dimensional storage contract. Only D4 `APPROVED` chunks belonging to `ACTIVE` policies are indexed. Chunk types exposed to retrieval are `OVERVIEW`, `ELIGIBILITY`, `APPLICATION`, `DOCUMENTS`, `FAQ`, and `CAUTION`.
+
+A4 retrieval requires an explicit selected `policy_id` and filters `document_status=APPROVED`, `trust_level=OFFICIAL`, `policy_status=ACTIVE`, and the configured embedding model before applying the cosine similarity threshold and Top K limit. Citation DTOs include document ID, chunk evidence ID, policy version, public source URL, source location, excerpt, and similarity. No matching evidence returns an explicit insufficient-evidence result with no citations; retrieval never expands the policy candidate set or changes eligibility.
