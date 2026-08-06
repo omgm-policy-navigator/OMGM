@@ -23,7 +23,7 @@ MVP 실행 기준 데이터는 `backend/data/policy-seed/`에 저장한다. 현�
 - 질문 option은 UI `label`과 사용자 사실/Rule 비교용 canonical `value`를 분리한다. Rule의 결정형 계산 가능 여부는 `evaluation_mode`로 명시한다.
 - Rule Engine에 제공하는 결정형 Rule은 `evaluation_mode=DETERMINISTIC`이면서 `review_status=APPROVED`인 항목으로 제한한다. `DRAFT` Rule은 catalog에 보존하되 결정형 조회 결과에 포함하지 않는다.
 - CSV header, enum 필드, boolean, ISO 날짜와 신청 기간 순서를 시작 시 fail-fast로 검증한다.
-- `SHA256SUMS`는 기준본 12개 파일의 저장소 내 변경을 검증한다.
+- `SHA256SUMS`는 기준본과 D3 파생 산출물 15개 파일의 저장소 내 변경을 검증한다.
 - `10_policy_document_chunk.csv`는 검수된 Overview 38건의 Chunk·출처 위치·콘텐츠 해시를 보존한다.
 - CSV는 읽기 전용이며 API 요청 중 변경하지 않는다.
 - 사용자 사실 및 평가 template CSV는 스키마 참고용 빈 파일이며 개인정보를 저장하지 않는다.

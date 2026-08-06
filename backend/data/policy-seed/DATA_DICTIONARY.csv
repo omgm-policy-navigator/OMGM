@@ -13,3 +13,9 @@ policy_document_chunk,source_location,원문 내 제목·조항·문단·표 행
 policy_document_chunk,quality_status,"APPROVED, REVIEW_REQUIRED; APPROVED만 임베딩 입력 허용"
 policy_document_chunk,content_hash,Chunk content UTF-8 bytes의 SHA-256
 policy_document_chunk,embedding,실제 임베딩 생성 전에는 빈 값
+policy_rule_seed,evidence_text,관리자 검수 기준본의 Rule 근거 문구
+policy_rule_seed,source_url,Rule이 연결된 정책의 공식 원문 URL
+policy_rule_seed,source_location,검수 기준본에서 근거 문구를 재현할 수 있는 행과 필드 위치
+policy_rule_seed,admin_review_status,"APPROVED, NEEDS_OFFICIAL_CONFIRMATION"
+question_seed,admin_review_status,관리자 검수 완료 여부
+policy_relation_seed,admin_review_status,관리자 검수 완료 여부

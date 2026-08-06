@@ -19,6 +19,9 @@ RAG Chunk 수: 38개
 - 08_policy_document.csv: RAG용 정책 개요 문서
 - 09_policy_flat.csv: 빠른 MVP·분석용 통합 파일
 - 10_policy_document_chunk.csv: 검수된 RAG Chunk와 임베딩 입력 Seed
+- policy_rule_seed.csv: 공식 URL·근거 위치·검수 상태를 포함한 D3 Rule 후보 산출물
+- question_seed.csv: 관리자 검수된 D3 사용자 질문 산출물
+- policy_relation_seed.csv: 관리자 검수된 D3 정책 관계 산출물
 
 ## 중요 주의사항
 1. 이 데이터는 MVP Seed Data이며 공식 자격 판정을 대체하지 않습니다.
@@ -28,6 +31,7 @@ RAG Chunk 수: 38개
 5. `evaluation_mode=OFFICIAL_CONFIRMATION_REQUIRED` Rule은 공식 기준 확인 전 결정형 판정에서 제외합니다.
 6. CSV는 Excel 한글 깨짐 방지를 위해 UTF-8 BOM으로 저장했습니다.
 7. Chunk는 `source_url`과 `source_location`을 반드시 가지며 `APPROVED` 행만 임베딩 입력으로 사용합니다.
+8. D3 파생 Seed는 기존 03·04·07 기준본을 대체하지 않으며 검수·근거 확인용 산출물입니다.
 
 ## 질문과 Rule 값 계약
 
