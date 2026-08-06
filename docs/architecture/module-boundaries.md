@@ -115,3 +115,13 @@
 금지 의존성: 애플리케이션 비즈니스 로직.
 
 테스트 범위: `docker compose config`, 초기화 스크립트 위치.
+
+## `backend/src/app/modules/user_facts`
+
+책임: 자유 입력 조건 추출 Prompt, 허용 Enum 검증, Confidence 기반 확인 필요 판정, 기존 확정 사실과의 충돌 후보 탐지.
+
+입력: 최소화된 사용자 자유 입력, 추출 전용 LLM JSON 응답, 기존 사용자 사실 DTO.
+
+출력: 검증된 추출 후보, `requires_confirmation`, 충돌 후보.
+
+금지 사항: FastAPI Router 또는 SQLAlchemy Session 의존, 추출 후보 직접 저장, 허용되지 않은 키 통과, 모호한 값을 확정 사실로 승격, 자격 상태 계산.
