@@ -541,7 +541,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
           </div>
         </div>
 
-        <div className="mt-6 flex justify-center overflow-x-auto pb-2">
+        <div className="mt-4 flex justify-center overflow-x-auto px-1 pb-3 pt-2">
           <div className="flex min-w-max gap-3">
             {categories.map(({ id, label, icon: Icon }) => {
               const selected = selectedCategoryId === id;

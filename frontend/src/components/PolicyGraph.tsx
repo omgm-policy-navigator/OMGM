@@ -1,5 +1,6 @@
 import { Background, Controls, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
-import { CircleHelp, ExternalLink, FileCheck2, FolderTree, Landmark, ListChecks, UserRound, X } from "lucide-react";
+import { CircleHelp, ExternalLink, FileCheck2, FolderTree, Landmark, ListChecks, UserRound, UsersRound, X } from "lucide-react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
 import { categories, policyNodes } from "../data/policies";
@@ -483,6 +484,17 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
     return () => controller.abort();
   }, [selectedCategory.backendCategoryCode]);
 
+  const handleGraphPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--policy-graph-spot-x", `${event.clientX - bounds.left}px`);
+    event.currentTarget.style.setProperty("--policy-graph-spot-y", `${event.clientY - bounds.top}px`);
+    event.currentTarget.style.setProperty("--policy-graph-spot-opacity", "1");
+  };
+
+  const handleGraphPointerLeave = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.style.setProperty("--policy-graph-spot-opacity", "0");
+  };
+
   const { nodes, edges } = useMemo(() => {
     const answered = hasSessionAnswers(sessionGraph);
     const summariesById = policySummaryById(policySummaries);
@@ -663,7 +675,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
         id: "couple",
         label: "우리 부부",
         description: "현재 답변한 조건을 기준으로 정책 연결을 계산합니다.",
-        icon: policyNodes[5].icon,
+        icon: UsersRound,
         status: "recommended",
         variant: "central",
       },
@@ -741,8 +753,16 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
         </p>
       </header>
 
-      <div className="policy-graph-bg h-full min-h-[560px] flex-1">
+      <div
+        className="policy-graph-bg relative h-full min-h-[560px] flex-1 overflow-hidden"
+        onPointerMove={handleGraphPointerMove}
+        onPointerLeave={handleGraphPointerLeave}
+        style={{ "--policy-graph-spot-x": "50%", "--policy-graph-spot-y": "50%", "--policy-graph-spot-opacity": "0" } as CSSProperties}
+      >
+        <div className="policy-graph-bg__center-glow" aria-hidden="true" />
+        <div className="policy-graph-bg__spotlight" aria-hidden="true" />
         <ReactFlow
+          className="relative z-10"
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}

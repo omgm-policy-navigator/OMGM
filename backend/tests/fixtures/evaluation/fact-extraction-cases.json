@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "dataset": "fact-extraction",
+  "cases": [
+    {
+      "id": "fact-explicit-region",
+      "title": "명시된 허용 조건 추출",
+      "tags": ["happy_path", "allowed_enum"],
+      "input": {"userText": "저는 서울에 거주하고 있어요.", "modelCandidates": [{"factKey": "RESIDENCE_REGION", "value": "SEOUL", "confidence": 0.98, "isAmbiguous": false, "evidence": "서울에 거주"}], "existingFacts": []},
+      "expected": {"acceptedFactKeys": ["RESIDENCE_REGION"], "needsConfirmation": false, "conflicts": [], "requiresNormalization": true}
+    },
+    {
+      "id": "fact-income-unknown",
+      "title": "소득 모름은 확정 값이 아님",
+      "tags": ["income_unknown", "ambiguous", "boundary"],
+      "input": {"userText": "가구 소득 구간은 아직 모르겠어요.", "modelCandidates": [{"factKey": "HOUSEHOLD_INCOME_RANGE", "value": "UNKNOWN", "confidence": 0.99, "isAmbiguous": true, "evidence": "아직 모르겠어요"}], "existingFacts": []},
+      "expected": {"acceptedFactKeys": ["HOUSEHOLD_INCOME_RANGE"], "needsConfirmation": true, "conflicts": [], "mustNotPersistAsConfirmed": true, "mustNotCoerceTo": [false, 0]}
+    },
+    {
+      "id": "fact-marriage-status-conflict",
+      "title": "기존 혼인 상태와 신규 답변 충돌",
+      "tags": ["marriage_status_conflict", "conflict", "failure"],
+      "input": {"userText": "아직 혼인신고 전입니다.", "modelCandidates": [{"factKey": "MARRIAGE_STATUS", "value": "PRE_MARRIAGE", "confidence": 0.97, "isAmbiguous": false, "evidence": "혼인신고 전"}], "existingFacts": [{"factKey": "MARRIAGE_STATUS", "value": "MARRIED", "confirmed": true}]},
+      "expected": {"acceptedFactKeys": ["MARRIAGE_STATUS"], "needsConfirmation": true, "conflicts": [{"factKey": "MARRIAGE_STATUS", "previousValue": "MARRIED", "candidateValue": "PRE_MARRIAGE", "resolutionRequired": true}], "mustNotOverwriteConfirmedFact": true}
+    },
+    {
+      "id": "fact-unknown-key-rejected",
+      "title": "허용되지 않은 조건 키 거부",
+      "tags": ["unknown_key", "security", "failure"],
+      "input": {"userText": "직업은 개발자입니다.", "modelCandidates": [{"factKey": "OCCUPATION", "value": "DEVELOPER", "confidence": 0.99, "isAmbiguous": false, "evidence": "개발자"}], "existingFacts": []},
+      "expected": {"parseError": "CONDITION_EXTRACTION_CONTRACT_VIOLATION", "persistedFactKeys": []}
+    }
+  ]
+}

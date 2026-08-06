@@ -16,7 +16,7 @@ export function ChatbotPage({ currentPath, onNavigate }: ChatbotPageProps) {
   const [sessionGraph, setSessionGraph] = useState<SessionGraphResponse | null>(null);
 
   return (
-    <main className="min-h-screen bg-brand-background text-text-primary">
+    <main className="min-h-screen bg-[#dfe8e1] text-text-primary">
       <Sidebar collapsed={collapsed} currentPath={currentPath} onNavigate={onNavigate} onToggle={() => setCollapsed((value) => !value)} />
       <div
         className={`grid h-screen grid-cols-1 gap-6 overflow-hidden p-6 transition-[margin-left] duration-300 ease-sidebar xl:grid-cols-[minmax(380px,0.86fr)_minmax(560px,1.14fr)] ${
