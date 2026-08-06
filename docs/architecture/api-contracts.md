@@ -377,6 +377,41 @@ Response `200`:
 ```
 
 
+
+### `GET /api/v1/session/graph`
+
+Returns frontend graph JSON derived from the current anonymous session's `user_fact` and `policy_evaluation` rows plus policy catalog metadata. The backend does not persist graph coordinates or frontend layout state. The projection applies priority-based node trimming and removes dangling edges after trimming.
+
+Query parameters:
+
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `category` | string | No | Restricts the graph to one category. Defaults to the session selected category when present. |
+| `policy_id` | string | No | Centers the graph on one policy and its related policies. |
+| `max_nodes` | integer | No | Bounds returned nodes. The server clamps the value to a safe maximum. |
+
+Response `200`:
+
+```json
+{
+  "nodes": [
+    {"id": "user:anonymous", "type": "USER", "label": "Anonymous user", "data": {"factCount": 2}},
+    {"id": "category:housing", "type": "CATEGORY", "label": "Housing", "data": {"categoryCode": "housing"}},
+    {"id": "condition:region", "type": "CONDITION", "label": "region", "data": {"factKey": "region", "value": "Seoul"}},
+    {"id": "policy:policy_housing_001", "type": "POLICY", "label": "Newlywed Rent Deposit Support", "data": {"policyId": "policy_housing_001", "eligibilityStatus": "LIKELY_ELIGIBLE"}},
+    {"id": "action:policy_housing_001:review", "type": "ACTION", "label": "Review application steps", "data": {"policyId": "policy_housing_001"}}
+  ],
+  "edges": [
+    {"id": "has_fact:region", "type": "HAS_FACT", "source": "user:anonymous", "target": "condition:region", "data": {}},
+    {"id": "matches:region:policy_housing_001", "type": "MATCHES", "source": "condition:region", "target": "policy:policy_housing_001", "data": {"ruleId": "rule_region"}}
+  ],
+  "nodeCount": 5,
+  "edgeCount": 2,
+  "truncated": false
+}
+```
+
+Supported node types are `USER`, `CATEGORY`, `CONDITION`, `POLICY`, and `ACTION`. Supported edge types are `SELECTED`, `HAS_FACT`, `MATCHES`, `MISSING_CONDITION`, `FAILED_CONDITION`, `RECOMMENDS`, `NEXT_ACTION`, `RELATED`, and `AVAILABLE_AFTER`.
 ### `POST /api/v1/session/evaluations`
 
 Evaluates approved active policies in the currently selected session category using stored `user_fact` values and deterministic policy rules. The session is identified only by the HttpOnly anonymous-session cookie. The response never exposes the session id.

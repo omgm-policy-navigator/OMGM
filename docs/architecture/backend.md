@@ -122,3 +122,8 @@ The session API stores the selected category on `anonymous_session` and stores s
 Phase B5 extends `app/modules/eligibility` with deterministic Rule Engine operators, explicit three-valued condition results, required and optional conditions, explicit AND/OR condition groups, application-window status handling, fixed evaluation-time input, recommendation scoring, and JSON evidence generation. The Rule Engine stays pure Python and does not depend on FastAPI routers or SQLAlchemy sessions.
 
 The session API persists `policy_evaluation` rows scoped by anonymous session and policy. User fact changes mark existing current-session evaluations `STALE` so stale diagnostic results are not silently reused.
+## Phase B6 Graph Projection
+
+Phase B6 adds `app/modules/graph` for frontend graph projection. It derives graph nodes and edges from current-session `user_fact`, `policy_evaluation`, policy catalog, category, and policy relation rows. It does not introduce a graph database or persist graph coordinates/layout state.
+
+The session API exposes `/api/v1/session/graph` with category filtering, selected-policy centering, batched policy/evaluation reads, relation edges, action nodes, priority-based node trimming, BFS depth limits, dangling-edge cleanup, and bounded node counts for frontend rendering.
