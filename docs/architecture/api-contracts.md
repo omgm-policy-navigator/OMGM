@@ -376,6 +376,46 @@ Response `200`:
 }
 ```
 
+
+### `POST /api/v1/session/evaluations`
+
+Evaluates approved active policies in the currently selected session category using stored `user_fact` values and deterministic policy rules. The session is identified only by the HttpOnly anonymous-session cookie. The response never exposes the session id.
+
+Response `200`:
+
+```json
+{
+  "status": "evaluated",
+  "items": [
+    {
+      "policyId": "policy_housing_001",
+      "eligibilityStatus": "LIKELY_ELIGIBLE",
+      "evaluationState": "ACTIVE",
+      "recommendationScore": 1010,
+      "evidence": {
+        "satisfied": [],
+        "unsatisfied": [],
+        "needsConfirmation": [],
+        "officialConfirmationRequired": []
+      },
+      "evaluatedAt": "2026-08-06T10:00:00+00:00",
+      "updatedAt": "2026-08-06T10:00:00+00:00"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/session/evaluations`
+
+Returns the current session's stored policy evaluations ordered by recommendation score descending. Results from other anonymous sessions are never returned.
+
+Response `200`: same item shape as `POST /api/v1/session/evaluations.items`.
+
+### `GET /api/v1/session/evaluations/{policyId}`
+
+Returns one stored evaluation for the current session and policy. Missing evaluations return `EVALUATION_NOT_FOUND`.
+
+User fact changes through session answer/fact endpoints mark existing current-session evaluations `STALE`; callers should create evaluations again to refresh them.
 ## Draft Endpoints
 
 ### `POST /api/v1/session/reset`
@@ -385,14 +425,6 @@ Starts a new diagnostic session by invalidating the existing anonymous session a
 ### `GET /api/v1/policies`
 
 Lists policy summaries using filters owned by the backend.
-
-### `POST /api/v1/evaluations`
-
-Evaluates policies using verified structured rules and current user facts. This endpoint is deferred until eligibility API implementation.
-
-### `GET /api/v1/evaluations/{evaluationId}`
-
-Returns an evaluation result and evidence references. This endpoint is deferred until eligibility API implementation.
 
 ### `GET /api/v1/policies/{policyId}/graph`
 

@@ -44,3 +44,26 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps frontend n
 Windows 작업 트리는 CSV를 CRLF로 checkout할 수 있고 GitHub Actions의 Linux 작업 트리는 LF로 checkout한다. 원시 bytes 체크섬은 같은 CSV 내용도 서로 다른 파일로 판단한다.
 
 Policy seed 로더는 체크섬 계산 전에 CRLF를 LF로 정규화한다. `SHA256SUMS`를 갱신할 때도 LF 정규화 bytes를 기준으로 계산해야 하며, 실제 셀 내용 변경은 계속 탐지한다.
+
+## Docker Desktop Linux engine pipe missing
+
+### Symptom
+
+Docker Compose commands fail before starting services:
+
+```text
+failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
+```
+
+### Cause
+
+Docker Desktop is not running, or the Linux engine is not available to the current Windows session.
+
+### Resolution
+
+Start Docker Desktop and wait until the Linux engine is healthy. Then rerun the same Compose command, for example:
+
+```powershell
+docker compose -f compose.yaml -f compose.dev.yaml config
+docker compose -f compose.yaml -f compose.dev.yaml run --rm backend alembic upgrade head
+```
