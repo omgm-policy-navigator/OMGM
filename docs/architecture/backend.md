@@ -126,4 +126,4 @@ The session API persists `policy_evaluation` rows scoped by anonymous session an
 
 Phase B6 adds `app/modules/graph` for frontend graph projection. It derives graph nodes and edges from current-session `user_fact`, `policy_evaluation`, policy catalog, category, and policy relation rows. It does not introduce a graph database or persist graph coordinates/layout state.
 
-The session API exposes `/api/v1/session/graph` with category filtering, selected-policy centering, relation edges, action nodes, and bounded node counts for frontend rendering.
+The session API exposes `/api/v1/session/graph` with category filtering, selected-policy centering, batched policy/evaluation reads, relation edges, action nodes, priority-based node trimming, BFS depth limits, dangling-edge cleanup, and bounded node counts for frontend rendering.

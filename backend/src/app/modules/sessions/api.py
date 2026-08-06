@@ -18,8 +18,9 @@ from app.modules.eligibility.repository import (
 )
 from app.modules.eligibility.schemas import CreateEvaluationsResponse, PolicyEvaluationResponse
 from app.modules.eligibility.service import evaluate_policy, evaluation_to_response, evidence_from_result
-from app.modules.graph.projection import build_session_graph
+from app.modules.graph.projection import CENTERED_GRAPH_MAX_DEPTH, build_session_graph
 from app.modules.graph.repository import (
+    list_centered_graph_policy_ids,
     list_graph_categories,
     list_graph_evaluations,
     list_graph_policies,
@@ -374,10 +375,23 @@ async def get_session_graph(
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     selected_category = validate_category_code(category) if category is not None else session.selected_category_code
     facts = facts_to_dict(await list_session_facts(db, session))
+    centered_policy_ids = None
+    if policy_id is not None:
+        centered_policy_ids = await list_centered_graph_policy_ids(
+            db,
+            policy_id,
+            max_depth=CENTERED_GRAPH_MAX_DEPTH,
+            category_code=selected_category,
+        )
     categories = await list_graph_categories(db, selected_category)
-    policies = await list_graph_policies(db, selected_category if policy_id is None else None)
-    evaluations = await list_graph_evaluations(db, session.id)
-    relations = await list_graph_relations(db, {policy.id for policy in policies})
+    policies = await list_graph_policies(
+        db,
+        selected_category if policy_id is None else None,
+        centered_policy_ids,
+    )
+    visible_policy_ids = {policy.id for policy in policies}
+    evaluations = await list_graph_evaluations(db, session.id, visible_policy_ids)
+    relations = await list_graph_relations(db, visible_policy_ids)
     graph = build_session_graph(
         facts=facts,
         categories=categories,
@@ -390,6 +404,8 @@ async def get_session_graph(
     )
     await db.commit()
     return graph
+
+
 @router.post("/evaluations", response_model=CreateEvaluationsResponse)
 async def create_session_evaluations(
     request: Request,

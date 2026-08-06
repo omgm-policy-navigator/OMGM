@@ -380,7 +380,7 @@ Response `200`:
 
 ### `GET /api/v1/session/graph`
 
-Returns frontend graph JSON derived from the current anonymous session's `user_fact` and `policy_evaluation` rows plus policy catalog metadata. The backend does not persist graph coordinates or frontend layout state.
+Returns frontend graph JSON derived from the current anonymous session's `user_fact` and `policy_evaluation` rows plus policy catalog metadata. The backend does not persist graph coordinates or frontend layout state. The projection applies priority-based node trimming and removes dangling edges after trimming.
 
 Query parameters:
 

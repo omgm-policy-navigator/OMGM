@@ -7,14 +7,14 @@ cd backend
 uv run pytest tests\unit\test_graph_projection.py tests\integration\test_session_graph_api.py
 ```
 
-Result: passed. 7 tests passed.
+Result: passed. 9 tests passed.
 
 ```bash
 cd backend
 uv run pytest
 ```
 
-Result: passed. 159 tests passed.
+Result: passed. 161 tests passed after graph hardening changes.
 
 ```bash
 cd backend

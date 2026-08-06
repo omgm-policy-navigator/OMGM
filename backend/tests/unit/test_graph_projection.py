@@ -79,9 +79,9 @@ class GraphProjectionTests(unittest.TestCase):
 
         node_ids = {node.id for node in graph.nodes}
         edge_types = {edge.type for edge in graph.edges}
-        self.assertIn("policy:policy_housing_001", node_ids)
-        self.assertIn("policy:policy_loan_001", node_ids)
-        self.assertNotIn("policy:policy_cash_001", node_ids)
+        self.assertIn("POLICY:policy_housing_001", node_ids)
+        self.assertIn("POLICY:policy_loan_001", node_ids)
+        self.assertNotIn("POLICY:policy_cash_001", node_ids)
         self.assertIn("RELATED", edge_types)
 
     def test_node_limit_truncates_without_persisted_coordinates(self) -> None:
@@ -104,3 +104,46 @@ class GraphProjectionTests(unittest.TestCase):
         self.assertEqual(graph.node_count, 5)
         self.assertTrue(graph.truncated)
         self.assertTrue(all("x" not in node.data and "y" not in node.data for node in graph.nodes))
+    def test_limit_preserves_selected_policy_before_fact_overflow(self) -> None:
+        facts = {f"fact_{index}": index for index in range(20)}
+        graph = build_session_graph(
+            facts=facts,
+            categories=[GraphCategory("housing", "Housing")],
+            policies=[GraphPolicy("policy_housing_001", "housing", "Rent Support", "Seoul", "Grant")],
+            evaluations=[],
+            relations=[],
+            selected_category_code="housing",
+            selected_policy_id="policy_housing_001",
+            max_nodes=3,
+        )
+
+        node_ids = {node.id for node in graph.nodes}
+        self.assertIn("USER:anonymous", node_ids)
+        self.assertIn("POLICY:policy_housing_001", node_ids)
+
+    def test_centered_policy_graph_enforces_two_hop_depth_and_cycle_guard(self) -> None:
+        graph = build_session_graph(
+            facts={},
+            categories=[GraphCategory("housing", "Housing")],
+            policies=[
+                GraphPolicy("p1", "housing", "Policy 1", "Seoul", "Grant"),
+                GraphPolicy("p2", "housing", "Policy 2", "Seoul", "Grant"),
+                GraphPolicy("p3", "housing", "Policy 3", "Seoul", "Grant"),
+                GraphPolicy("p4", "housing", "Policy 4", "Seoul", "Grant"),
+            ],
+            evaluations=[],
+            relations=[
+                GraphRelation("r1", "p1", "p2", "RELATED"),
+                GraphRelation("r2", "p2", "p3", "RELATED"),
+                GraphRelation("r3", "p3", "p4", "RELATED"),
+                GraphRelation("cycle", "p2", "p1", "RELATED"),
+            ],
+            selected_category_code="housing",
+            selected_policy_id="p1",
+        )
+
+        node_ids = {node.id for node in graph.nodes}
+        self.assertIn("POLICY:p1", node_ids)
+        self.assertIn("POLICY:p2", node_ids)
+        self.assertIn("POLICY:p3", node_ids)
+        self.assertNotIn("POLICY:p4", node_ids)

@@ -9,7 +9,13 @@ from unittest.mock import AsyncMock, patch
 from app.core.config import AppConfig
 from app.db.session import get_db
 from app.main import create_app
-from app.modules.graph.projection import GraphCategory, GraphEvaluation, GraphPolicy, GraphRelation
+from app.modules.graph.projection import (
+    CENTERED_GRAPH_MAX_DEPTH,
+    GraphCategory,
+    GraphEvaluation,
+    GraphPolicy,
+    GraphRelation,
+)
 
 TEST_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost:5432/test_db"
 
@@ -101,8 +107,8 @@ class SessionGraphApiTests(unittest.TestCase):
         self.assertEqual(body["nodeCount"], len(body["nodes"]))
         self.assertNotIn("sessionId", json.dumps(body))
         categories.assert_awaited_once_with(db, "housing")
-        policies.assert_awaited_once_with(db, "housing")
-        evaluations.assert_awaited_once_with(db, 7)
+        policies.assert_awaited_once_with(db, "housing", None)
+        evaluations.assert_awaited_once_with(db, 7, {"policy_housing_001"})
 
     def test_get_graph_accepts_category_filter_and_policy_center(self) -> None:
         db = AsyncMock()
@@ -111,6 +117,9 @@ class SessionGraphApiTests(unittest.TestCase):
             "app.modules.sessions.api.list_session_facts",
             new=AsyncMock(return_value=[]),
         ), patch(
+            "app.modules.sessions.api.list_centered_graph_policy_ids",
+            new=AsyncMock(return_value={"policy_loan_001", "policy_housing_001"}),
+        ) as centered_ids, patch(
             "app.modules.sessions.api.list_graph_categories",
             new=AsyncMock(return_value=[GraphCategory("loan", "Loan")]),
         ) as categories, patch(
@@ -139,8 +148,14 @@ class SessionGraphApiTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         categories.assert_awaited_once_with(db, "loan")
-        policies.assert_awaited_once_with(db, None)
-        self.assertTrue(any(node["id"] == "policy:policy_loan_001" for node in body["nodes"]))
+        centered_ids.assert_awaited_once_with(
+            db,
+            "policy_loan_001",
+            max_depth=CENTERED_GRAPH_MAX_DEPTH,
+            category_code="loan",
+        )
+        policies.assert_awaited_once_with(db, None, {"policy_loan_001", "policy_housing_001"})
+        self.assertTrue(any(node["id"] == "POLICY:policy_loan_001" for node in body["nodes"]))
 
     def test_get_graph_rejects_unknown_category(self) -> None:
         db = AsyncMock()
