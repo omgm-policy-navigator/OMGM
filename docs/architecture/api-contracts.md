@@ -2,7 +2,7 @@
 
 ## Contract Status
 
-This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend, backend, and data-pipeline work can proceed without sharing internal entities.
+This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 
@@ -363,7 +363,11 @@ Response `201`:
       "prompt": "거주 지역을 확인해 주세요.",
       "answerType": "single_select",
       "required": true,
-      "options": ["서울", "경기", "인천"]
+      "options": [
+        {"label": "서울", "value": "SEOUL"},
+        {"label": "경기", "value": "GYEONGGI"},
+        {"label": "인천", "value": "INCHEON"}
+      ]
     }
   ]
 }
@@ -381,7 +385,7 @@ Request:
     {
       "questionId": "q_region",
       "factKey": "region",
-      "value": "서울",
+      "value": "SEOUL",
       "confirmed": true
     }
   ]

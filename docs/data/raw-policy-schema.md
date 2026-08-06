@@ -8,7 +8,9 @@ D0는 수집한 정책 원문을 재현 가능하게 보존하는 계약을 정�
 
 ## Raw Policy Metadata 1.0
 
-각 원문 파일에는 같은 basename의 `.metadata.json` sidecar를 둔다. 기계 판독 계약은 [`data-pipeline/schemas/raw-policy.schema.json`](../../data-pipeline/schemas/raw-policy.schema.json), Python 경계 검증은 `policy_pipeline.raw_policy.RawPolicyMetadata`에 있다.
+> 이 문서는 D0 당시 수집 파이프라인 계약 기록이다. D1-D3에서 별도 파이프라인이 제거되어 현재 런타임 계약에는 사용하지 않는다. 현재 기준은 [`backend/data/policy-seed/README.md`](../../backend/data/policy-seed/README.md)다.
+
+당시 계약에서는 각 원문 파일에 같은 basename의 `.metadata.json` sidecar를 두었다.
 
 | 필드 | 형식 | 필수 | 기준 |
 | --- | --- | --- | --- |

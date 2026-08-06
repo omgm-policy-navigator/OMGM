@@ -22,14 +22,14 @@ The package root is `backend/src/app`. The Phase B0 folder contract maps to this
 - LLM code may normalize language, assist extraction, adjust search queries, and draft explanations. It must not create final eligibility status.
 - LLM outputs must preserve the `app.llm.AIOutput` contract and use fallback statuses instead of inventing unsupported facts.
 - Graph projection derives display relationships from stored policy and evaluation data. It does not own policy source data.
-- Data pipeline code must not be imported into request handling.
+- The versioned CSV seed is loaded read-only at startup; request handling must not collect sources or mutate seed files.
 
 ## Data Ownership
 
 - Anonymous sessions are server-generated cookie identities and own temporary conversation state until account identity exists.
 - User fact modules own normalized answers, fact versions, and conflict markers.
-- Data Pipeline owns raw API payloads, raw HTML/PDF, extraction candidates, review-pending data, and source hashes before publication.
-- Backend Policy modules own approved and published `policy`, `policy_version`, `policy_rule`, `policy_document`, and service read models.
+- `backend/data/policy-seed` owns the reviewed MVP policy, question, rule, relation, and RAG document baseline.
+- Backend Policy modules validate and expose that baseline. Rules containing official/announcement placeholders remain confirmation-required and cannot drive deterministic eligibility.
 - Evaluation records are owned by eligibility modules and reference `policy_version` plus user fact version.
 
 ## Development Rules

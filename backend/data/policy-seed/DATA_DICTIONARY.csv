@@ -1,0 +1,11 @@
+﻿table,column,description
+policy,status,"ACTIVE, RECRUITMENT_BASED, PERIODIC, PILOT_OR_BUDGET_LIMITED, BUDGET_LIMITED"
+policy_rule,condition_key,사용자 조건을 표현하는 정규화 키
+policy_rule,operator,"EQ, IN, LTE, GTE, BETWEEN, IN_PERIOD, CONTAINS 등"
+policy_rule,expected_value,정확한 수치가 변동될 경우 OFFICIAL_THRESHOLD/ANNOUNCEMENT_THRESHOLD 사용
+policy_rule,evaluation_mode,"DETERMINISTIC, OFFICIAL_CONFIRMATION_REQUIRED"
+policy_rule,review_status,"APPROVED, DRAFT; 결정형 계산은 APPROVED만 허용"
+question,options,"label과 canonical value를 갖는 JSON 객체 배열"
+question,show_condition,"condition_key, operator, value를 갖는 조건부 질문 JSON 객체"
+policy_relation,relation_type,"BEFORE, AFTER, RELATED, ALTERNATIVE, CONFLICT, REEVALUATE_AFTER"
+policy_document,embedding,pgvector 적재 전에는 빈 값; 임베딩 파이프라인에서 생성

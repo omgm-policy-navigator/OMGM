@@ -2,6 +2,8 @@
 
 FastAPI modular monolith for the OMGM MVP. The package root is `backend/src/app`.
 
+Reviewed MVP policy data is versioned under `data/policy-seed`. The backend validates and loads it read-only at startup. Override the location with `POLICY_SEED_DIR` when necessary.
+
 ## Local Setup
 
 ```bash
@@ -45,6 +47,8 @@ uv run alembic upgrade head
 - `app/core`: configuration, logging, lifespan, and common errors.
 - `app/db`: SQLAlchemy async engine/session setup and Alembic integration.
 - `app/modules`: feature module boundaries. `app/modules/eligibility` owns the Rule Engine.
+- `app/modules/policies`: read-only policy CSV validation and catalog access.
 - `app/llm`: AI response schemas and Ollama/LLM boundary helpers.
+- `data/policy-seed`: reviewed policy, question, rule, relation, and RAG document CSVs.
 
 See [Backend Architecture](../docs/architecture/backend.md), [API Contracts](../docs/architecture/api-contracts.md), and [AI Contracts](../docs/architecture/ai-contracts.md) for detailed ownership and HTTP/AI contracts.

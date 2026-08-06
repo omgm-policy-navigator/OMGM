@@ -1,5 +1,6 @@
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from app.core.config import AppConfig
@@ -20,10 +21,22 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.database_url, TEST_DATABASE_URL)
         self.assertEqual(config.database_pool_size, 5)
         self.assertEqual(config.database_max_overflow, 10)
+        self.assertTrue(config.policy_seed_dir.is_dir())
         self.assertEqual(config.llm_provider, "ollama")
         self.assertEqual(config.ollama_generation_model, "qwen3:4b")
         self.assertEqual(config.llm_temperature, 0.1)
         self.assertEqual(config.llm_timeout_seconds, 30)
+
+    def test_policy_seed_directory_can_be_overridden(self) -> None:
+        custom_path = Path("custom-policy-seed")
+        with patch.dict(
+            os.environ,
+            {"DATABASE_URL": TEST_DATABASE_URL, "POLICY_SEED_DIR": str(custom_path)},
+            clear=True,
+        ):
+            config = AppConfig.from_env()
+
+        self.assertEqual(config.policy_seed_dir, custom_path)
 
     def test_missing_database_url_raises_configuration_error(self) -> None:
         with patch.dict(os.environ, {"DATABASE_URL": ""}, clear=True):

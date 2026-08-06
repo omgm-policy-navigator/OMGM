@@ -8,6 +8,7 @@ COPY pyproject.toml README.md alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 COPY tests ./tests
+COPY data ./data
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -e .[dev]
 
