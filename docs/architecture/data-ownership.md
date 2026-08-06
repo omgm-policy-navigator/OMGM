@@ -77,3 +77,4 @@ AI A2 조건 추출 결과는 사용자 사실 저장값이 아니라 후보 DTO
 - The committed `backend/data/policy-seed` remains the only reviewed runtime baseline.
 - Approved regeneration output is a separate staged Seed directory. Promotion to the committed baseline remains an
   explicit administrator review and Git change; D6 does not publish to PostgreSQL automatically.
+- Approved patches are owned by the immutable review report. Callers cannot substitute new patches during regeneration.

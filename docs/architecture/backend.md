@@ -145,3 +145,7 @@ of FastAPI routers and SQLAlchemy sessions. Request handling never invokes colle
 Detected content changes become an isolated `OUTDATED` report and must transition through `REVIEWING` before
 `APPROVED`. Regeneration writes a new staging directory, recalculates `SHA256SUMS`, and loads the complete candidate
 with the normal Seed validator. It never overwrites `backend/data/policy-seed` or updates operating tables directly.
+
+Approval freezes the exact Seed patches inside the report. Patch targets must match the report policy or its affected
+Rule/Chunk IDs, and policy field values must match the reviewed Diff. Regeneration accepts no external patch argument,
+requires at least one approved patch for changed bytes, and emits a manifest binding the report, Seed hashes, and rows.

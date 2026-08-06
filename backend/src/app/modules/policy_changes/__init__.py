@@ -1,6 +1,8 @@
 from app.modules.policy_changes.workflow import (
     ChangeStatus,
+    ExtractionStatus,
     PolicyBaseline,
+    RegenerationManifest,
     ReviewReport,
     SeedPatch,
     SourceSnapshot,
@@ -13,8 +15,10 @@ from app.modules.policy_changes.workflow import (
 
 __all__ = [
     "ChangeStatus",
+    "ExtractionStatus",
     "PolicyBaseline",
     "ReviewReport",
+    "RegenerationManifest",
     "SeedPatch",
     "SourceSnapshot",
     "approve_report",

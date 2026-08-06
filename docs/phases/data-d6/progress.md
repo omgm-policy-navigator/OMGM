@@ -11,3 +11,6 @@ Implemented on `analysis-d6-change-detection`.
 - 원문을 포함하지 않는 JSON 검수 이력 리포트와 강제 상태 전이를 구현했다.
 - 승인 전 Seed 생성을 차단하고 승인 후 별도 디렉터리 생성·checksum 갱신·전체 로더 검증을 구현했다.
 - 활성 Seed와 운영 DB를 자동 변경하지 않는다.
+- PR #28 리뷰에 따라 승인 리포트와 Seed Patch를 결합하고, 무관한 정책·Rule·Chunk 수정과 빈 재생성을 차단했다.
+- HTML/PDF extractor를 필수화하고 extraction 상태·버전을 분리했으며 HTTPS·공식 호스트 allowlist를 적용했다.
+- 재생성 manifest에 report ID, 기준/생성 Seed hash, 적용 행을 기록한다.

@@ -11,6 +11,7 @@
 - 변경 필드 기반 Rule 영향 및 원문 변경 기반 Chunk 영향 식별
 - `OUTDATED → REVIEWING → APPROVED` 검수 리포트
 - 승인된 리포트만 별도 staging Seed로 재생성하고 전체 Seed 무결성 재검증
+- 승인 시 검증된 Seed Patch를 리포트에 고정하고 재생성 manifest로 적용 범위를 추적
 
 ## 제외 범위
 
