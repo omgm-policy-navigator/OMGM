@@ -136,3 +136,12 @@ The session API exposes `/api/v1/session/graph` with category filtering, selecte
 Phase B7 adds `app/modules/ai` for session-scoped AI explanations. The module reads approved active policy metadata, approved official RAG chunks or policy documents, and current-session `policy_evaluation` rows, then returns structured responses with citations. Rule Engine results remain authoritative: LLM output is used only as explanatory text and cannot replace or mutate `eligibilityStatus`.
 
 The API exposes `POST /api/chat`, `POST /api/policies/{policy_id}/explain`, and `GET /api/chat/stream`. If approved official RAG chunk evidence is unavailable, the explanation response reports `OFFICIAL_CONFIRMATION_REQUIRED` and does not call the LLM. RAG queries are derived from policy metadata and condition keys rather than raw user text or personal fact values. Retrieved chunks are isolated in `<retrieved_context>` delimiters so document text cannot act as LLM instructions. If RAG or the LLM provider is unavailable or times out, the API still returns the existing Rule Engine decision where safe and uses a static explanation generated from stored JSON evidence with `aiStatus: FALLBACK`. Generated answers must validate against the B7 structured answer schema and post-generation contradiction detector before they are returned.
+## Analysis D6 offline policy change workflow
+
+`app.modules.policy_changes` owns offline official-source recollection, exact-byte HTML/PDF/API hashes, structured field
+diffs, Rule/Chunk impact projection, review history reports, and approved candidate Seed regeneration. It is independent
+of FastAPI routers and SQLAlchemy sessions. Request handling never invokes collection or changes CSV files.
+
+Detected content changes become an isolated `OUTDATED` report and must transition through `REVIEWING` before
+`APPROVED`. Regeneration writes a new staging directory, recalculates `SHA256SUMS`, and loads the complete candidate
+with the normal Seed validator. It never overwrites `backend/data/policy-seed` or updates operating tables directly.

@@ -69,3 +69,11 @@ D4 가공 Chunk는 정책 기준 데이터 영역이 소유한다. 각 Chunk는 
 개인정보와 민감정보의 보존 기간은 미확정이다. 다음 Phase에서 동의 목적, 법적 근거, 서비스 필요성을 기준으로 필드별 보존 기간을 확정해야 한다.
 
 AI A2 조건 추출 결과는 사용자 사실 저장값이 아니라 후보 DTO다. 낮은 신뢰도, 모호성, 기존 확정 사실과의 충돌이 있으면 재확인 전까지 확정하거나 저장하지 않는다. A2 자체는 `user_fact` 테이블을 만들거나 변경하지 않는다.
+## D6 change candidate ownership
+
+- Official HTTP responses collected by D6 are transient candidate inputs, not the active policy catalog.
+- `ReviewReport` owns hashes, field changes, affected Rule/Chunk IDs, required reindex/reevaluation actions, and review
+  attribution. It deliberately excludes raw response bytes and credentials, and persisted report files are append-only.
+- The committed `backend/data/policy-seed` remains the only reviewed runtime baseline.
+- Approved regeneration output is a separate staged Seed directory. Promotion to the committed baseline remains an
+  explicit administrator review and Git change; D6 does not publish to PostgreSQL automatically.
