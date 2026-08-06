@@ -7,14 +7,14 @@ cd backend
 uv run pytest tests\unit\test_eligibility.py tests\integration\test_session_evaluations_api.py
 ```
 
-Result: passed. 16 tests passed.
+Result: passed. 23 tests passed.
 
 ```bash
 cd backend
 uv run pytest
 ```
 
-Result: passed. 126 tests passed.
+Result: passed. 152 tests passed after merging latest `origin/main` and review hardening changes.
 
 ```bash
 cd backend

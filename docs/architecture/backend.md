@@ -119,6 +119,6 @@ The session API stores the selected category on `anonymous_session` and stores s
 
 ## Phase B5 Rule Engine and Evaluations
 
-Phase B5 extends `app/modules/eligibility` with deterministic Rule Engine operators, required and optional conditions, limited OR groups, application-window status handling, recommendation scoring, and JSON evidence generation. The Rule Engine stays pure Python and does not depend on FastAPI routers or SQLAlchemy sessions.
+Phase B5 extends `app/modules/eligibility` with deterministic Rule Engine operators, explicit three-valued condition results, required and optional conditions, explicit AND/OR condition groups, application-window status handling, fixed evaluation-time input, recommendation scoring, and JSON evidence generation. The Rule Engine stays pure Python and does not depend on FastAPI routers or SQLAlchemy sessions.
 
 The session API persists `policy_evaluation` rows scoped by anonymous session and policy. User fact changes mark existing current-session evaluations `STALE` so stale diagnostic results are not silently reused.

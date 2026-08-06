@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -39,6 +39,18 @@ class RuleEvaluationMode(StrEnum):
     OFFICIAL_CONFIRMATION_REQUIRED = "OFFICIAL_CONFIRMATION_REQUIRED"
 
 
+class ConditionResult(StrEnum):
+    MET = "MET"
+    UNMET = "UNMET"
+    UNKNOWN = "UNKNOWN"
+    OFFICIAL_CONFIRMATION_REQUIRED = "OFFICIAL_CONFIRMATION_REQUIRED"
+
+
+class GroupOperator(StrEnum):
+    AND = "AND"
+    OR = "OR"
+
+
 @dataclass(frozen=True)
 class Condition:
     field: str
@@ -49,6 +61,12 @@ class Condition:
     evidence: str | None = None
     group_id: str | None = None
     evaluation_mode: RuleEvaluationMode = RuleEvaluationMode.DETERMINISTIC
+
+
+@dataclass(frozen=True)
+class ConditionGroup:
+    operator: GroupOperator
+    conditions: tuple[Condition | ConditionGroup, ...]
 
 
 @dataclass(frozen=True)
@@ -65,6 +83,7 @@ class ConditionEvidence:
     expected: Any
     actual: Any
     required: bool
+    result: ConditionResult
     evidence: str | None = None
 
 
@@ -85,42 +104,36 @@ def evaluate_conditions(
     *,
     policy_window: PolicyWindow | None = None,
     today: date | None = None,
+    evaluation_time: date | datetime | None = None,
 ) -> EvaluationResult:
-    current_date = today or date.today()
+    current_date = _evaluation_date(evaluation_time or today)
     if policy_window is not None:
         if policy_window.ends_at is not None and current_date > policy_window.ends_at:
             return EvaluationResult(eligibility_status=EligibilityStatus.LIKELY_INELIGIBLE, recommendation_score=-1000)
         if policy_window.starts_at is not None and current_date < policy_window.starts_at:
             return EvaluationResult(eligibility_status=EligibilityStatus.AVAILABLE_LATER, recommendation_score=-100)
 
-    satisfied: list[ConditionEvidence] = []
-    unsatisfied: list[ConditionEvidence] = []
-    needs_confirmation: list[ConditionEvidence] = []
-    official_confirmation: list[ConditionEvidence] = []
+    return evaluate_condition_group(_legacy_conditions_to_group(conditions), answers)
 
-    for group in _group_conditions(conditions):
-        result = _evaluate_condition_group(group, answers)
-        satisfied.extend(result.satisfied)
-        unsatisfied.extend(result.unsatisfied)
-        needs_confirmation.extend(result.needs_confirmation)
-        official_confirmation.extend(result.official_confirmation_required)
 
-    if unsatisfied:
-        status = EligibilityStatus.LIKELY_INELIGIBLE
-    elif needs_confirmation:
-        status = EligibilityStatus.NEEDS_CONFIRMATION
-    elif official_confirmation:
-        status = EligibilityStatus.OFFICIAL_CONFIRMATION_REQUIRED
-    else:
-        status = EligibilityStatus.LIKELY_ELIGIBLE
-
+def evaluate_condition_group(group: ConditionGroup, answers: dict[str, Any]) -> EvaluationResult:
+    result = _evaluate_group(group, answers)
+    status = _status_from_evidence(
+        result.unsatisfied,
+        result.needs_confirmation,
+        result.official_confirmation_required,
+    )
+    satisfied = list(result.satisfied)
+    unsatisfied = list(result.unsatisfied)
+    needs_confirmation = list(result.needs_confirmation)
+    official_confirmation = list(result.official_confirmation_required)
     return EvaluationResult(
         eligibility_status=status,
         evaluation_state=EvaluationState.ACTIVE,
-        satisfied=tuple(satisfied),
-        unsatisfied=tuple(unsatisfied),
-        needs_confirmation=tuple(needs_confirmation),
-        official_confirmation_required=tuple(official_confirmation),
+        satisfied=result.satisfied,
+        unsatisfied=result.unsatisfied,
+        needs_confirmation=result.needs_confirmation,
+        official_confirmation_required=result.official_confirmation_required,
         recommendation_score=_score(status, satisfied, unsatisfied, needs_confirmation, official_confirmation),
     )
 
@@ -144,54 +157,117 @@ class _GroupResult:
     needs_confirmation: tuple[ConditionEvidence, ...] = ()
     official_confirmation_required: tuple[ConditionEvidence, ...] = ()
 
+    @property
+    def condition_result(self) -> ConditionResult:
+        if self.unsatisfied:
+            return ConditionResult.UNMET
+        if self.needs_confirmation:
+            return ConditionResult.UNKNOWN
+        if self.official_confirmation_required:
+            return ConditionResult.OFFICIAL_CONFIRMATION_REQUIRED
+        return ConditionResult.MET
 
-def _group_conditions(conditions: list[Condition]) -> list[list[Condition]]:
+
+def _legacy_conditions_to_group(conditions: list[Condition]) -> ConditionGroup:
     groups: dict[str, list[Condition]] = {}
-    standalone: list[list[Condition]] = []
+    top_level: list[Condition | ConditionGroup] = []
     for condition in conditions:
         if condition.group_id is None:
-            standalone.append([condition])
+            top_level.append(condition)
         else:
             groups.setdefault(condition.group_id, []).append(condition)
-    return standalone + list(groups.values())
+    top_level.extend(ConditionGroup(GroupOperator.OR, tuple(group)) for group in groups.values())
+    return ConditionGroup(GroupOperator.AND, tuple(top_level))
 
 
-def _evaluate_condition_group(group: list[Condition], answers: dict[str, Any]) -> _GroupResult:
-    results = [_evaluate_single(condition, answers) for condition in group]
-    if len(group) == 1:
-        return results[0]
-    if any(result.satisfied for result in results):
-        satisfied = tuple(item for result in results for item in result.satisfied)
-        return _GroupResult(satisfied=satisfied)
-    if any(result.needs_confirmation for result in results):
-        needs = tuple(item for result in results for item in result.needs_confirmation)
-        return _GroupResult(needs_confirmation=needs)
-    unsatisfied = tuple(item for result in results for item in result.unsatisfied)
-    return _GroupResult(unsatisfied=unsatisfied)
+def _evaluate_group(group: ConditionGroup, answers: dict[str, Any]) -> _GroupResult:
+    results = [
+        _evaluate_group(item, answers) if isinstance(item, ConditionGroup) else _evaluate_single(item, answers)
+        for item in group.conditions
+    ]
+    if group.operator is GroupOperator.AND:
+        return _merge_and(results)
+    if group.operator is GroupOperator.OR:
+        return _merge_or(results)
+    raise ValueError(f"Unsupported group operator: {group.operator}")
+
+
+def _merge_and(results: list[_GroupResult]) -> _GroupResult:
+    return _GroupResult(
+        satisfied=tuple(item for result in results for item in result.satisfied),
+        unsatisfied=tuple(item for result in results for item in result.unsatisfied),
+        needs_confirmation=tuple(item for result in results for item in result.needs_confirmation),
+        official_confirmation_required=tuple(
+            item for result in results for item in result.official_confirmation_required
+        ),
+    )
+
+
+def _merge_or(results: list[_GroupResult]) -> _GroupResult:
+    met_results = [result for result in results if result.condition_result is ConditionResult.MET]
+    if met_results:
+        return _GroupResult(satisfied=tuple(item for result in met_results for item in result.satisfied))
+    unknown_results = [result for result in results if result.condition_result is ConditionResult.UNKNOWN]
+    if unknown_results:
+        return _GroupResult(
+            needs_confirmation=tuple(item for result in unknown_results for item in result.needs_confirmation)
+        )
+    official_results = [
+        result for result in results if result.condition_result is ConditionResult.OFFICIAL_CONFIRMATION_REQUIRED
+    ]
+    if official_results:
+        return _GroupResult(
+            official_confirmation_required=tuple(
+                item for result in official_results for item in result.official_confirmation_required
+            )
+        )
+    return _GroupResult(unsatisfied=tuple(item for result in results for item in result.unsatisfied))
 
 
 def _evaluate_single(condition: Condition, answers: dict[str, Any]) -> _GroupResult:
     actual = answers.get(condition.field)
-    evidence = ConditionEvidence(
+    if condition.evaluation_mode is RuleEvaluationMode.OFFICIAL_CONFIRMATION_REQUIRED:
+        evidence = _condition_evidence(condition, actual, ConditionResult.OFFICIAL_CONFIRMATION_REQUIRED)
+        return _GroupResult(official_confirmation_required=(evidence,))
+    if actual is None or actual == "":
+        if condition.required:
+            evidence = _condition_evidence(condition, actual, ConditionResult.UNKNOWN)
+            return _GroupResult(needs_confirmation=(evidence,))
+        return _GroupResult()
+    if _compare(actual, condition.operator, condition.expected):
+        evidence = _condition_evidence(condition, actual, ConditionResult.MET)
+        return _GroupResult(satisfied=(evidence,))
+    if condition.required:
+        evidence = _condition_evidence(condition, actual, ConditionResult.UNMET)
+        return _GroupResult(unsatisfied=(evidence,))
+    return _GroupResult()
+
+
+def _condition_evidence(condition: Condition, actual: Any, result: ConditionResult) -> ConditionEvidence:
+    return ConditionEvidence(
         rule_id=condition.rule_id,
         field=condition.field,
         operator=condition.operator,
         expected=condition.expected,
         actual=actual,
         required=condition.required,
+        result=result,
         evidence=condition.evidence,
     )
-    if condition.evaluation_mode is RuleEvaluationMode.OFFICIAL_CONFIRMATION_REQUIRED:
-        return _GroupResult(official_confirmation_required=(evidence,))
-    if actual is None or actual == "":
-        if condition.required:
-            return _GroupResult(needs_confirmation=(evidence,))
-        return _GroupResult()
-    if _compare(actual, condition.operator, condition.expected):
-        return _GroupResult(satisfied=(evidence,))
-    if condition.required:
-        return _GroupResult(unsatisfied=(evidence,))
-    return _GroupResult()
+
+
+def _status_from_evidence(
+    unsatisfied: tuple[ConditionEvidence, ...],
+    needs_confirmation: tuple[ConditionEvidence, ...],
+    official_confirmation: tuple[ConditionEvidence, ...],
+) -> EligibilityStatus:
+    if unsatisfied:
+        return EligibilityStatus.LIKELY_INELIGIBLE
+    if needs_confirmation:
+        return EligibilityStatus.NEEDS_CONFIRMATION
+    if official_confirmation:
+        return EligibilityStatus.OFFICIAL_CONFIRMATION_REQUIRED
+    return EligibilityStatus.LIKELY_ELIGIBLE
 
 
 def _score(
@@ -233,20 +309,35 @@ def _compare(value: Any, operator: str, expected: Any) -> bool:
     if parsed_operator is RuleOperator.NOT_IN:
         return value not in _as_collection(expected)
     if parsed_operator is RuleOperator.LTE:
-        return _coerce_comparable(value) <= _coerce_comparable(expected)
+        left, right = _coerce_ordered_pair(value, expected)
+        return left <= right
     if parsed_operator is RuleOperator.GTE:
-        return _coerce_comparable(value) >= _coerce_comparable(expected)
+        left, right = _coerce_ordered_pair(value, expected)
+        return left >= right
     if parsed_operator is RuleOperator.BETWEEN:
         lower, upper = _between_bounds(expected)
-        coerced = _coerce_comparable(value)
-        return _coerce_comparable(lower) <= coerced <= _coerce_comparable(upper)
+        lower_bound, coerced = _coerce_ordered_pair(lower, value)
+        coerced, upper_bound = _coerce_ordered_pair(coerced, upper)
+        return lower_bound <= coerced <= upper_bound
     if parsed_operator is RuleOperator.BEFORE:
-        return _coerce_comparable(value) < _coerce_comparable(expected)
+        left, right = _coerce_ordered_pair(value, expected)
+        return left < right
     if parsed_operator is RuleOperator.AFTER:
-        return _coerce_comparable(value) > _coerce_comparable(expected)
+        left, right = _coerce_ordered_pair(value, expected)
+        return left > right
     if parsed_operator is RuleOperator.EXISTS:
         return value is not None and value != ""
     raise ValueError(f"Unsupported operator: {operator}")
+
+
+def _evaluation_date(value: date | datetime | None) -> date:
+    if value is None:
+        return date.today()
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(UTC).date()
+        return value.date()
+    return value
 
 
 def _as_collection(expected: Any) -> tuple[Any, ...]:
@@ -264,15 +355,45 @@ def _between_bounds(expected: Any) -> tuple[Any, Any]:
     return values[0], values[1]
 
 
+def _coerce_ordered_pair(left: Any, right: Any) -> tuple[Any, Any]:
+    coerced_left = _coerce_comparable(left)
+    coerced_right = _coerce_comparable(right)
+    if (
+        isinstance(coerced_left, datetime)
+        and isinstance(coerced_right, date)
+        and not isinstance(coerced_right, datetime)
+    ):
+        coerced_right = datetime.combine(coerced_right, datetime.min.time(), tzinfo=coerced_left.tzinfo)
+    if (
+        isinstance(coerced_right, datetime)
+        and isinstance(coerced_left, date)
+        and not isinstance(coerced_left, datetime)
+    ):
+        coerced_left = datetime.combine(coerced_left, datetime.min.time(), tzinfo=coerced_right.tzinfo)
+    if isinstance(coerced_left, datetime) and isinstance(coerced_right, datetime):
+        if coerced_left.tzinfo is not None and coerced_right.tzinfo is None:
+            coerced_right = coerced_right.replace(tzinfo=UTC)
+        if coerced_right.tzinfo is not None and coerced_left.tzinfo is None:
+            coerced_left = coerced_left.replace(tzinfo=UTC)
+    return coerced_left, coerced_right
+
+
 def _coerce_comparable(value: Any) -> Any:
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(UTC)
+        return value
     if isinstance(value, int | float | date):
         return value
     if isinstance(value, str):
         try:
-            return date.fromisoformat(value)
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             try:
-                return float(value)
+                return date.fromisoformat(value)
             except ValueError:
-                return value
+                try:
+                    return float(value)
+                except ValueError:
+                    return value
     return value

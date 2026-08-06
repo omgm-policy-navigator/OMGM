@@ -1,13 +1,17 @@
 import unittest
-from datetime import date
+from datetime import UTC, date, datetime
 
 from app.modules.eligibility.rules import (
     Condition,
+    ConditionGroup,
+    ConditionResult,
     EligibilityStatus,
     EvaluationState,
+    GroupOperator,
     PolicyWindow,
     RuleEvaluationMode,
     detect_conflict,
+    evaluate_condition_group,
     evaluate_conditions,
     mark_stale,
 )
@@ -20,6 +24,7 @@ class EligibilityTests(unittest.TestCase):
         self.assertEqual(result.eligibility_status, EligibilityStatus.NEEDS_CONFIRMATION)
         self.assertEqual(result.evaluation_state, EvaluationState.ACTIVE)
         self.assertEqual(result.needs_confirmation[0].field, "income")
+        self.assertEqual(result.needs_confirmation[0].result, ConditionResult.UNKNOWN)
         self.assertEqual(result.unsatisfied, ())
 
     def test_failed_required_condition_is_ineligible(self) -> None:
@@ -27,6 +32,7 @@ class EligibilityTests(unittest.TestCase):
 
         self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_INELIGIBLE)
         self.assertEqual(result.unsatisfied[0].field, "income")
+        self.assertEqual(result.unsatisfied[0].result, ConditionResult.UNMET)
 
     def test_all_required_conditions_satisfied(self) -> None:
         result = evaluate_conditions(
@@ -40,6 +46,26 @@ class EligibilityTests(unittest.TestCase):
         self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
         self.assertEqual([item.field for item in result.satisfied], ["marital_status", "income"])
 
+
+    def test_unknown_required_condition_takes_precedence_over_falsey_missing_values(self) -> None:
+        result = evaluate_conditions(
+            [Condition("income", "LTE", 70_000_000), Condition("region", "EQ", "Seoul")],
+            {"region": "Seoul"},
+        )
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.NEEDS_CONFIRMATION)
+        self.assertEqual(result.needs_confirmation[0].result, ConditionResult.UNKNOWN)
+        self.assertEqual(result.unsatisfied, ())
+
+    def test_unmet_required_condition_overrides_unknown_required_condition(self) -> None:
+        result = evaluate_conditions(
+            [Condition("income", "LTE", 70_000_000), Condition("region", "EQ", "Seoul")],
+            {"income": 80_000_000},
+        )
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_INELIGIBLE)
+        self.assertEqual(result.unsatisfied[0].result, ConditionResult.UNMET)
+        self.assertEqual(result.needs_confirmation[0].result, ConditionResult.UNKNOWN)
     def test_supported_operators(self) -> None:
         conditions = [
             Condition("eq", "EQ", "A"),
@@ -83,6 +109,64 @@ class EligibilityTests(unittest.TestCase):
         self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
         self.assertEqual(result.satisfied[0].expected, "Gyeonggi")
 
+
+    def test_explicit_group_object_evaluates_and_with_nested_or(self) -> None:
+        group = ConditionGroup(
+            GroupOperator.AND,
+            (
+                Condition("income", "LTE", 60_000_000),
+                ConditionGroup(
+                    GroupOperator.OR,
+                    (
+                        Condition("children_count", "GTE", 2),
+                        Condition("is_multicultural", "EQ", True),
+                    ),
+                ),
+            ),
+        )
+
+        result = evaluate_condition_group(group, {"income": 55_000_000, "is_multicultural": True})
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
+        self.assertEqual([item.field for item in result.satisfied], ["income", "is_multicultural"])
+
+    def test_explicit_or_group_with_only_unknown_children_needs_confirmation(self) -> None:
+        group = ConditionGroup(
+            GroupOperator.AND,
+            (
+                Condition("income", "LTE", 60_000_000),
+                ConditionGroup(
+                    GroupOperator.OR,
+                    (
+                        Condition("children_count", "GTE", 2),
+                        Condition("is_multicultural", "EQ", True),
+                    ),
+                ),
+            ),
+        )
+
+        result = evaluate_condition_group(group, {"income": 55_000_000})
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.NEEDS_CONFIRMATION)
+        self.assertEqual({item.field for item in result.needs_confirmation}, {"children_count", "is_multicultural"})
+
+    def test_evaluation_time_accepts_timezone_aware_datetime(self) -> None:
+        result = evaluate_conditions(
+            [],
+            {},
+            policy_window=PolicyWindow(starts_at=date(2026, 8, 6), ends_at=date(2026, 8, 6)),
+            evaluation_time=datetime(2026, 8, 6, 23, 30, tzinfo=UTC),
+        )
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
+
+    def test_iso_datetime_comparison_is_timezone_safe(self) -> None:
+        result = evaluate_conditions(
+            [Condition("submitted_at", "BEFORE", "2026-08-07T00:00:00+00:00")],
+            {"submitted_at": "2026-08-06T23:00:00Z"},
+        )
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
     def test_application_period_ended_is_ineligible(self) -> None:
         result = evaluate_conditions(
             [],
@@ -111,6 +195,14 @@ class EligibilityTests(unittest.TestCase):
 
         self.assertEqual(result.eligibility_status, EligibilityStatus.OFFICIAL_CONFIRMATION_REQUIRED)
 
+
+    def test_date_and_iso_datetime_comparison_uses_stable_timezone_normalization(self) -> None:
+        result = evaluate_conditions(
+            [Condition("submitted_at", "AFTER", "2026-08-06")],
+            {"submitted_at": "2026-08-06T01:00:00+00:00"},
+        )
+
+        self.assertEqual(result.eligibility_status, EligibilityStatus.LIKELY_ELIGIBLE)
     def test_invalid_operator_raises(self) -> None:
         with self.assertRaises(ValueError):
             evaluate_conditions([Condition("income", "BAD", 1)], {"income": 1})
