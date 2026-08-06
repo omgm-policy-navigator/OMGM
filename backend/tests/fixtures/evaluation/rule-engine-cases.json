@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "dataset": "rule-engine",
+  "cases": [
+    {
+      "id": "rule-all-required-met",
+      "title": "모든 필수 조건 충족",
+      "tags": ["all_conditions_met", "happy_path"],
+      "input": {
+        "evaluationDate": "2026-08-06",
+        "policyWindow": {"startsAt": "2026-01-01", "endsAt": "2026-12-31"},
+        "conditions": [
+          {"ruleId": "rule-region", "field": "RESIDENCE_REGION", "operator": "EQ", "expected": "SEOUL", "required": true},
+          {"ruleId": "rule-home", "field": "HOME_OWNERSHIP", "operator": "EQ", "expected": "NONE", "required": true}
+        ],
+        "facts": {"RESIDENCE_REGION": "SEOUL", "HOME_OWNERSHIP": "NONE"}
+      },
+      "expected": {"eligibilityStatus": "LIKELY_ELIGIBLE", "evaluationState": "ACTIVE", "satisfiedRuleIds": ["rule-region", "rule-home"], "unsatisfiedRuleIds": [], "needsConfirmationRuleIds": []}
+    },
+    {
+      "id": "rule-income-unknown",
+      "title": "소득 정보 없음은 탈락이 아님",
+      "tags": ["income_unknown", "missing_data", "boundary"],
+      "input": {
+        "evaluationDate": "2026-08-06",
+        "conditions": [{"ruleId": "rule-income", "field": "HOUSEHOLD_INCOME_RANGE", "operator": "LTE", "expected": 7200, "required": true}],
+        "facts": {}
+      },
+      "expected": {"eligibilityStatus": "NEEDS_CONFIRMATION", "evaluationState": "ACTIVE", "satisfiedRuleIds": [], "unsatisfiedRuleIds": [], "needsConfirmationRuleIds": ["rule-income"], "missingValueMustNotBecome": [false, 0]}
+    },
+    {
+      "id": "rule-application-ended",
+      "title": "신청기간 종료",
+      "tags": ["application_ended", "boundary"],
+      "input": {"evaluationDate": "2026-08-06", "policyWindow": {"startsAt": "2026-01-01", "endsAt": "2026-07-31"}, "conditions": [], "facts": {}},
+      "expected": {"eligibilityStatus": "LIKELY_INELIGIBLE", "evaluationState": "ACTIVE", "recommendationScore": -1000}
+    },
+    {
+      "id": "rule-available-later",
+      "title": "향후 신청 가능",
+      "tags": ["available_later", "future_condition", "boundary"],
+      "input": {"evaluationDate": "2026-08-06", "policyWindow": {"startsAt": "2026-09-01", "endsAt": "2026-12-31"}, "conditions": [], "facts": {}},
+      "expected": {"eligibilityStatus": "AVAILABLE_LATER", "evaluationState": "ACTIVE", "recommendationScore": -100}
+    },
+    {
+      "id": "rule-official-confirmation",
+      "title": "Rule로 확정할 수 없는 공식 확인 조건",
+      "tags": ["official_evidence_insufficient", "failure"],
+      "input": {
+        "evaluationDate": "2026-08-06",
+        "conditions": [{"ruleId": "rule-agency-review", "field": "CONTRACT_STATUS", "operator": "EQ", "expected": "VALID", "required": true, "evaluationMode": "OFFICIAL_CONFIRMATION_REQUIRED"}],
+        "facts": {"CONTRACT_STATUS": "VALID"}
+      },
+      "expected": {"eligibilityStatus": "OFFICIAL_CONFIRMATION_REQUIRED", "evaluationState": "ACTIVE", "officialConfirmationRuleIds": ["rule-agency-review"]}
+    }
+  ]
+}
