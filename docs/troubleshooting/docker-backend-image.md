@@ -67,3 +67,11 @@ Start Docker Desktop and wait until the Linux engine is healthy. Then rerun the 
 docker compose -f compose.yaml -f compose.dev.yaml config
 docker compose -f compose.yaml -f compose.dev.yaml run --rm backend alembic upgrade head
 ```
+## Windows pytest temporary directory access denied
+
+If pytest fails before test setup with `PermissionError` under `%LOCALAPPDATA%\Temp\pytest-of-<user>`, point pytest at
+a repository-writable temporary base instead of changing global directory permissions:
+
+```powershell
+backend\.venv\Scripts\python.exe -m pytest --basetemp C:\path\to\OMGM\pytest-temp
+```

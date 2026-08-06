@@ -26,6 +26,12 @@ class PolicyStatus(StrEnum):
     DRAFT = "DRAFT"
     INACTIVE = "INACTIVE"
 
+
+class ApprovalStatus(StrEnum):
+    APPROVED = "APPROVED"
+    DRAFT = "DRAFT"
+    REJECTED = "REJECTED"
+
 class Category(Base):
     __tablename__ = "category"
 
@@ -90,6 +96,9 @@ class PolicyRule(Base):
     value_text: Mapped[str] = mapped_column(String(200), nullable=False)
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_text: Mapped[str] = mapped_column(Text, nullable=False)
+    approval_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, index=True, server_default=ApprovalStatus.DRAFT
+    )
 
     policy: Mapped[Policy] = relationship(back_populates="rules")
 
@@ -106,6 +115,9 @@ class PolicyDocument(Base):
     reviewed_at: Mapped[date] = mapped_column(Date, nullable=False)
     collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     document_hash: Mapped[str] = mapped_column(String(80), nullable=False)
+    approval_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, index=True, server_default=ApprovalStatus.DRAFT
+    )
 
     policy: Mapped[Policy] = relationship(back_populates="documents")
 

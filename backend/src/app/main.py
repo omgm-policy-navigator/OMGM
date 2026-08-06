@@ -12,6 +12,7 @@ from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.core.lifespan import lifespan
 from app.core.logging import get_logger
+from app.core.middleware import OperationsMiddleware
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,13 @@ def error_payload(code: str, message: str, details: list[dict[str, Any]] | None 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
     app = FastAPI(title="나만 결혼해? Backend", lifespan=lifespan)
+    effective_config = config or AppConfig.from_env()
+    app.add_middleware(
+        OperationsMiddleware,
+        max_body_bytes=effective_config.request_max_body_bytes,
+        rate_requests=effective_config.rate_limit_requests,
+        rate_window_seconds=effective_config.rate_limit_window_seconds,
+    )
     cors_allowed_origins = config.cors_allowed_origins if config is not None else os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     app.add_middleware(
         CORSMiddleware,
@@ -38,8 +46,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         allow_headers=["Accept", "Content-Type"],
     )
     app.include_router(api_router)
-    if config is not None:
-        app.state.config = config
+    app.state.config = effective_config
 
     @app.exception_handler(AppError)
     async def app_error_handler(_request, exc: AppError) -> JSONResponse:

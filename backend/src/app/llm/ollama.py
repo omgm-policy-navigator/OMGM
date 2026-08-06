@@ -29,11 +29,13 @@ class OllamaLLMProvider:
         timeout_seconds: float = 30,
         temperature: float = 0.1,
         client: httpx.AsyncClient | None = None,
+        max_attempts: int = 2,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.temperature = temperature
+        self.max_attempts = max_attempts
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             base_url=self.base_url,
@@ -104,11 +106,23 @@ class OllamaLLMProvider:
         return {model["name"] for model in models if isinstance(model, dict) and isinstance(model.get("name"), str)}
 
     async def _get(self, path: str) -> dict[str, Any]:
-        response = await self._client.get(path)
-        response.raise_for_status()
-        return response.json()
+        return await self._request_json("GET", path)
 
     async def _post(self, path: str, json_payload: dict[str, Any]) -> dict[str, Any]:
-        response = await self._client.post(path, json=json_payload)
-        response.raise_for_status()
-        return response.json()
+        return await self._request_json("POST", path, json_payload=json_payload)
+
+    async def _request_json(
+        self, method: str, path: str, json_payload: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                response = await self._client.request(method, path, json=json_payload)
+                response.raise_for_status()
+                return response.json()
+            except (httpx.TimeoutException, httpx.NetworkError):
+                if attempt == self.max_attempts:
+                    raise
+            except httpx.HTTPStatusError as exc:
+                if attempt == self.max_attempts or exc.response.status_code not in {502, 503, 504}:
+                    raise
+        raise RuntimeError("unreachable")

@@ -553,3 +553,11 @@ Saved policy and notification contracts are intentionally not fixed in B0. They 
 ## Mock Contract Rules
 
 Mocks must preserve the response envelopes, status strings, and null handling defined here. Mock data must be synthetic and must not include real personal data or real application records.
+## Backend B8 operations contract
+
+- Every HTTP response includes `X-Request-ID`; request completion logs contain method, route path, status, and duration.
+- Bodies above `REQUEST_MAX_BODY_BYTES` return `413 REQUEST_TOO_LARGE`.
+- Per-instance client-IP limits return `429 RATE_LIMITED` with `Retry-After`.
+- `POST /api/v1/admin/sessions/cleanup` requires `Authorization: Bearer <ADMIN_API_KEY>` and returns
+  `{ "deletedSessions": number }`. A missing server-side key disables the endpoint with 503.
+- Chat text is limited to 1,000 characters, answer batches to 50 items, and identifiers/notes have explicit schema limits.

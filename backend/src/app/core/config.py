@@ -29,11 +29,17 @@ class AppConfig(BaseSettings):
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
     llm_temperature: float = Field(default=0.1, ge=0, le=0.2)
     llm_timeout_seconds: int = Field(default=30, gt=0)
+    llm_max_attempts: int = Field(default=2, ge=1, le=3)
     policy_seed_dir: Path = DEFAULT_POLICY_SEED_DIR
     anonymous_session_cookie_name: str = "anonymous_session"
     anonymous_session_absolute_ttl_minutes: int = Field(default=1440, gt=0)
     anonymous_session_idle_ttl_minutes: int = Field(default=60, gt=0)
     anonymous_session_cookie_samesite: str = "lax"
+    session_cleanup_interval_seconds: int = Field(default=300, ge=10)
+    request_max_body_bytes: int = Field(default=65536, ge=1024, le=1048576)
+    rate_limit_requests: int = Field(default=60, ge=1)
+    rate_limit_window_seconds: int = Field(default=60, ge=1)
+    admin_api_key: str | None = None
 
     @field_validator("log_level")
     @classmethod

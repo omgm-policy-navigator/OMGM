@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.catalog.models import Category, Policy, PolicyDocument, PolicyStatus
+from app.catalog.models import ApprovalStatus, Category, Policy, PolicyDocument, PolicyStatus
 from app.catalog.schemas import (
     CategoryResponse,
     PolicyDetailResponse,
@@ -113,5 +113,12 @@ async def list_policy_documents(session: AsyncSession, policy_id: str) -> list[P
     if policy is None:
         return None
 
-    documents = sorted(policy.documents, key=lambda document: document.title)
+    documents = sorted(
+        (
+            document
+            for document in policy.documents
+            if getattr(document, "approval_status", ApprovalStatus.APPROVED) == ApprovalStatus.APPROVED
+        ),
+        key=lambda document: document.title,
+    )
     return [document_to_response(document) for document in documents]

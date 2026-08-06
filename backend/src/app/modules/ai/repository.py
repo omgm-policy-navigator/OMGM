@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.catalog.models import Policy, PolicyDocument, PolicyEvaluation, PolicyStatus
+from app.catalog.models import ApprovalStatus, Policy, PolicyDocument, PolicyEvaluation, PolicyStatus
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,11 @@ async def get_policy_evidence_bundle(
         )
     )
     evaluation = evaluation_result.scalar_one_or_none()
-    return PolicyEvidenceBundle(policy=policy, evaluation=evaluation, documents=tuple(policy.documents))
+    policy.rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+    documents = tuple(
+        document for document in policy.documents if document.approval_status == ApprovalStatus.APPROVED
+    )
+    return PolicyEvidenceBundle(policy=policy, evaluation=evaluation, documents=documents)
 
 
 async def get_top_session_policy_evidence_bundle(
@@ -151,6 +155,7 @@ async def find_policy_evidence_bundle_for_message(
         return None
 
     policy = scored[0][1]
+    policy.rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
     evaluation_result = await db.execute(
         select(PolicyEvaluation).where(
             PolicyEvaluation.session_id == session_id,
@@ -160,5 +165,7 @@ async def find_policy_evidence_bundle_for_message(
     return PolicyEvidenceBundle(
         policy=policy,
         evaluation=evaluation_result.scalar_one_or_none(),
-        documents=tuple(policy.documents),
+        documents=tuple(
+            document for document in policy.documents if document.approval_status == ApprovalStatus.APPROVED
+        ),
     )
