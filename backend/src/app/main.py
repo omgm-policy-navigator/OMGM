@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
+from app.core.body_limit import RequestBodyLimitMiddleware
 from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.core.lifespan import lifespan
@@ -33,10 +34,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     effective_config = config or AppConfig.from_env()
     app.add_middleware(
         OperationsMiddleware,
-        max_body_bytes=effective_config.request_max_body_bytes,
         rate_requests=effective_config.rate_limit_requests,
         rate_window_seconds=effective_config.rate_limit_window_seconds,
+        trusted_proxies=set(parse_allowed_origins(effective_config.trusted_proxy_ips)),
     )
+    app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=effective_config.request_max_body_bytes)
     cors_allowed_origins = config.cors_allowed_origins if config is not None else os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
     app.add_middleware(
         CORSMiddleware,

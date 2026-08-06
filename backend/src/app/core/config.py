@@ -39,6 +39,7 @@ class AppConfig(BaseSettings):
     request_max_body_bytes: int = Field(default=65536, ge=1024, le=1048576)
     rate_limit_requests: int = Field(default=60, ge=1)
     rate_limit_window_seconds: int = Field(default=60, ge=1)
+    trusted_proxy_ips: str = ""
     admin_api_key: str | None = None
 
     @field_validator("log_level")

@@ -556,8 +556,10 @@ Mocks must preserve the response envelopes, status strings, and null handling de
 ## Backend B8 operations contract
 
 - Every HTTP response includes `X-Request-ID`; request completion logs contain method, route path, status, and duration.
-- Bodies above `REQUEST_MAX_BODY_BYTES` return `413 REQUEST_TOO_LARGE`.
+- Bodies above `REQUEST_MAX_BODY_BYTES` return `413 REQUEST_TOO_LARGE`; the limit counts received chunks and does not
+  rely only on `Content-Length`.
 - Per-instance client-IP limits return `429 RATE_LIMITED` with `Retry-After`.
 - `POST /api/v1/admin/sessions/cleanup` requires `Authorization: Bearer <ADMIN_API_KEY>` and returns
   `{ "deletedSessions": number }`. A missing server-side key disables the endpoint with 503.
 - Chat text is limited to 1,000 characters, answer batches to 50 items, and identifiers/notes have explicit schema limits.
+- `X-Forwarded-For` influences rate-limit identity only when the direct peer is listed in `TRUSTED_PROXY_IPS`.

@@ -52,6 +52,10 @@ curl -X POST http://localhost:8000/api/v1/admin/sessions/cleanup \
 Do not place the admin key in browser code or a `VITE_*` variable. Ollama calls use `LLM_TIMEOUT_SECONDS` and retry
 transient timeout/network/502/503/504 failures up to `LLM_MAX_ATTEMPTS`.
 
+The body limit counts actual received bytes, including chunked requests. Behind a reverse proxy, set
+`TRUSTED_PROXY_IPS` only to direct proxy IPs under your control; forwarded client IP headers from other peers are
+ignored. A gateway-level body and rate limit should also be configured for production.
+
 ## Verification
 
 ```bash

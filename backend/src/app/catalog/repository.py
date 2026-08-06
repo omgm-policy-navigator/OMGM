@@ -117,7 +117,7 @@ async def list_policy_documents(session: AsyncSession, policy_id: str) -> list[P
         (
             document
             for document in policy.documents
-            if getattr(document, "approval_status", ApprovalStatus.APPROVED) == ApprovalStatus.APPROVED
+            if document.approval_status == ApprovalStatus.APPROVED
         ),
         key=lambda document: document.title,
     )

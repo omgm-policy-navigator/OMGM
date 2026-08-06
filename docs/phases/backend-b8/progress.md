@@ -11,3 +11,5 @@ Implemented on `feature/backend-b8-ops-security`.
 - Added bounded retry for transient Ollama failures.
 - Added API schema limits and operational/security integration coverage.
 - Updated backend execution, API, security, and troubleshooting documentation.
+- Addressed PR review findings: chunked-body enforcement, fail-closed approvals, reviewed-Seed-only migration promotion,
+  empty-approved-Rule exclusion, bounded rate-limit buckets, trusted-proxy handling, and exception-log regression tests.

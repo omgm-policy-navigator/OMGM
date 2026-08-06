@@ -23,9 +23,13 @@ async def list_active_policies_for_category(db: AsyncSession, category_code: str
         .order_by(Policy.title, Policy.id)
     )
     policies = list(result.scalars().all())
+    evaluable: list[Policy] = []
     for policy in policies:
-        policy.rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
-    return policies
+        approved_rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+        if approved_rules:
+            policy.rules = approved_rules
+            evaluable.append(policy)
+    return evaluable
 
 
 async def get_active_policy_with_rules(db: AsyncSession, policy_id: str) -> Policy | None:
@@ -40,7 +44,10 @@ async def get_active_policy_with_rules(db: AsyncSession, policy_id: str) -> Poli
     )
     policy = result.scalar_one_or_none()
     if policy is not None:
-        policy.rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+        approved_rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+        if not approved_rules:
+            return None
+        policy.rules = approved_rules
     return policy
 
 
