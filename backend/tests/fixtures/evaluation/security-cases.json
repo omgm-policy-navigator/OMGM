@@ -14,7 +14,7 @@
       "title": "검색 결과에 없는 Citation 차단",
       "tags": ["citation_integrity", "failure"],
       "input": {"allowedEvidenceIds": ["chunk-approved"], "modelEvidenceIds": ["chunk-invented"]},
-      "expected": {"explanationStatus": "SAFE_FALLBACK", "officialEvidenceIds": [], "inventedCitationExposed": false}
+      "expected": {"explanationStatus": "SAFE_FALLBACK", "officialEvidenceIds": ["chunk-approved"], "inventedCitationExposed": false}
     },
     {
       "id": "security-private-citation-url",

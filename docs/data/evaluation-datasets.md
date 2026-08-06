@@ -31,14 +31,14 @@ D5 기준본은 [`backend/tests/fixtures/evaluation`](../../backend/tests/fixtur
 - `input`: 실행 모듈에 전달하거나 Adapter가 변환할 입력이다.
 - `expected`: 상태, 근거 ID, 충돌, fallback 등 명시적 기대 결과다.
 
-CI Adapter는 모듈별 DTO 차이를 변환할 수 있지만 `expected`의 의미를 변경해서는 안 된다. 알 수 없는 필드를 무시할 수 있으나 지원하지 않는 major 버전은 실패해야 한다.
+CI Adapter는 모듈별 DTO 차이를 변환할 수 있지만 `expected`의 의미를 변경해서는 안 된다. `major.minor` 형식과 major `1`을 검증하며 같은 major의 minor 변경과 알 수 없는 선택 필드는 호환 가능하다.
 
 ## 데이터셋 책임
 
 - `rule-engine-cases.json`: 현재 Rule Engine에서 직접 재생 가능한 조건, 사실, 고정 평가일, 신청기간과 기대 상태
-- `rag-retrieval-cases.json`: 선택 정책, 승인 상태, 공식 신뢰도, 활성 정책, 유사도 임계값과 기대 Citation
+- `rag-retrieval-cases.json`: 실제 `SearchHit` 생성에 필요한 문서·버전·본문·URL·위치 메타데이터와 정확한 기대 Citation 값
 - `fact-extraction-cases.json`: A2 허용 Enum, 모호성, confidence, 기존 확정 사실 충돌과 저장 금지 기대값
-- `e2e-scenarios.json`: fact 검토, Rule 판정, RAG, 설명 상태와 재색인·재평가를 단계별로 연결한 시나리오
+- `e2e-scenarios.json`: `ruleCaseId`, `factCaseId`, `retrievalCaseId`로 실행 가능한 구성요소 Case를 연결하고 설명 상태와 재색인·재평가를 단계별로 명시한 시나리오
 - `security-cases.json`: Prompt injection, Citation 무결성, 비공개 URL, 로그 데이터, 입력 크기 제한
 
 ## 불변 조건
@@ -52,4 +52,4 @@ CI Adapter는 모듈별 DTO 차이를 변환할 수 있지만 `expected`의 의�
 
 ## 검증
 
-`backend/tests/unit/test_evaluation_datasets.py`는 파일 목록, Envelope, Case ID 유일성, 필수 시나리오 포함 여부, Enum을 검증한다. Rule Case는 실제 Rule Engine으로, fact Case는 실제 A2 파서와 검토 로직으로 재생한다.
+`backend/tests/unit/test_evaluation_datasets.py`는 파일 목록, Envelope, Case ID 유일성, 필수 시나리오 포함 여부, Enum을 검증한다. Rule Case는 실제 Rule Engine으로, fact Case는 실제 A2 파서와 검토 로직으로, RAG Case는 실제 검색 서비스와 `SearchHit`→Citation 변환으로 재생한다. Security Case는 실제 Citation URL 및 A2 입력 크기 경계를 호출한다. E2E Case의 구성요소 참조와 기대 상태도 실행된 데이터셋 사이에서 검증한다. 개인정보 패턴과 비밀정보 키 검사는 다섯 JSON 전체에 적용한다.

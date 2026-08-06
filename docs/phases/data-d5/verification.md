@@ -2,8 +2,8 @@
 
 ## 검증 결과
 
-- D5 집중 테스트: `4 passed`
-- 전체 백엔드 테스트: `202 passed, 1 skipped`
+- D5 집중 테스트: `7 passed`
+- 전체 백엔드 테스트: `205 passed, 1 skipped`
 - Ruff (`src/app`, `tests`): 통과
 - Compose 설정 렌더링: 통과
 - Alembic 단일 Head: `20260806_0006`
