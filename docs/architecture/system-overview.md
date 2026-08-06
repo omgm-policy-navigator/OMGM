@@ -2,9 +2,9 @@
 
 ## 단일 저장소 기준
 
-「나만 결혼해?」 MVP는 React Web, FastAPI Backend, 정책 데이터 파이프라인, PostgreSQL + pgvector, Ollama, Docker Compose 로컬 인프라를 하나의 Git 저장소에서 관리한다.
+「나만 결혼해?」 MVP는 React Web, FastAPI Backend, 검수된 정책 CSV 기준 데이터, PostgreSQL + pgvector, Ollama, Docker Compose 로컬 인프라를 하나의 Git 저장소에서 관리한다.
 
-배포 단위와 실행 프로세스는 프론트엔드, 백엔드, 파이프라인, 인프라로 나뉠 수 있다. 하지만 Phase 0에서는 제품·도메인·보안 계약을 빠르게 동기화하기 위해 단일 저장소 경계를 유지한다.
+배포 단위와 실행 프로세스는 프론트엔드, 백엔드, 인프라로 나뉜다. 정책 CSV 기준본은 백엔드 배포에 포함한다.
 
 ## 왜 MSA가 아닌가
 
@@ -21,8 +21,7 @@ flowchart LR
     API --> Graph[Graph Projection]
     API <--> PG[(PostgreSQL + pgvector)]
     RAG <--> Ollama[Ollama]
-    Pipeline[Policy Data Pipeline] --> PG
-    Pipeline --> Ollama
+    Seed[Reviewed Policy CSV Seed] --> API
 ```
 
 ## React Web
@@ -49,13 +48,13 @@ Ollama는 로컬 생성 모델과 임베딩 모델 실행 환경이다. 기본 �
 
 Ollama는 조건 후보 추출 보조, 자연어 질문 이해, 검색 질의 보정, 판정 설명 생성에 사용한다. 최종 자격 상태는 Rule Engine이 계산한다.
 
-## 정책 데이터 파이프라인
+## 정책 CSV 기준 데이터
 
-파이프라인은 공공데이터 API, 서울시 Open API, 복지로, 공고문, FAQ, 정책 안내문, 필요한 경우 제한적 크롤링에서 데이터를 수집하는 확장 지점이다.
+MVP는 별도 수집·정규화 파이프라인을 실행하지 않는다. 관리자 검수를 거친 `backend/data/policy-seed`의 CSV를 백엔드가 시작 시 직접 로딩한다.
 
-처리 흐름은 원천 데이터 수집, 원문 보존, 내부 모델 구조화, 조건 후보 추출, 관리자 검수 상태 기록, 정책 테이블 저장, 문서 청크 생성, 임베딩 생성, pgvector 저장이다.
+로더는 정책·질문·Rule·관계·RAG 문서의 header, enum, 날짜, ID와 참조 무결성을 검증한다. 질문의 표시 label은 canonical value와 명시적으로 연결하며, `evaluation_mode`가 공식 확인 필요인 Rule은 확정 판정에 사용하지 않는다.
 
-백엔드가 웹 요청 중 정책 원문 전체를 직접 수집하거나 임베딩하지 않는다.
+백엔드는 웹 요청 중 외부 원문을 수집하거나 CSV를 변경하지 않는다. 청크·임베딩 생성은 현재 범위가 아니다.
 
 ## 향후 분리 가능한 경계
 

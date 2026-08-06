@@ -16,19 +16,21 @@
 
 조회 허용 범위: 판정 모듈은 필요한 필드만 조회한다. 설명 모듈은 화면에 필요한 값만 받는다.
 
-## 정책 수집 영역
+## 정책 기준 데이터 영역
 
-소유 데이터: raw API payload, raw HTML/PDF, 추출 후보, 검수 대기 데이터, 원문 해시.
+소유 데이터: 검수된 정책, 질문, Rule, 정책 관계, RAG 문서 CSV.
 
-변경 책임: 데이터 파이프라인.
+변경 책임: 저장소 코드 리뷰를 거친 `backend/data/policy-seed` 변경.
 
-조회 허용 범위: 관리자 검수와 게시 준비 흐름. Backend API 요청 처리 경로가 수집 원본을 직접 소유하거나 수정하지 않는다.
+조회 허용 범위: Backend Policy Module이 시작 시 읽고 검증한다. 런타임에 파일을 수정하지 않는다.
+
+D0 Raw Policy Schema는 과거 수집 파이프라인 계약으로 보존한다. 현재 MVP 실행 경로는 제공·검수된 CSV 기준본이며 `source_url`이 없는 데이터는 로딩하지 않는다. 변동 기준 placeholder는 공식 확인 전 확정 판정 근거로 사용할 수 없다.
 
 ## 게시 정책 영역
 
 소유 데이터: 승인·게시된 정책 식별자, 정책명, 기관, 지역, 대상, 신청 기간, 정책 상태, `policy_version`, 승인된 `policy_rule`, 승인된 `policy_document`, 서비스 조회용 Read Model.
 
-변경 책임: Backend Policy Module. 데이터 파이프라인의 검수 완료 산출물을 게시 단위로 반영한다.
+변경 책임: Backend Policy Module. 검수 완료 CSV를 읽기 전용 게시 기준으로 반영한다.
 
 조회 허용 범위: 정책 검색, 구조화, 판정, 설명 모듈.
 

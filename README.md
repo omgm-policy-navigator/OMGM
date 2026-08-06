@@ -8,7 +8,7 @@
 
 - `frontend/`: React Web UI.
 - `backend/`: FastAPI 모듈러 모놀리스 API.
-- `data-pipeline/`: 정책 데이터 수집·구조화·청크·임베딩 준비 CLI.
+- `backend/data/policy-seed/`: 검수된 정책·질문·Rule·관계·RAG 문서 CSV 기준본.
 - `infra/`: PostgreSQL, pgvector, Ollama 로컬 인프라.
 - `docs/`: 제품, 아키텍처, 도메인, 데이터, RAG, 보안 문서.
 - `scripts/`: 검증 보조 스크립트.
@@ -24,9 +24,8 @@ FastAPI Modular Monolith
   -> PostgreSQL + pgvector
   -> Ollama
 
-Policy Data Pipeline
-  -> collect / parse / normalize / extract rules / chunk / embed
-  -> PostgreSQL + pgvector
+Reviewed Policy CSV Seed
+  -> FastAPI policy catalog / Rule input / RAG document input
 ```
 
 PostgreSQL은 정책, 질문, 사용자 사실, 규칙, 판정, 관계 같은 정형 데이터를 관리합니다. pgvector는 정책 원문 청크와 임베딩 검색을 PostgreSQL 안에서 처리합니다. Ollama는 질문 이해, 검색 질의 보정, 조건 후보 추출 보조, 설명 생성을 담당하지만 최종 판정을 결정하지 않습니다.
@@ -49,6 +48,8 @@ make health
 
 ## 주요 명령
 
+`make test`와 `scripts/test-all.sh`는 로컬 Python·Node 설치 대신 Docker Compose 안에서 migration, 테스트, Lint, 타입 검사와 빌드를 실행합니다. Windows의 pytest 임시 폴더 및 Vite 파일 접근 권한에 영향을 받지 않습니다.
+
 ```bash
 make help
 make dev
@@ -64,10 +65,9 @@ make docker-infra-up
 make docker-ps
 make docker-logs
 make docker-down
-make pipeline-sample
 ```
 
-개별 실행 세부 내용은 [Backend](backend/README.md), [Frontend](frontend/README.md), [Data Pipeline](data-pipeline/README.md), [Infra](infra/README.md)를 확인합니다.
+개별 실행 세부 내용은 [Backend](backend/README.md), [Frontend](frontend/README.md), [Infra](infra/README.md)를 확인합니다.
 
 ## 핵심 문서
 
@@ -77,6 +77,7 @@ make pipeline-sample
 - [시스템 개요](docs/architecture/system-overview.md)
 - [백엔드 아키텍처](docs/architecture/backend.md)
 - [API 계약](docs/architecture/api-contracts.md)
+- [AI 계약](docs/architecture/ai-contracts.md)
 - [모듈 경계](docs/architecture/module-boundaries.md)
 - [데이터 소유권](docs/architecture/data-ownership.md)
 - [RAG와 자격판정 흐름](docs/architecture/rag-and-eligibility-flow.md)

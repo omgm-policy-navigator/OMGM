@@ -8,6 +8,7 @@ on:
       - "feat/**"
       - "chore/**"
       - "fix/**"
+      - "backend-*"
 
 permissions:
   contents: read
@@ -16,42 +17,49 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: marry_policy
+          POSTGRES_USER: marry_policy
+          POSTGRES_PASSWORD: ci-local-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marry_policy -d marry_policy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://marry_policy:ci-local-only-password@localhost:5432/marry_policy
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install backend
         run: |
           cd backend
-          python -m pip install --upgrade pip
-          python -m pip install -e .
+          uv sync
+      - name: Run migrations
+        run: |
+          cd backend
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
       - name: Test backend
         run: |
           cd backend
-          python -m unittest discover
-
-  data-pipeline:
-    name: Data Pipeline
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install data pipeline
+          uv run pytest
+      - name: Lint backend
         run: |
-          cd data-pipeline
-          python -m pip install --upgrade pip
-          python -m pip install -e .
-      - name: Test data pipeline
-        run: |
-          cd data-pipeline
-          python -m unittest discover
-      - name: Run sample pipeline
-        run: |
-          cd data-pipeline
-          python -m policy_pipeline.main --sample ../sample-data/sample-policy.json
+          cd backend
+          uv run ruff check src/app tests
 
   frontend:
     name: Frontend
@@ -71,6 +79,10 @@ jobs:
         run: |
           cd frontend
           npm test
+      - name: Lint frontend
+        run: |
+          cd frontend
+          npm run lint
       - name: Typecheck frontend
         run: |
           cd frontend
@@ -96,6 +108,8 @@ jobs:
         run: scripts/verify-structure.sh
       - name: Validate Compose
         run: make compose-config
+      - name: Validate Compose dev override
+        run: docker compose -f compose.yaml -f compose.dev.yaml config --quiet
       - name: Validate ignored local artifacts
         run: make env-check
       - name: Validate markdown links

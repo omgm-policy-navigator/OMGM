@@ -2,7 +2,7 @@
 
 ## Contract Status
 
-This document is the Phase B0 backend API draft. Only `GET /health` is implemented. Other endpoints define mockable contracts so frontend, backend, and data-pipeline work can proceed without sharing internal entities.
+This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 
@@ -86,6 +86,21 @@ Missing user information is not an error when the request itself is valid. Evalu
 
 ## Implemented Endpoint
 
+
+### `GET /health/live`
+
+Returns backend process liveness without checking PostgreSQL or other dependencies. `GET /health` remains as a compatibility alias.
+
+Response `200`:
+
+```json
+{
+  "status": "ok",
+  "service": "omgm-backend",
+  "environment": "local"
+}
+```
+
 ### `GET /health`
 
 Returns backend process health.
@@ -98,6 +113,103 @@ Response `200`:
   "service": "omgm-backend",
   "environment": "local"
 }
+```
+
+## Implemented Policy Catalog Endpoints
+### `GET /api/categories`
+
+Returns policy categories sorted by catalog order.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": "housing",
+    "name": "Housing",
+    "description": "Housing and rent support"
+  }
+]
+```
+
+### `GET /api/categories/{code}/policies`
+
+Returns approved and active policy summaries for one category. Draft, inactive, archived, or otherwise unapproved policies are not exposed.
+
+Response `200`:
+
+```json
+[
+  {
+    "policyId": "policy_housing_001",
+    "categoryCode": "housing",
+    "title": "Newlywed Rent Deposit Support",
+    "agency": "Seoul Housing Office",
+    "region": "Seoul",
+    "applicationPeriod": "2026-01-01 to 2026-12-31",
+    "status": "APPROVED",
+    "officialSourceUrl": "https://example.go.kr/policies/housing-001",
+    "reviewedAt": "2026-08-01"
+  }
+]
+```
+
+### `GET /api/policies/{policy_id}`
+
+Returns approved and active policy detail with institution, source, and application-period metadata.
+
+Response `200`:
+
+```json
+{
+  "policyId": "policy_housing_001",
+  "categoryCode": "housing",
+  "title": "Newlywed Rent Deposit Support",
+  "agency": "Seoul Housing Office",
+  "region": "Seoul",
+  "summary": "Rent deposit interest support for newlywed households.",
+  "applicationPeriod": "2026-01-01 to 2026-12-31",
+  "supportType": "Interest subsidy",
+  "status": "APPROVED",
+  "source": {
+    "label": "Official notice",
+    "url": "https://example.go.kr/policies/housing-001",
+    "reviewedAt": "2026-08-01"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "POLICY_NOT_FOUND",
+    "message": "Requested policy was not found."
+  }
+}
+```
+
+### `GET /api/policies/{policy_id}/documents`
+
+Returns approved policy source documents. The policy must be approved and active, otherwise the endpoint returns `POLICY_NOT_FOUND`.
+
+Response `200`:
+
+```json
+[
+  {
+    "documentId": "doc_policy_housing_001",
+    "policyId": "policy_housing_001",
+    "title": "Newlywed Rent Deposit Support Source Document",
+    "url": "https://example.go.kr/policies/housing-001",
+    "documentType": "official_notice",
+    "officialSource": "Official notice",
+    "reviewedAt": "2026-08-01",
+    "collectedAt": "2026-08-05T00:00:00Z",
+    "documentHash": "sha256:policy_housing_001"
+  }
+]
 ```
 
 ## Draft Endpoints
@@ -251,7 +363,11 @@ Response `201`:
       "prompt": "거주 지역을 확인해 주세요.",
       "answerType": "single_select",
       "required": true,
-      "options": ["서울", "경기", "인천"]
+      "options": [
+        {"label": "서울", "value": "SEOUL"},
+        {"label": "경기", "value": "GYEONGGI"},
+        {"label": "인천", "value": "INCHEON"}
+      ]
     }
   ]
 }
@@ -269,7 +385,7 @@ Request:
     {
       "questionId": "q_region",
       "factKey": "region",
-      "value": "서울",
+      "value": "SEOUL",
       "confirmed": true
     }
   ]
@@ -404,3 +520,40 @@ Saved policy and notification contracts are intentionally not fixed in B0. They 
 ## Mock Contract Rules
 
 Mocks must preserve the response envelopes, status strings, and null handling defined here. Mock data must be synthetic and must not include real personal data or real application records.
+
+### `GET /health/ready`
+
+Returns process readiness and verifies that PostgreSQL accepts a simple query. `GET /ready` remains as a compatibility alias. This endpoint is intended for local and container readiness checks; it does not expose connection strings or database error details. Responses include `Cache-Control: no-cache, no-store, must-revalidate` so intermediaries do not cache readiness state.
+
+Response `200`:
+
+```json
+{
+  "status": "ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "connected"
+}
+```
+
+Response `503` when PostgreSQL cannot be reached:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "unavailable"
+}
+```
+
+Response `503` when PostgreSQL does not respond within the readiness timeout:
+
+```json
+{
+  "status": "not_ready",
+  "service": "omgm-backend",
+  "environment": "local",
+  "database": "timeout"
+}
+```
