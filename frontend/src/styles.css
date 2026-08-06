@@ -81,7 +81,34 @@ button {
 }
 
 .policy-graph-bg {
-  background: radial-gradient(circle at center, #d6ead8 0%, #ffffff 70%);
+  background: #f0eeee;
+}
+
+.policy-graph-bg__center-glow {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 0;
+  width: min(680px, 86%);
+  aspect-ratio: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(250, 220, 214, 0.62) 0%, rgba(250, 220, 214, 0.32) 42%, rgba(250, 220, 214, 0) 72%);
+}
+
+.policy-graph-bg__spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--policy-graph-spot-opacity);
+  background: radial-gradient(
+    circle 260px at var(--policy-graph-spot-x) var(--policy-graph-spot-y),
+    rgba(250, 220, 214, 0.62),
+    rgba(250, 220, 214, 0.24) 44%,
+    rgba(250, 220, 214, 0) 74%
+  );
+  transition: opacity 220ms ease-out;
 }
 
 .react-flow__attribution {
