@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>나만 결혼해?! - 신혼부부 정책 챗봇</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"surface-container-high": "#eae8e7", "on-background": "#1b1c1c", surface: "#fbf9f8", "on-primary-fixed-variant": "#3a4c31", "on-surface": "#1b1c1c", "surface-container-highest": "#e4e2e2", "surface-container-lowest": "#ffffff", "secondary-container": "#ffca98", secondary: "#7d562d", "inverse-on-surface": "#f2f0f0", "on-error-container": "#93000a", background: "#fbf9f8", "surface-dim": "#dbd9d9", "on-surface-variant": "#444840", "tertiary-fixed-dim": "#cdc5be", primary: "#516447", "primary-container": "#8fa382", "inverse-surface": "#303030", "primary-fixed-dim": "#b8cdaa", "on-tertiary-container": "#38342e", "surface-container-low": "#f5f3f3", "surface-tint": "#516447", "secondary-fixed": "#ffdcbd", "on-primary-fixed": "#101f09", "surface-variant": "#e4e2e2", "on-tertiary-fixed-variant": "#4a4640", "on-tertiary-fixed": "#1e1b16", "primary-fixed": "#d4e9c4", "on-primary-container": "#283920", "on-secondary-fixed": "#2c1600", "inverse-primary": "#b8cdaa", "tertiary-fixed": "#e9e1d9", "error-container": "#ffdad6", "secondary-fixed-dim": "#f0bd8b", outline: "#74786f", "on-secondary": "#ffffff", "on-secondary-fixed-variant": "#623f18", error: "#ba1a1a", "on-error": "#ffffff", "surface-bright": "#fbf9f8", "on-secondary-container": "#7a532a", tertiary: "#635e57", "surface-container": "#efeded", "tertiary-container": "#a29c95", "on-primary": "#ffffff", "outline-variant": "#c4c8bd", "on-tertiary": "#ffffff"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {"margin-mobile": "16px", gutter: "24px", xs: "4px", sm: "8px", unit: "4px", lg: "24px", md: "16px", "margin-desktop": "64px", xl: "48px"}, fontFamily: {"label-lg": ["Manrope"], "headline-lg": ["Manrope"], "label-md": ["Manrope"], "body-md": ["Be Vietnam Pro"], "headline-xl": ["Manrope"], "headline-lg-mobile": ["Manrope"], "body-sm": ["Be Vietnam Pro"], headline: ["Manrope"], display: ["Manrope"], body: ["Be Vietnam Pro"], label: ["Manrope"]}, fontSize: {"label-lg": ["14px", {lineHeight: "1.2", letterSpacing: "0.05em", fontWeight: "600"}], "headline-lg": ["32px", {lineHeight: "1.25", fontWeight: "600"}], "label-md": ["12px", {lineHeight: "1.2", fontWeight: "500"}], "body-md": ["16px", {lineHeight: "1.6", fontWeight: "400"}], "headline-xl": ["40px", {lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700"}], "headline-lg-mobile": ["24px", {lineHeight: "1.3", fontWeight: "600"}], "body-sm": ["14px", {lineHeight: "1.5", fontWeight: "400"}]}}}};</script>
+<style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-surface h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest text-on-surface flex justify-between items-center h-16 px-6 w-full mx-auto border-b border-outline-variant z-50 shrink-0">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[32px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<div>
+<h1 class="font-headline text-lg font-bold text-on-surface">나만 결혼해?!</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">서울 예비·신혼부부 정책 내비게이터</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-6">
+<a class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">bookmark</span>
+                    My Policy
+                </a>
+</nav>
+<div class="flex items-center gap-4 border-l border-outline-variant pl-4">
+<button class="text-on-surface-variant hover:bg-surface-container rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined text-xl">notifications</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe-eap0uO5-YoMEu_7K2mcd-OnXjs2_5NvfC0JG7ATz5Pfwxk9Yd6xW6hli4wnrF7FE7aZwZ5az8dujNmlgwjUS_X-a2yThzXgw8ufYID7qkTNgkD8-ppiYoC8gJed2xidgJABhnihahx7oGP7lZCHhcpu_9a7hC8Vq5aY0awYt9EEM55ozlGs8LFsyzrdd-emovMKIUF0mAaZT0OXUSZMi-Ta-92bbe-h0QF2ejbJouLkVK_JZIZy"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-surface w-64 flex-shrink-0 flex flex-col py-6 border-r border-outline-variant hidden md:flex relative transition-all duration-300">
+<div class="px-6 mb-8">
+<div class="flex items-start justify-between mb-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="overflow-hidden">
+<h2 class="font-label-lg text-label-lg text-primary whitespace-nowrap">Policy Chatbot</h2>
+<p class="font-label-md text-label-md text-on-surface-variant whitespace-nowrap">Guiding your new chapter</p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container rounded-full p-1 transition-colors -mr-2 mt-1 shrink-0" title="Collapse Menu">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</button>
+</div>
+<button class="w-full bg-primary text-on-primary rounded-xl py-2 px-4 font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-on-primary-fixed-variant transition-colors mt-4">
+<span class="material-symbols-outlined text-sm">add</span> <span class="whitespace-nowrap">Start New Chat</span>
+</button>
+</div>
+<nav class="flex-1 overflow-y-auto">
+<ul class="flex flex-col gap-1 px-2">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">dashboard</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Dashboard</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-xl mx-2 hover:scale-[1.02] transition-transform duration-200 overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Housing</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">payments</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Loans</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">celebration</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Wedding</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">receipt_long</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Taxes</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">child_care</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Childcare</span>
+</a>
+</li>
+</ul>
+</nav>
+<div class="mt-auto px-2 pt-4 border-t border-outline-variant">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">settings</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl mx-2 text-on-surface-variant hover:bg-surface-variant transition-colors overflow-hidden" href="#">
+<span class="material-symbols-outlined text-xl shrink-0">logout</span>
+<span class="font-label-lg text-label-lg whitespace-nowrap">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:flex-row bg-surface-container-low p-6 gap-6 overflow-hidden">
+<!-- Chat Area (Left) -->
+<section class="flex flex-col bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant w-full md:w-[450px] flex-shrink-0 h-full overflow-hidden">
+<div class="p-4 border-b border-outline-variant relative">
+<h2 class="font-headline text-xl font-bold text-on-surface">정책 챗봇</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">주제를 선택하면 꼭 필요한 질문만 드려요.</p>
+<div class="relative mt-4">
+<div class="flex gap-4 overflow-x-auto pb-4 pt-2 px-2 scrollbar-hide pr-12"><button class="flex flex-col items-center justify-center p-3 pt-6 rounded-t-full rounded-b-xl border-2 border-primary-container bg-primary-container/20 w-20 h-24 flex-shrink-0 hover:bg-primary-container/30 transition-colors relative overflow-hidden group">
+<span class="material-symbols-outlined text-primary text-2xl mb-2 relative z-10" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-[10px] text-primary font-bold bg-primary-container/10 px-1 py-1 rounded-md w-full text-center relative z-10">주거</span>
+</button><button class="flex flex-col items-center justify-center p-3 pt-6 rounded-t-full rounded-b-xl border border-outline-variant bg-surface w-20 h-24 flex-shrink-0 hover:bg-surface-container transition-colors relative overflow-hidden group"><span class="material-symbols-outlined text-on-surface-variant text-2xl mb-2 relative z-10">payments</span><span class="font-label-md text-[10px] text-on-surface-variant bg-surface-container-low px-1 py-1 rounded-md w-full text-center relative z-10">대출</span></button><button class="flex flex-col items-center justify-center p-3 pt-6 rounded-t-full rounded-b-xl border border-outline-variant bg-surface w-20 h-24 flex-shrink-0 hover:bg-surface-container transition-colors relative overflow-hidden group"><span class="material-symbols-outlined text-on-surface-variant text-2xl mb-2 relative z-10">celebration</span><span class="font-label-md text-[10px] text-on-surface-variant bg-surface-container-low px-1 py-1 rounded-md w-full text-center relative z-10">웨딩</span></button><button class="flex flex-col items-center justify-center p-3 pt-6 rounded-t-full rounded-b-xl border border-outline-variant bg-surface w-20 h-24 flex-shrink-0 hover:bg-surface-container transition-colors relative overflow-hidden group"><span class="material-symbols-outlined text-on-surface-variant text-2xl mb-2 relative z-10">receipt_long</span><span class="font-label-md text-[10px] text-on-surface-variant bg-surface-container-low px-1 py-1 rounded-md w-full text-center relative z-10">세제 혜택</span></button><button class="flex flex-col items-center justify-center p-3 pt-6 rounded-t-full rounded-b-xl border border-outline-variant bg-surface w-20 h-24 flex-shrink-0 hover:bg-surface-container transition-colors relative overflow-hidden group"><span class="material-symbols-outlined text-on-surface-variant text-2xl mb-2 relative z-10">child_care</span><span class="font-label-md text-[10px] text-on-surface-variant bg-surface-container-low px-1 py-1 rounded-md w-full text-center relative z-10">출산/육아</span></button></div>
+<div class="absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-surface-container-lowest to-transparent flex items-center justify-end z-20 pointer-events-none pr-1">
+<button class="w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors pointer-events-auto">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+<!-- Bot Message -->
+<div class="flex items-start gap-2 max-w-[85%]">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface text-sm">smart_toy</span>
+</div>
+<div>
+<div class="bg-surface rounded-2xl rounded-tl-sm p-3 border border-outline-variant shadow-sm">
+<p class="font-body-sm text-body-sm text-on-surface">Q1. 혼인신고를 완료했나요?</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:01</span>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex items-start gap-2 max-w-[85%] self-end flex-row-reverse">
+<img alt="User" class="w-8 h-8 rounded-full flex-shrink-0 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2z_LxhFC5PQbMDobSDlVeAJZ_qjjPoIk9cKFh88K0TwqNHP-w304MZHg6x_d_s3uraiB7ZKdEkHYPBDhcfQmrKReq7skWhRVfsCApoFIa3ISNC_EVSIOV3lw7OS3epjZp4SJIsBUR2zVok-NjpeKhQUTXTr9hNYFB6V0-ks8Jfw_Wzhn16xgmy4Xu6Oya_gq8pRQ25S8o4LVphI3T3HDbf-mpi1f3CwMziwLVr9hb6_cMlO1WOEXr"/>
+<div class="flex flex-col items-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-3 shadow-sm">
+<p class="font-body-sm text-body-sm">예비부부</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:01</span>
+</div>
+</div>
+<!-- Bot Message -->
+<div class="flex items-start gap-2 max-w-[85%]">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface text-sm">smart_toy</span>
+</div>
+<div>
+<div class="bg-surface rounded-2xl rounded-tl-sm p-3 border border-outline-variant shadow-sm">
+<p class="font-body-sm text-body-sm text-on-surface">Q2. 현재 서울에 거주하거나 전입 예정인가요?</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:01</span>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex items-start gap-2 max-w-[85%] self-end flex-row-reverse">
+<img alt="User" class="w-8 h-8 rounded-full flex-shrink-0 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBTctndu3llmcxQV1plJalE9mdNQIM9eAeUF7Dh4hHUqHN1bqt5IQs2FmqjVKpATT8cSgColdZAjGYhgnP795cKKp4zKn9JLjg_7K79upJkkwnWBZtTrXUJhBOZIhZvmvezp2XoJbRha3lOfpn8xciRd0Oyco---AZF2dOJyhtfiuaF4vO0HbgnaE1Q8H6yvfkWZPGboDNVCZhrxqH15mdbHUrz1Afus3uDWQt6MOWp2zS-B4YqDGA"/>
+<div class="flex flex-col items-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-3 shadow-sm">
+<p class="font-body-sm text-body-sm">서울 거주</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:02</span>
+</div>
+</div>
+<!-- Bot Message -->
+<div class="flex items-start gap-2 max-w-[85%]">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface text-sm">smart_toy</span>
+</div>
+<div>
+<div class="bg-surface rounded-2xl rounded-tl-sm p-3 border border-outline-variant shadow-sm">
+<p class="font-body-sm text-body-sm text-on-surface">Q3. 두 분 모두 무주택인가요?</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:02</span>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex items-start gap-2 max-w-[85%] self-end flex-row-reverse">
+<img alt="User" class="w-8 h-8 rounded-full flex-shrink-0 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtyLe490QvgaJGkE3As4cYDlsfhnlaYtzhkDFP_r7CiH3lojv8FzD9BXiJN7OVos34J1KtcGMd5gFfIJm6FhytZf7id7bmNFzISU-zLklq-ED0YmL_GrqvyvsUeGXPseniV8y25nDlAbajoKFNifpWG1YZLOv99t_lWdgjfns3SAWYVuPW-wFi1VPHfR_8oqLAxS3plPZEf_u3RGo01m40v1UyCamJeXu7nSBXS49L4qaurj0zOBAr"/>
+<div class="flex flex-col items-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-3 shadow-sm">
+<p class="font-body-sm text-body-sm">무주택</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:02</span>
+</div>
+</div>
+<!-- Bot Message -->
+<div class="flex items-start gap-2 max-w-[85%]">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface text-sm">smart_toy</span>
+</div>
+<div>
+<div class="bg-surface rounded-2xl rounded-tl-sm p-3 border border-outline-variant shadow-sm">
+<p class="font-body-sm text-body-sm text-on-surface">Q4. 부부 합산 연 소득은 어떻게 되시나요?</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:02</span>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex items-start gap-2 max-w-[85%] self-end flex-row-reverse">
+<img alt="User" class="w-8 h-8 rounded-full flex-shrink-0 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDg0zxD_b9B0bXxtZ3o9_iUKBOib3zDlVVSjJesAm-LPIUNwTXNUmr2Bg8QKiUA6_7JbB9q5dKz-rveJDQFlPC1m357vp7T9Ditg7OWZ1cz5XRx0z3lG4YKlpKGtG2EwvxdS-Rw4a1uH0kYRb7rQd_-GM-x2h7hnfAoHngdrbM9tJWDmzmi01ZzWjBUCV6yB9OdSsNE_Qp9l1BUF8MmcFcqmmYaTzdYBC3wym80_Ys69wqS_nGvMId0"/>
+<div class="flex flex-col items-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-3 shadow-sm">
+<p class="font-body-sm text-body-sm">소득 8천만 원 이하</p>
+</div>
+<span class="font-label-md text-[10px] text-outline mt-1 block">10:03</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface border-t border-outline-variant">
+<div class="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
+<button class="font-label-md text-label-md text-on-surface-variant bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-outline-variant transition-colors whitespace-nowrap">
+                            다음 질문 <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+<button class="font-label-md text-label-md text-primary bg-primary-fixed px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-primary-fixed-dim transition-colors whitespace-nowrap border border-primary/20">
+                            상견례 준비 보기 <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+<button class="font-label-md text-label-md text-on-surface-variant bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-outline-variant transition-colors whitespace-nowrap">
+                            다른 주제 선택 <span class="material-symbols-outlined text-sm">grid_view</span>
+</button>
+</div>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-full py-3 pl-4 pr-12 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface placeholder:text-on-surface-variant" placeholder="궁금한 점을 입력하세요..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-primary p-1 hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Main Workspace (Center/Right) -->
+<section class="flex-1 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant flex flex-col overflow-hidden relative">
+<!-- Header -->
+<div class="p-6 flex justify-between items-start z-10 relative bg-surface-container-lowest/80 backdrop-blur-sm border-b border-outline-variant/50">
+<div>
+<h2 class="font-headline text-xl font-bold text-on-surface">맞춤 정책 그래프</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">선택한 조건을 기반으로 연결된 정책을 한눈에 확인하세요.</p>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors text-on-surface font-label-lg">
+<span class="material-symbols-outlined text-sm">zoom_in</span> 그래프 확대
+                        </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors text-on-surface font-label-lg">
+<span class="material-symbols-outlined text-sm">filter_list</span> 전체 보기
+                        </button>
+</div>
+</div>
+<!-- Graph Area -->
+<div class="flex-1 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-container/10 via-surface-container-low to-surface-container-lowest" style="background: radial-gradient(rgba(212, 163, 115, 0.1) 0%, rgb(245, 243, 243) 50%, rgb(255, 255, 255) 100%);">
+<!-- SVG Lines connecting nodes -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 0;">
+<!-- Center to Category -->
+<line stroke="#c4c8bd" stroke-width="2" x1="50%" x2="40%" y1="50%" y2="40%"></line>
+<line stroke="#c4c8bd" stroke-width="2" x1="50%" x2="70%" y1="50%" y2="30%"></line>
+<line stroke="#c4c8bd" stroke-width="2" x1="50%" x2="75%" y1="50%" y2="45%"></line>
+<line stroke="#516447" stroke-width="2" x1="50%" x2="72%" y1="50%" y2="60%"></line> <!-- Active connection -->
+<line stroke="#c4c8bd" stroke-width="2" x1="50%" x2="65%" y1="50%" y2="75%"></line>
+<!-- Conditions to Category -->
+<line stroke="#c4c8bd" stroke-dasharray="4" stroke-width="1" x1="40%" x2="35%" y1="40%" y2="25%"></line>
+<line stroke="#c4c8bd" stroke-dasharray="4" stroke-width="1" x1="40%" x2="25%" y1="40%" y2="45%"></line>
+<line stroke="#c4c8bd" stroke-dasharray="4" stroke-width="1" x1="40%" x2="30%" y1="40%" y2="60%"></line>
+<line stroke="#c4c8bd" stroke-dasharray="4" stroke-width="1" x1="40%" x2="45%" y1="40%" y2="65%"></line>
+<line stroke="#c4c8bd" stroke-dasharray="4" stroke-width="1" x1="40%" x2="52%" y1="40%" y2="62%"></line>
+</svg>
+<!-- Nodes Container -->
+<div class="absolute inset-0 z-10 w-full h-full">
+<!-- Central User Node -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest border-2 border-primary rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-primary text-3xl">group</span>
+<span class="font-label-md text-[11px] text-on-surface mt-1 font-bold">우리 부부</span>
+</div>
+<!-- Category Node: Meeting (Active) -->
+<div class="absolute top-[40%] left-[40%] -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest border-2 border-primary rounded-full w-20 h-20 flex flex-col items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-primary text-2xl">handshake</span>
+<span class="font-label-md text-[10px] text-on-surface mt-1 font-bold">상견례</span>
+</div>
+<!-- Condition Nodes around Meeting -->
+<div class="absolute top-[25%] left-[35%] -translate-x-1/2 -translate-y-1/2 bg-surface border border-outline-variant rounded-full w-16 h-16 flex flex-col items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">favorite</span>
+<span class="font-label-md text-[9px] text-on-surface-variant mt-1">혼인상태</span>
+</div>
+<div class="absolute top-[45%] left-[25%] -translate-x-1/2 -translate-y-1/2 bg-surface border border-outline-variant rounded-full w-16 h-16 flex flex-col items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">location_on</span>
+<span class="font-label-md text-[9px] text-on-surface-variant mt-1">서울 거주</span>
+</div>
+<div class="absolute top-[60%] left-[30%] -translate-x-1/2 -translate-y-1/2 bg-surface border border-outline-variant rounded-full w-16 h-16 flex flex-col items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">house</span>
+<span class="font-label-md text-[9px] text-on-surface-variant mt-1">무주택</span>
+</div>
+<div class="absolute top-[65%] left-[45%] -translate-x-1/2 -translate-y-1/2 bg-surface border border-outline-variant rounded-full w-16 h-16 flex flex-col items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">payments</span>
+<span class="font-label-md text-[9px] text-on-surface-variant mt-1">소득 구간</span>
+</div>
+<div class="absolute top-[62%] left-[52%] -translate-x-1/2 -translate-y-1/2 bg-surface border border-outline-variant rounded-full w-16 h-16 flex flex-col items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">description</span>
+<span class="font-label-md text-[9px] text-on-surface-variant mt-1">계약 전</span>
+</div>
+<!-- Policy Nodes on Right -->
+<div class="absolute top-[30%] left-[70%] -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest border border-outline-variant rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl">account_balance_wallet</span>
+<span class="font-label-md text-[10px] text-on-surface mt-1 text-center leading-tight">신혼부부 임차보증금<br/>이자지원</span>
+</div>
+<div class="absolute top-[45%] left-[75%] -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest border border-outline-variant rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl">apartment</span>
+<span class="font-label-md text-[10px] text-on-surface mt-1 text-center leading-tight">신혼부부 공공임대</span>
+</div>
+<!-- Active Policy Node -->
+<div class="absolute top-[60%] left-[72%] -translate-x-1/2 -translate-y-1/2 bg-primary-fixed border-2 border-primary rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-md z-20">
+<span class="material-symbols-outlined text-primary text-2xl">home_work</span>
+<span class="font-label-md text-[10px] text-primary mt-1 text-center font-bold leading-tight">신혼부부 주거비 지원</span>
+</div>
+<div class="absolute top-[75%] left-[65%] -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest border border-outline-variant rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl">child_friendly</span>
+<span class="font-label-md text-[10px] text-on-surface mt-1 text-center leading-tight">출산가구 주거비 지원</span>
+</div>
+</div>
+<!-- Selected Policy Card Overlay -->
+<div class="absolute bottom-6 left-6 w-[340px] bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg z-30 flex flex-col overflow-hidden">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<h3 class="font-headline text-lg font-bold text-on-surface">상견례 장소 추천</h3>
+<span class="bg-surface-container-high text-on-surface-variant font-label-md text-[10px] px-2 py-1 rounded-full flex items-center gap-1 border border-outline-variant/30">
+<span class="material-symbols-outlined text-[12px]">info</span> 추가 확인 필요
+                            </span>
+</div>
+<div class="p-4 bg-surface-container-lowest flex flex-col gap-3">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span> 지원 대상</h4>
+<p class="font-body-sm text-sm text-on-surface-variant ml-3.5 mt-1">서울 거주 예비부부</p>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span> 혜택 내용</h4>
+<p class="font-body-sm text-sm text-on-surface-variant ml-3.5 mt-1">공공기관 장소 대관</p>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span> 다음 단계</h4>
+<p class="font-body-sm text-sm text-on-surface-variant ml-3.5 mt-1">일정 확인 및 예약 접수</p>
+</div>
+<button class="mt-2 w-full py-2 bg-surface-container border border-outline-variant rounded-lg text-on-surface font-label-lg flex justify-center items-center gap-2 hover:bg-surface-container-high transition-colors">
+                                자세히 보기 <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+</div>
+<!-- Legend -->
+<div class="absolute bottom-4 right-4 bg-surface-container-lowest/80 backdrop-blur-md px-4 py-2 rounded-full border border-outline-variant/50 flex gap-4 text-[11px] font-label-md text-on-surface-variant shadow-sm">
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-full border border-outline-variant border-dashed"></div> 조건 노드
+                        </div>
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-full border border-outline-variant bg-surface-container-lowest"></div> 정책 노드
+                        </div>
+<div class="flex items-center gap-1.5">
+<div class="w-8 border-t border-outline-variant border-dashed"></div> 연결 관계
+                        </div>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>

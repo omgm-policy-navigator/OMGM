@@ -1,75 +1,113 @@
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202124;
-  background: #f6f7f9;
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "@xyflow/react/dist/style.css";
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #6fa77e;
+  --color-brand-surface: #eaf5ec;
+  --color-brand-surface-container: #d6ead8;
+  --color-brand-background: #ffffff;
+  --color-brand-border: #b8d8c1;
+  --color-brand-warm: #fcefe6;
+  --color-text-primary: #1a2b1c;
+  --color-text-secondary: #5d6e5f;
+
+  --font-sans: "Manrope", system-ui, sans-serif;
+
+  --text-h1: 48px;
+  --text-h1--line-height: 64px;
+  --text-h1--font-weight: 800;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2: 32px;
+  --text-h2--line-height: 44px;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 24px;
+  --text-h3--line-height: 32px;
+  --text-h3--font-weight: 700;
+  --text-h4: 20px;
+  --text-h4--line-height: 28px;
+  --text-h4--font-weight: 600;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 600;
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+  --text-body-md--font-weight: 500;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 20px;
+  --text-body-sm--font-weight: 400;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+  --text-caption--letter-spacing: 0.01em;
+
+  --radius-xl: 12px;
+  --radius-3xl: 24px;
+  --radius-arch: 45px 45px 0 0;
+
+  --shadow-card: 0 12px 32px rgba(111, 167, 126, 0.12);
+  --shadow-cta: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --ease-sidebar: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
+  background: #ffffff;
+  font-family: "Manrope", system-ui, sans-serif;
 }
 
-button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 6px;
-  padding: 0 16px;
-  background: #176b87;
-  color: white;
-  font-weight: 700;
-}
-
-.shell {
-  min-height: 100vh;
-  padding: 24px;
+* {
   box-sizing: border-box;
 }
 
-.workspace {
-  display: grid;
-  grid-template-columns: 280px minmax(320px, 1fr) 320px;
-  gap: 16px;
-  max-width: 1280px;
-  margin: 0 auto;
+button,
+a,
+input {
+  font: inherit;
 }
 
-.panel,
-.chat,
-.summary {
-  background: white;
-  border: 1px solid #d9dee7;
-  border-radius: 8px;
-  padding: 20px;
+button {
+  cursor: pointer;
 }
 
-.panel h1,
-.summary h2 {
-  margin-top: 0;
+.policy-graph-bg {
+  background: radial-gradient(circle at center, #d6ead8 0%, #ffffff 70%);
 }
 
-.status {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e8ef;
-  font-size: 14px;
-  color: #5f6368;
-  overflow-wrap: anywhere;
+.react-flow__attribution {
+  display: none;
 }
 
-.chat {
-  min-height: 420px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+.react-flow__node {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
-.message {
-  border-left: 4px solid #64a6bd;
-  padding-left: 14px;
-  line-height: 1.6;
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
-@media (max-width: 900px) {
-  .workspace {
-    grid-template-columns: 1fr;
+.animate-modal-in {
+  animation: modal-in 250ms ease-out;
+}
+
+@media (max-width: 1279px) {
+  .react-flow__viewport {
+    transform-origin: center;
   }
 }
