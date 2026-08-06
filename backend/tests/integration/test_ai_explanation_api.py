@@ -70,7 +70,12 @@ def app_with_session(session):
     app.dependency_overrides[get_db] = override_get_db
     app.state.llm_provider = FakeLLMProvider(
         output=AIOutput(
-            answer="Generated explanation from official evidence.",
+            answer=(
+                '{"summary":"Generated explanation from official evidence.",'
+                '"reasons":["The explanation follows stored rule evidence."],'
+                '"next_steps":["Review the official citation."],'
+                '"disclaimer":"Official confirmation may still be required."}'
+            ),
             resultStatus="ANSWERED",
             citations=[
                 {

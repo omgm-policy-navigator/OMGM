@@ -457,7 +457,7 @@ All B7 endpoints identify the anonymous user only through the HttpOnly anonymous
 
 ### `POST /api/chat`
 
-Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official RAG chunk evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support. RAG queries are built from policy metadata and condition keys, not raw user free text or personal fact values.
+Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official RAG chunk evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support. RAG queries are built from policy metadata and condition keys, not raw user free text or personal fact values. Retrieved chunks are wrapped in `<retrieved_context>` delimiters and treated as reference data, not instructions.
 
 Request:
 
@@ -495,7 +495,7 @@ Response `200`:
 
 ### `POST /api/policies/{policyId}/explain`
 
-Explains one policy for the current anonymous session. Missing active approved policies return `POLICY_NOT_FOUND`. RAG and LLM calls use strict timeout/fallback handling. LLM failures are converted to `aiStatus: "FALLBACK"` while keeping the stored Rule Engine `eligibilityStatus` and official citations available through a static explanation generated from stored JSON evidence.
+Explains one policy for the current anonymous session. Missing active approved policies return `POLICY_NOT_FOUND`. RAG and LLM calls use strict timeout/fallback handling. LLM output must pass the B7 structured answer schema (`summary`, `reasons`, `next_steps`, `disclaimer`) and post-generation contradiction checks before being returned. LLM failures are converted to `aiStatus: "FALLBACK"` while keeping the stored Rule Engine `eligibilityStatus` and official citations available through a static explanation generated from stored JSON evidence.
 
 Request:
 

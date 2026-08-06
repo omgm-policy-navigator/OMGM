@@ -5,7 +5,13 @@ from types import SimpleNamespace
 
 from app.llm import AIOutput, FakeLLMProvider, LLMRequest, LLMUnavailableError
 from app.modules.ai.schemas import AIResponseStatus, CitationResponse
-from app.modules.ai.service import ExplanationContext, build_prompt, explain_with_ai
+from app.modules.ai.service import (
+    ExplanationContext,
+    build_prompt,
+    contradicts_rule_status,
+    explain_with_ai,
+    retrieved_context,
+)
 
 
 def policy(policy_id="policy_housing_001"):
@@ -48,6 +54,15 @@ def citation():
     )
 
 
+def json_answer(summary="The deterministic result is explained."):
+    return (
+        '{"summary":"'
+        + summary
+        + '","reasons":["The explanation follows stored rule evidence."],'
+        + '"next_steps":["Review the official citation."],'
+        + '"disclaimer":"Official confirmation may still be required."}'
+    )
+
 class FailingProvider:
     async def health(self):
         raise AssertionError("not used")
@@ -77,7 +92,7 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_llm_cannot_change_rule_status(self) -> None:
         provider = FakeLLMProvider(
             output=AIOutput(
-                answer="The user appears eligible, but this is only explanatory text.",
+                answer=json_answer("The stored rule result is likely ineligible."),
                 resultStatus="ANSWERED",
                 citations=[
                     {
@@ -140,3 +155,63 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("readOnlyRuleResult", prompt)
         self.assertIn("Do not change eligibilityStatus", prompt)
         self.assertIn("unmatchedConditions", prompt)
+
+    async def test_contradictory_generated_answer_falls_back(self) -> None:
+        provider = FakeLLMProvider(
+            output=AIOutput(
+                answer=json_answer("You are eligible and can apply."),
+                resultStatus="ANSWERED",
+                citations=[
+                    {
+                        "sourceId": "doc_1",
+                        "title": "Official notice",
+                        "url": "https://example.go.kr/policy/1",
+                        "policyVersionId": "policy_housing_001",
+                        "evidenceId": "chunk_1",
+                    }
+                ],
+            )
+        )
+
+        response = await explain_with_ai(
+            ExplanationContext(policy(), evaluation("LIKELY_INELIGIBLE"), (), (citation(),)),
+            provider,
+        )
+
+        self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
+        self.assertIn("Rule Engine status is LIKELY_INELIGIBLE", response.answer)
+
+    async def test_invalid_structured_answer_falls_back(self) -> None:
+        provider = FakeLLMProvider(
+            output=AIOutput(
+                answer="plain text is not accepted",
+                resultStatus="ANSWERED",
+                citations=[
+                    {
+                        "sourceId": "doc_1",
+                        "title": "Official notice",
+                        "url": "https://example.go.kr/policy/1",
+                        "policyVersionId": "policy_housing_001",
+                        "evidenceId": "chunk_1",
+                    }
+                ],
+            )
+        )
+
+        response = await explain_with_ai(
+            ExplanationContext(policy(), evaluation("LIKELY_ELIGIBLE"), (), (citation(),)),
+            provider,
+        )
+
+        self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
+
+    def test_retrieved_context_uses_delimiters(self) -> None:
+        context = retrieved_context([citation()])
+
+        self.assertIn("<retrieved_context>", context)
+        self.assertIn("</retrieved_context>", context)
+        self.assertIn("<citation", context)
+
+    def test_contradiction_detector_blocks_positive_claims_for_ineligible_status(self) -> None:
+        self.assertTrue(contradicts_rule_status("You can apply now.", "LIKELY_INELIGIBLE"))
+        self.assertFalse(contradicts_rule_status("You can apply now.", "LIKELY_ELIGIBLE"))

@@ -4,9 +4,9 @@
 
 - `uv run pytest tests/unit/test_ai_explanations.py` - passed, 3 tests.
 - `uv run pytest tests/integration/test_ai_explanation_api.py` - passed, 3 tests.
-- `uv run pytest tests/unit/test_ai_explanations.py tests/integration/test_ai_explanation_api.py` - passed, 10 tests after P1/P2 hardening.
-- `uv run pytest` - passed, 182 tests and 1 skipped after P1/P2 hardening.
-- `uv run ruff check src/app tests` - passed after P1/P2 hardening.
+- `uv run pytest tests/unit/test_ai_explanations.py tests/integration/test_ai_explanation_api.py tests/unit/test_config.py` - passed, 22 tests after post-generation validation hardening.
+- `uv run pytest` - passed, 186 tests and 1 skipped after post-generation validation hardening.
+- `uv run ruff check src/app tests` - passed after post-generation validation hardening.
 - `docker compose -f compose.yaml -f compose.dev.yaml config` - passed.
 - `git diff --check` - passed before the merge update; rerun before final push.
 
