@@ -131,15 +131,58 @@ const optionLabels: Record<string, string> = {
   family_budget: "가계 예산",
 };
 
+const questionExamples: Record<string, string[]> = {
+  q_housing_region: ["서울", "경기", "전국"],
+  q_housing_marital_status: ["예비부부", "신혼부부", "기혼"],
+  q_housing_income: ["5천만 원 미만", "5천만-8천만 원", "모름"],
+  q_housing_ownership: ["무주택", "주택 소유", "모름"],
+  q_housing_lease_type: ["전세", "월세", "매매"],
+  q_cash_region: ["서울", "대전", "전국"],
+  q_cash_marital_status: ["예비부부", "신혼부부", "기혼"],
+  q_cash_marriage_registered: ["예", "아니오"],
+  q_cash_registration_date: ["2026-05-24", "2026.05.24"],
+  q_childcare_region: ["전국", "세종", "서울"],
+  q_childcare_pregnancy: ["임신 준비", "임신 중", "해당 없음"],
+  q_childcare_has_child: ["예", "아니오"],
+  q_childcare_child_age: ["6", "12개월"],
+  q_loan_region: ["전국", "서울", "경기"],
+  q_loan_marital_status: ["예비부부", "신혼부부", "기혼"],
+  q_loan_income: ["5천만 원 미만", "5천만-8천만 원", "모름"],
+  q_loan_credit_need: ["주거", "웨딩", "정착"],
+  q_education_region: ["전국", "서울", "경기"],
+  q_education_topic: ["주거 계약", "재무 상담", "가계 예산"],
+  q_education_marital_status: ["예비부부", "신혼부부", "기혼"],
+};
+
+function formatQuestionGuide(question: QuestionResponse) {
+  const examples =
+    questionExamples[question.questionId] ??
+    (question.options.length > 0 ? question.options.slice(0, 3).map(({ value }) => optionLabels[value] ?? value) : []);
+
+  if (question.answerType === "date") {
+    return "입력 예시: 2026-05-24 또는 2026.05.24";
+  }
+
+  if (question.answerType === "number") {
+    return "입력 예시: 6 또는 12개월";
+  }
+
+  if (examples.length > 0) {
+    return `입력 예시: ${examples.join(", ")}`;
+  }
+
+  return "질문에 맞는 값을 짧게 입력해 주세요.";
+}
+
 function formatQuestion(question: QuestionResponse) {
   const prompt = questionLabels[question.questionId] ?? question.prompt;
   const options = question.options.map(({ value }) => optionLabels[value] ?? value);
 
   if (options.length === 0) {
-    return prompt;
+    return `${prompt}\n${formatQuestionGuide(question)}`;
   }
 
-  return `${prompt}\n선택지: ${options.join(", ")}`;
+  return `${prompt}\n선택지: ${options.join(", ")}\n${formatQuestionGuide(question)}`;
 }
 
 function normalizeAnswer(input: string, question: QuestionResponse): string | number | boolean | null {
@@ -214,7 +257,12 @@ function normalizeAnswer(input: string, question: QuestionResponse): string | nu
   }
 
   if (question.answerType === "date") {
-    return /^\d{4}-\d{2}-\d{2}$/.test(input.trim()) ? input.trim() : null;
+    const match = input.trim().match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);
+    if (!match) {
+      return null;
+    }
+    const [, year, month, day] = match;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
   for (const [alias, value] of Object.entries(aliases)) {
@@ -311,11 +359,11 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   }, [isLiveMode, onGraphChange, selectedCategory]);
 
   const optionHint = useMemo(() => {
-    if (!activeQuestion || activeQuestion.options.length === 0) {
+    if (!activeQuestion) {
       return null;
     }
 
-    return activeQuestion.options.map(({ value }) => optionLabels[value] ?? value).join(", ");
+    return formatQuestionGuide(activeQuestion);
   }, [activeQuestion]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -336,7 +384,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
 
     const value = normalizeAnswer(answerText, activeQuestion);
     if (value === null) {
-      appendMessage("bot", optionHint ? `선택지 중 하나로 답변해 주세요: ${optionHint}` : "이 질문은 백엔드가 요구하는 형식으로 입력해 주세요.");
+      appendMessage("bot", optionHint ? `입력 형식이 맞지 않습니다.\n${optionHint}` : "입력 형식이 맞지 않습니다. 질문에 맞는 값을 짧게 입력해 주세요.");
       return;
     }
 
@@ -442,7 +490,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             className="h-14 w-full rounded-xl border border-brand-border bg-white pl-5 pr-14 text-body-md text-text-primary outline-none transition focus:border-brand-primary focus:ring-4 focus:ring-brand-surface"
-            placeholder={loading ? "백엔드와 통신 중입니다..." : `${selectedCategory.label} 정책 조건을 입력하세요...`}
+            placeholder={loading ? "백엔드와 통신 중입니다..." : activeQuestion ? formatQuestionGuide(activeQuestion).replace("입력 예시: ", "예: ") : `${selectedCategory.label} 정책 조건을 입력하세요...`}
             disabled={loading}
           />
           <button
