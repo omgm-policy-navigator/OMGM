@@ -9,6 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
+from app.modules.eligibility.repository import (
+    get_session_policy_evaluation,
+    list_active_policies_for_category,
+    list_session_evaluations,
+    mark_session_evaluations_stale,
+    upsert_policy_evaluation,
+)
+from app.modules.eligibility.schemas import CreateEvaluationsResponse, PolicyEvaluationResponse
+from app.modules.eligibility.service import evaluate_policy, evaluation_to_response, evidence_from_result
 from app.modules.questions.engine import (
     dependent_fact_keys,
     next_questions,
@@ -258,6 +267,7 @@ async def put_fact(
         payload.confirmed,
         payload.note,
     )
+    await mark_session_evaluations_stale(db, session.id)
     await db.commit()
     return UserFactResponse(
         conditionKey=fact.condition_key,
@@ -318,6 +328,8 @@ async def submit_answers(
     for fact_key in invalidated:
         merged_facts.pop(fact_key, None)
     follow_ups = [question_to_response(question) for question in next_questions(category_code, merged_facts)]
+    if stored:
+        await mark_session_evaluations_stale(db, session.id)
     await db.commit()
     return SubmitAnswersResponse(status="stored", stored=stored, conflicts=[], nextQuestions=follow_ups)
 
@@ -339,3 +351,59 @@ async def get_question_progress(
         totalRequired=total,
         complete=complete,
     )
+
+@router.post("/evaluations", response_model=CreateEvaluationsResponse)
+async def create_session_evaluations(
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> CreateEvaluationsResponse:
+    validate_unsafe_origin(request, allowed_origins(config))
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    category_code = require_category_code(session.selected_category_code)
+    facts = facts_to_dict(await list_session_facts(db, session))
+    policies = await list_active_policies_for_category(db, category_code)
+    stored = []
+    for policy in policies:
+        result = evaluate_policy(policy, facts)
+        evaluation = await upsert_policy_evaluation(
+            db,
+            session_id=session.id,
+            policy_id=policy.id,
+            eligibility_status=result.eligibility_status,
+            evaluation_state=result.evaluation_state,
+            recommendation_score=result.recommendation_score,
+            evidence=evidence_from_result(result),
+            fact_snapshot=facts,
+        )
+        stored.append(evaluation)
+    stored.sort(key=lambda item: (-item.recommendation_score, item.policy_id))
+    await db.commit()
+    return CreateEvaluationsResponse(status="evaluated", items=[evaluation_to_response(item) for item in stored])
+
+
+@router.get("/evaluations", response_model=list[PolicyEvaluationResponse])
+async def get_session_evaluations(
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> list[PolicyEvaluationResponse]:
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    evaluations = await list_session_evaluations(db, session.id)
+    await db.commit()
+    return [evaluation_to_response(evaluation) for evaluation in evaluations]
+
+
+@router.get("/evaluations/{policy_id}", response_model=PolicyEvaluationResponse)
+async def get_session_policy_evaluation_result(
+    policy_id: str,
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> PolicyEvaluationResponse:
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    evaluation = await get_session_policy_evaluation(db, session.id, policy_id)
+    await db.commit()
+    if evaluation is None:
+        raise AppError("EVALUATION_NOT_FOUND", "Requested evaluation does not exist.", HTTPStatus.NOT_FOUND)
+    return evaluation_to_response(evaluation)
