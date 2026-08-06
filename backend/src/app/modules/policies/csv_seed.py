@@ -510,6 +510,10 @@ def _require_references(catalog: PolicySeedCatalog) -> None:
             raise PolicySeedError(f"Chunk {chunk.id} references an unknown document")
         if document.policy_id != chunk.policy_id:
             raise PolicySeedError(f"Chunk {chunk.id} policy does not match document {chunk.document_id}")
+        if document.document_type is not chunk.document_type:
+            raise PolicySeedError(
+                f"Chunk {chunk.id} document type does not match document {chunk.document_id}"
+            )
         if document.source_url != chunk.source_url:
             raise PolicySeedError(f"Chunk {chunk.id} source URL does not match document {chunk.document_id}")
         actual_hash = hashlib.sha256(chunk.content.encode("utf-8")).hexdigest()

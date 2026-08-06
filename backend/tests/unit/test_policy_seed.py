@@ -100,6 +100,18 @@ def test_chunk_source_url_must_match_its_document(tmp_path: Path) -> None:
         load_policy_seed(seed)
 
 
+def test_chunk_document_type_must_match_parent_document(tmp_path: Path) -> None:
+    seed = _copy_seed(tmp_path)
+
+    def mutate(rows: list[dict[str, str]]) -> None:
+        rows[0]["document_type"] = "FAQ"
+
+    _rewrite_csv(seed, "10_policy_document_chunk.csv", mutate)
+
+    with pytest.raises(PolicySeedError, match="document type does not match"):
+        load_policy_seed(seed)
+
+
 def test_question_options_expose_labels_and_canonical_values() -> None:
     catalog = load_policy_seed(SEED_DIRECTORY)
 

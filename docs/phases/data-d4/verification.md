@@ -54,3 +54,7 @@ D4는 분석 DTO와 CSV Seed만 변경하므로 신규 Alembic migration을 추�
 ## Troubleshooting
 
 현재까지 재사용 가능한 신규 장애는 확인되지 않았다. Docker 이미지 불일치와 Windows 권한 문제는 기존 [Docker backend image 재빌드](../../troubleshooting/docker-backend-image.md)를 따른다.
+
+## PR #16 Review Verification
+
+표 내부 연락처, 전화번호·이메일, 승인 Chunk 부분 필터링, 부모 문서 유형 불일치, 표 열 불일치, escaped pipe와 제목 기반 혼합 의미 검사를 포함한 집중 테스트 33개가 통과했다. 리뷰 대응 후 전체 pytest 122개, Ruff, Markdown 링크 검사와 `git diff --check`가 통과했다.

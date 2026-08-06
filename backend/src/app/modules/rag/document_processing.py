@@ -87,6 +87,9 @@ _HEADING = re.compile(r"^(?:#{1,6}\s+)(.+)$")
 _ARTICLE = re.compile(r"^(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*\([^)]*\))?)\s*(.*)$")
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?。])\s+")
 _TABLE_SEPARATOR = re.compile(r"^:?-{3,}:?$")
+_TABLE_CELL_SPLIT = re.compile(r"(?<!\\)\|")
+_PHONE_PATTERN = re.compile(r"(?<!\d)(?:0\d{1,2}[-.\s]?)?\d{3,4}[-.\s]?\d{4}(?!\d)")
+_EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 _KIND_CUES: tuple[tuple[ChunkKind, tuple[str, ...]], ...] = (
     (ChunkKind.REQUIRED_DOCUMENTS, ("제출서류", "구비서류", "필요서류", "첨부서류")),
@@ -171,11 +174,6 @@ def process_document(document: SourceDocument) -> tuple[DocumentChunk, ...]:
 
 
 def build_embedding_seed(chunks: tuple[DocumentChunk, ...]) -> tuple[EmbeddingSeed, ...]:
-    review_required = [chunk.chunk_id for chunk in chunks if chunk.quality is not ChunkQuality.APPROVED]
-    if review_required:
-        raise DocumentProcessingError(
-            f"embedding seed requires approved chunks: {', '.join(review_required)}"
-        )
     return tuple(
         EmbeddingSeed(
             chunk_id=chunk.chunk_id,
@@ -190,6 +188,7 @@ def build_embedding_seed(chunks: tuple[DocumentChunk, ...]) -> tuple[EmbeddingSe
             content_hash=chunk.content_hash,
         )
         for chunk in chunks
+        if chunk.quality is ChunkQuality.APPROVED
     )
 
 
@@ -221,9 +220,22 @@ def _make_chunk(
     source_location: str,
     *,
     forced_kind: ChunkKind | None = None,
+    additional_issues: tuple[str, ...] = (),
 ) -> DocumentChunk:
     kind = forced_kind or _classify_chunk_kind(f"{heading} {content}")
-    issues = _quality_issues(content, kind, source_location)
+    issues = tuple(
+        dict.fromkeys(
+            (
+                *_quality_issues(
+                    heading=heading,
+                    content=content,
+                    kind=kind,
+                    source_location=source_location,
+                ),
+                *additional_issues,
+            )
+        )
+    )
     digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
     chunk_key = f"{document.document_id}|{source_location}|{digest}"
     chunk_id = f"chunk_{hashlib.sha256(chunk_key.encode('utf-8')).hexdigest()[:20]}"
@@ -243,16 +255,29 @@ def _make_chunk(
     )
 
 
-def _quality_issues(content: str, kind: ChunkKind, source_location: str) -> tuple[str, ...]:
+def _quality_issues(
+    *,
+    heading: str,
+    content: str,
+    kind: ChunkKind,
+    source_location: str,
+) -> tuple[str, ...]:
     issues: list[str] = []
-    detected_kinds = {candidate for candidate, cues in _KIND_CUES if any(cue in content for cue in cues)}
+    semantic_text = f"{heading} {content}"
+    detected_kinds = {
+        candidate for candidate, cues in _KIND_CUES if any(cue in semantic_text for cue in cues)
+    }
     if len(detected_kinds) > 1:
         issues.append("mixed_semantic_kinds")
     if len(content) > 1000:
         issues.append("chunk_too_long")
     if not source_location.strip():
         issues.append("missing_source_location")
-    if kind is ChunkKind.CONTACT:
+    if (
+        kind is ChunkKind.CONTACT
+        or ChunkKind.CONTACT in detected_kinds
+        or _contains_contact_information(content)
+    ):
         issues.append("contact_requires_review")
     if kind is ChunkKind.OTHER and len(content) < 10:
         issues.append("insufficient_context")
@@ -277,7 +302,7 @@ def _table_chunks(
     lines: list[str],
     table_number: int,
 ) -> tuple[DocumentChunk, ...]:
-    rows = [[cell.strip() for cell in line.strip("|").split("|")] for line in lines]
+    rows = [_parse_table_row(line) for line in lines]
     if len(rows) < 2:
         return (
             _make_chunk(
@@ -297,8 +322,10 @@ def _table_chunks(
     for row_number, row in enumerate(data_rows, start=1):
         if len(row) != len(headers):
             content = " | ".join(row)
+            additional_issues = ("table_column_mismatch",)
         else:
             content = "; ".join(f"{header}: {value}" for header, value in zip(headers, row, strict=True))
+            additional_issues = ()
         chunks.append(
             _make_chunk(
                 document,
@@ -307,6 +334,20 @@ def _table_chunks(
                 content,
                 f"heading:{heading}/table:{table_number}/row:{row_number}",
                 forced_kind=ChunkKind.TABLE_ROW,
+                additional_issues=additional_issues,
             )
         )
     return tuple(chunks)
+
+
+def _parse_table_row(line: str) -> list[str]:
+    stripped = line.strip()
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|") and not stripped.endswith(r"\|"):
+        stripped = stripped[:-1]
+    return [cell.replace(r"\|", "|").strip() for cell in _TABLE_CELL_SPLIT.split(stripped)]
+
+
+def _contains_contact_information(content: str) -> bool:
+    return bool(_PHONE_PATTERN.search(content) or _EMAIL_PATTERN.search(content))

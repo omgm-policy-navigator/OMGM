@@ -70,8 +70,7 @@ class RagDocumentProcessingTests(unittest.TestCase):
 
         self.assertEqual(chunks[0].quality, ChunkQuality.REVIEW_REQUIRED)
         self.assertIn("mixed_semantic_kinds", chunks[0].quality_issues)
-        with self.assertRaises(DocumentProcessingError):
-            build_embedding_seed(chunks)
+        self.assertEqual(build_embedding_seed(chunks), ())
 
     def test_sentences_with_different_meanings_are_split(self) -> None:
         chunks = process_document(
@@ -100,6 +99,83 @@ class RagDocumentProcessingTests(unittest.TestCase):
         self.assertEqual(chunks[0].chunk_kind, ChunkKind.CONTACT)
         self.assertEqual(chunks[0].quality, ChunkQuality.REVIEW_REQUIRED)
         self.assertIn("contact_requires_review", chunks[0].quality_issues)
+
+    def test_contact_inside_table_requires_review(self) -> None:
+        chunks = process_document(
+            self.source(
+                """# 문의처
+| 구분 | 내용 |
+| --- | --- |
+| 문의 | 주거지원과 02-1234-5678 |"""
+            )
+        )
+
+        self.assertEqual(chunks[0].chunk_kind, ChunkKind.TABLE_ROW)
+        self.assertEqual(chunks[0].quality, ChunkQuality.REVIEW_REQUIRED)
+        self.assertIn("contact_requires_review", chunks[0].quality_issues)
+
+    def test_email_inside_table_requires_review(self) -> None:
+        chunks = process_document(
+            self.source(
+                """# 담당부서
+| 구분 | 내용 |
+| --- | --- |
+| 이메일 | housing@example.go.kr |"""
+            )
+        )
+
+        self.assertIn("contact_requires_review", chunks[0].quality_issues)
+
+    def test_embedding_seed_excludes_only_review_required_chunks(self) -> None:
+        chunks = process_document(
+            self.source(
+                """# 신청 대상
+서울 거주 신혼부부가 신청할 수 있습니다.
+
+# 문의
+문의: 주거지원과에 확인하세요."""
+            )
+        )
+
+        seed = build_embedding_seed(chunks)
+
+        self.assertEqual(len(seed), 1)
+        self.assertEqual(seed[0].chunk_kind, ChunkKind.ELIGIBILITY)
+
+    def test_table_column_mismatch_requires_review(self) -> None:
+        chunks = process_document(
+            self.source(
+                """# 지원 내용
+| 구분 | 내용 |
+| --- | --- |
+| 지원금 | 최대 100만원 | 추가 설명 |"""
+            )
+        )
+
+        self.assertEqual(chunks[0].quality, ChunkQuality.REVIEW_REQUIRED)
+        self.assertIn("table_column_mismatch", chunks[0].quality_issues)
+
+    def test_escaped_pipe_inside_table_cell_is_preserved(self) -> None:
+        chunks = process_document(
+            self.source(
+                r"""# 지원 내용
+| 상태 | 설명 |
+| --- | --- |
+| 선택 | 신청 가능 \| 신청 불가 |"""
+            )
+        )
+
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("설명: 신청 가능 | 신청 불가", chunks[0].content)
+        self.assertNotIn("table_column_mismatch", chunks[0].quality_issues)
+
+    def test_heading_is_included_in_mixed_semantic_review(self) -> None:
+        chunks = process_document(
+            self.source("# 신청 대상 및 신청 방법\n서울 거주 신혼부부는 온라인으로 접수합니다.")
+        )
+
+        self.assertEqual(chunks[0].quality, ChunkQuality.REVIEW_REQUIRED)
+        self.assertIn("mixed_semantic_kinds", chunks[0].quality_issues)
 
     def test_invalid_source_url_and_empty_document_are_rejected(self) -> None:
         with self.assertRaises(DocumentProcessingError):
