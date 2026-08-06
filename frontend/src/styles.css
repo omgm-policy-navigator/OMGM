@@ -109,6 +109,33 @@ button {
   animation: modal-in 250ms ease-out;
 }
 
+.landing-chatbot-figure {
+  filter: drop-shadow(0 18px 30px rgba(111, 167, 126, 0.16));
+}
+
+.hero-consultation-card__mood {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: var(--hero-mood-opacity);
+  background:
+    radial-gradient(circle 420px at 18% 24%, rgba(250, 220, 214, 0.58), rgba(250, 220, 214, 0.18) 44%, rgba(250, 220, 214, 0) 72%),
+    radial-gradient(circle 320px at 78% 18%, rgba(250, 220, 214, 0.42), rgba(250, 220, 214, 0.14) 46%, rgba(250, 220, 214, 0) 74%),
+    radial-gradient(circle 260px at 48% 78%, rgba(250, 220, 214, 0.36), rgba(250, 220, 214, 0.12) 48%, rgba(250, 220, 214, 0) 76%);
+  transition: opacity 420ms ease-out;
+}
+
+.hero-consultation-card__spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--hero-spot-opacity);
+  background: radial-gradient(circle 230px at var(--hero-spot-x) var(--hero-spot-y), rgba(250, 220, 214, 0.52), rgba(250, 220, 214, 0.2) 42%, rgba(250, 220, 214, 0) 72%);
+  transition: opacity 220ms ease-out;
+}
+
 @media (max-width: 1279px) {
   .react-flow__viewport {
     transform-origin: center;
