@@ -38,6 +38,37 @@ CONTRADICTORY_ELIGIBLE_PATTERNS = tuple(
         r"지원\s*가능",
     )
 )
+CONDITION_DETAIL_PATTERNS = (
+    "신청 조건",
+    "조건",
+    "자격",
+    "대상",
+    "요건",
+    "eligibility",
+    "requirement",
+)
+FACT_LABELS = {
+    "region": "거주 지역",
+    "income": "소득 구간",
+    "household_income_range": "가구 소득 구간",
+    "asset": "자산 기준",
+    "housing_status": "주거 상태",
+    "housing_ownership": "주택 보유",
+    "lease_type": "계약 유형",
+    "loan_purpose": "대출 목적",
+    "marital_status": "혼인 상태",
+    "marriage_registered": "혼인신고 여부",
+    "marriage_registered_at": "혼인신고일",
+    "wedding_date": "예식일",
+    "child_birth_date": "자녀 출생일",
+    "children_count": "자녀 수",
+    "tax_year": "귀속 연도",
+    "residence_region": "거주 지역",
+    "marriage_status": "혼인 상태",
+    "household_income": "가구 소득",
+    "rent_contract_status": "임대차계약 상태",
+    "home_ownership": "주택 보유",
+}
 
 
 class StructuredExplanation(BaseModel):
@@ -235,7 +266,7 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
     region = display_catalog_value(getattr(policy, "region", "공식 공고 확인"))
     support_type = display_catalog_value(getattr(policy, "support_type", "공식 공고 확인"))
     parts = [
-        f"{policy.title}은 검수된 정책 카탈로그에 등록된 정책입니다.",
+        f"{policy.title}{topic_particle(policy.title)} 검수된 정책 카탈로그에 등록된 정책입니다.",
         f"주요 내용: {policy.summary}.",
         (
             f"담당 기관은 {getattr(policy, 'agency', '공식 기관')}이고, "
@@ -252,14 +283,31 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
         if evaluation_state == EvaluationState.STALE:
             parts.append("다만 최근 답변 이후 평가가 오래되어 다시 계산이 필요합니다.")
         evidence = context.evaluation.evidence
-        missing = _fact_keys(evidence.get("needsConfirmation", []))
-        unmatched = _fact_keys(evidence.get("unsatisfied", []))
+        satisfied = _fact_labels(evidence.get("satisfied", []))
+        missing = _fact_labels(evidence.get("needsConfirmation", []))
+        unmatched = _fact_labels(evidence.get("unsatisfied", []))
+        if wants_condition_details(context.user_message):
+            condition_parts = []
+            if satisfied:
+                condition_parts.append("확인된 조건: " + ", ".join(satisfied))
+            if unmatched:
+                condition_parts.append("맞지 않는 조건: " + ", ".join(unmatched))
+            if missing:
+                condition_parts.append("추가 확인 조건: " + ", ".join(missing))
+            if condition_parts:
+                parts.append("신청 조건은 현재 입력한 답변 기준으로 " + "; ".join(condition_parts) + "입니다.")
         if unmatched:
             parts.append("충족하지 못한 조건은 " + ", ".join(unmatched) + "입니다.")
         if missing:
             parts.append("추가 확인이 필요한 조건은 " + ", ".join(missing) + "입니다.")
     else:
         parts.append("아직 이 정책에 대한 사용자 조건 평가는 완료되지 않았습니다.")
+        if wants_condition_details(context.user_message):
+            rule_descriptions = policy_rule_descriptions(policy)
+            if rule_descriptions:
+                parts.append("카탈로그에 등록된 신청 조건 확인 항목은 " + ", ".join(rule_descriptions) + "입니다.")
+            else:
+                parts.append("카탈로그에 등록된 상세 조건 항목이 없어 공식 안내 페이지 확인이 필요합니다.")
 
     parts.append("세부 금액, 소득·자산 기준, 모집 가능 여부는 공식 안내 페이지에서 다시 확인해 주세요.")
     return " ".join(parts)
@@ -274,6 +322,13 @@ def display_catalog_value(value: object) -> str:
         "Busan": "부산",
         "National": "전국",
     }.get(text, text)
+
+
+def wants_condition_details(message: str | None) -> bool:
+    if message is None:
+        return False
+    normalized = message.casefold()
+    return any(pattern in normalized for pattern in CONDITION_DETAIL_PATTERNS)
 
 
 def fallback_response(
@@ -320,3 +375,38 @@ def _fact_keys(items: object) -> list[str]:
         if isinstance(item, dict) and isinstance(item.get("factKey"), str):
             keys.append(item["factKey"])
     return keys[:5]
+
+
+def _fact_labels(items: object) -> list[str]:
+    return [FACT_LABELS.get(key, key) for key in _fact_keys(items)]
+
+
+def policy_rule_descriptions(policy: Policy) -> list[str]:
+    descriptions = []
+    for rule in sorted(getattr(policy, "rules", ()), key=lambda item: (not item.required, item.fact_key, item.id)):
+        fact_key = str(rule.fact_key)
+        label = FACT_LABELS.get(fact_key, fact_key)
+        value = display_rule_value(getattr(rule, "value_text", ""))
+        if value:
+            descriptions.append(f"{label}: {value}")
+        else:
+            descriptions.append(label)
+    return descriptions[:6]
+
+
+def display_rule_value(value: object) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    mapped_parts = [display_catalog_value(part) for part in text.split("|")]
+    return "/".join(mapped_parts)
+
+
+def topic_particle(value: object) -> str:
+    text = str(value).strip()
+    if not text:
+        return "은"
+    last = text[-1]
+    if not ("가" <= last <= "힣"):
+        return "은"
+    return "은" if (ord(last) - ord("가")) % 28 else "는"

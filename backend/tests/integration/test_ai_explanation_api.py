@@ -132,6 +132,53 @@ def policy_bundle():
     return SimpleNamespace(policy=policy, evaluation=evaluation, documents=(document,))
 
 
+def tax_policy_bundle():
+    policy = SimpleNamespace(
+        id="policy_tax_020",
+        title="결혼세액공제",
+        summary="2024~2026년 혼인신고자에게 생애 1회 적용되는 혼인 관련 세액공제",
+        application_period="공식 공고 확인",
+        category_code="education",
+        support_type="세제 혜택",
+        rules=(
+            SimpleNamespace(
+                id="rule_tax_20_marriage",
+                fact_key="marriage_registered",
+                value_text="YES",
+                required=True,
+                evidence_text="2024~2026년 혼인신고자",
+            ),
+            SimpleNamespace(
+                id="rule_tax_20_year",
+                fact_key="tax_year",
+                value_text="2024|2025|2026",
+                required=True,
+                evidence_text="생애 1회 적용",
+            ),
+        ),
+    )
+    evaluation = SimpleNamespace(
+        policy_id="policy_tax_020",
+        eligibility_status="OFFICIAL_CONFIRMATION_REQUIRED",
+        evaluation_state="ACTIVE",
+        evidence={
+            "satisfied": [{"factKey": "marriage_registered"}],
+            "unsatisfied": [],
+            "needsConfirmation": [{"factKey": "tax_year"}],
+            "officialConfirmationRequired": [],
+        },
+    )
+    document = SimpleNamespace(
+        id="doc_tax_20",
+        policy_id="policy_tax_020",
+        title="결혼세액공제 공식 안내",
+        url="https://www.nts.go.kr/webtv/na/ntt/selectNttList.do?bbsId=30148&nttSn=1340311",
+        official_source="국세청",
+        document_hash="hash_tax_20",
+    )
+    return SimpleNamespace(policy=policy, evaluation=evaluation, documents=(document,))
+
+
 def rag_citations():
     return (
         CitationResponse(
@@ -209,7 +256,7 @@ class AIExplanationApiTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(body["aiStatus"], "GENERATED")
-        top_bundle.assert_awaited_once_with(db, session_id=7)
+        top_bundle.assert_awaited_once_with(db, session_id=7, category_code="housing")
 
     def test_chat_without_policy_rejects_unrelated_message(self) -> None:
         db = AsyncMock()
@@ -227,7 +274,9 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertEqual(body["policyId"], None)
         self.assertEqual(body["aiStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
         self.assertIn("정책명을 포함해 다시 질문", body["answer"])
-        finder.assert_awaited_once_with(db, session_id=7, category_code="housing", message="안녕?")
+        self.assertEqual(finder.await_count, 2)
+        finder.assert_any_await(db, session_id=7, category_code="housing", message="안녕?")
+        finder.assert_any_await(db, session_id=7, category_code=None, message="안녕?")
         top_bundle.assert_not_awaited()
 
     def test_chat_without_policy_matches_catalog_policy_before_top_evaluation(self) -> None:
@@ -252,6 +301,56 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertEqual(body["policyId"], "policy_housing_001")
         finder.assert_awaited_once_with(db, session_id=7, category_code="housing", message="Housing support 알려줘")
         top_bundle.assert_not_awaited()
+
+    def test_chat_without_policy_falls_back_to_all_categories_for_policy_name(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        finder = AsyncMock(side_effect=(None, tax_policy_bundle()))
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=finder,
+        ), patch(
+            "app.modules.ai.api.get_top_session_policy_evidence_bundle",
+            new=AsyncMock(),
+        ) as top_bundle, patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(app, "POST", "/api/chat", body={"message": "결혼세액공제 신청 조건 알려줘"})
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["policyId"], "policy_tax_020")
+        self.assertEqual(body["aiStatus"], "FALLBACK")
+        self.assertIn("결혼세액공제", body["answer"])
+        self.assertIn("신청 조건", body["answer"])
+        self.assertIn("혼인신고 여부", body["answer"])
+        self.assertIn("귀속 연도", body["answer"])
+        finder.assert_any_await(db, session_id=7, category_code="housing", message="결혼세액공제 신청 조건 알려줘")
+        finder.assert_any_await(db, session_id=7, category_code=None, message="결혼세액공제 신청 조건 알려줘")
+        top_bundle.assert_not_awaited()
+
+    def test_chat_without_policy_uses_ranked_evaluation_for_ordinal_followup(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.get_ranked_session_policy_evidence_bundle",
+            new=AsyncMock(return_value=tax_policy_bundle()),
+        ) as ranked_bundle, patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(),
+        ) as finder, patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(asgi_request(app, "POST", "/api/chat", body={"message": "2번째는?"}))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["policyId"], "policy_tax_020")
+        self.assertIn("결혼세액공제", body["answer"])
+        ranked_bundle.assert_awaited_once_with(db, session_id=7, category_code="housing", rank=2)
+        finder.assert_not_awaited()
 
     def test_chat_stream_returns_sse_events(self) -> None:
         db = AsyncMock()

@@ -24,7 +24,7 @@ async def get_policy_evidence_bundle(
 ) -> PolicyEvidenceBundle | None:
     result = await db.execute(
         select(Policy)
-        .options(selectinload(Policy.documents))
+        .options(selectinload(Policy.documents), selectinload(Policy.rules))
         .where(
             Policy.id == policy_id,
             Policy.status == PolicyStatus.APPROVED,
@@ -49,13 +49,42 @@ async def get_top_session_policy_evidence_bundle(
     db: AsyncSession,
     *,
     session_id: int,
+    category_code: str | None = None,
 ) -> PolicyEvidenceBundle | None:
-    result = await db.execute(
+    return await get_ranked_session_policy_evidence_bundle(
+        db,
+        session_id=session_id,
+        category_code=category_code,
+        rank=1,
+    )
+
+
+async def get_ranked_session_policy_evidence_bundle(
+    db: AsyncSession,
+    *,
+    session_id: int,
+    category_code: str | None = None,
+    rank: int = 1,
+) -> PolicyEvidenceBundle | None:
+    if rank < 1:
+        return None
+
+    statement = (
         select(PolicyEvaluation)
-        .where(PolicyEvaluation.session_id == session_id)
+        .join(Policy, Policy.id == PolicyEvaluation.policy_id)
+        .where(
+            PolicyEvaluation.session_id == session_id,
+            Policy.status == PolicyStatus.APPROVED,
+            Policy.is_active.is_(True),
+        )
         .order_by(PolicyEvaluation.recommendation_score.desc(), PolicyEvaluation.policy_id)
+        .offset(rank - 1)
         .limit(1)
     )
+    if category_code is not None:
+        statement = statement.where(Policy.category_code == category_code)
+
+    result = await db.execute(statement)
     evaluation = result.scalar_one_or_none()
     if evaluation is None:
         return None
@@ -102,7 +131,7 @@ async def find_policy_evidence_bundle_for_message(
 ) -> PolicyEvidenceBundle | None:
     statement = (
         select(Policy)
-        .options(selectinload(Policy.documents))
+        .options(selectinload(Policy.documents), selectinload(Policy.rules))
         .where(
             Policy.status == PolicyStatus.APPROVED,
             Policy.is_active.is_(True),
@@ -118,7 +147,7 @@ async def find_policy_evidence_bundle_for_message(
         ((_policy_match_score(policy, message), policy) for policy in candidates),
         key=lambda item: (-item[0], item[1].title, item[1].id),
     )
-    if not scored or scored[0][0] <= 0:
+    if not scored or scored[0][0] < 70:
         return None
 
     policy = scored[0][1]
