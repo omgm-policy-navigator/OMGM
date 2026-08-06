@@ -44,7 +44,7 @@ export function Sidebar({ collapsed, currentPath, onNavigate, onToggle }: Sideba
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <h1 className="truncate text-h4">나만 결혼 혜택?!</h1>
+            <h1 className="truncate text-h4">나만 결혼해?!</h1>
             <p className="truncate text-caption text-text-secondary">Policy Navigator</p>
           </div>
         )}

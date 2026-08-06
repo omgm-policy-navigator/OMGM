@@ -1,5 +1,6 @@
 import { Background, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
-import { X } from "lucide-react";
+import { UsersRound, X } from "lucide-react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
 import { policyNodes } from "../data/policies";
@@ -50,6 +51,17 @@ function getOppositeHandle(handle: string) {
 export function PolicyGraph() {
   const [selectedPolicy, setSelectedPolicy] = useState<PolicyNodeData | null>(null);
 
+  const handleGraphPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--policy-graph-spot-x", `${event.clientX - bounds.left}px`);
+    event.currentTarget.style.setProperty("--policy-graph-spot-y", `${event.clientY - bounds.top}px`);
+    event.currentTarget.style.setProperty("--policy-graph-spot-opacity", "1");
+  };
+
+  const handleGraphPointerLeave = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.style.setProperty("--policy-graph-spot-opacity", "0");
+  };
+
   const { nodes, edges } = useMemo(() => {
     const center: Node<GraphNodeData> = {
       id: "couple",
@@ -61,7 +73,7 @@ export function PolicyGraph() {
         id: "couple",
         label: "우리 부부",
         description: "현재 답변한 조건을 기준으로 정책 연결을 계산합니다.",
-        icon: policyNodes[5].icon,
+        icon: UsersRound,
         status: "recommended",
         variant: "central",
       },
@@ -117,8 +129,16 @@ export function PolicyGraph() {
         <p className="mt-1 text-body-sm text-text-secondary">정책 노드를 클릭하면 자격 근거와 다음 단계를 확인할 수 있어요.</p>
       </header>
 
-      <div className="policy-graph-bg h-full min-h-[560px] flex-1">
+      <div
+        className="policy-graph-bg relative h-full min-h-[560px] flex-1 overflow-hidden"
+        onPointerMove={handleGraphPointerMove}
+        onPointerLeave={handleGraphPointerLeave}
+        style={{ "--policy-graph-spot-x": "50%", "--policy-graph-spot-y": "50%", "--policy-graph-spot-opacity": "0" } as CSSProperties}
+      >
+        <div className="policy-graph-bg__center-glow" aria-hidden="true" />
+        <div className="policy-graph-bg__spotlight" aria-hidden="true" />
         <ReactFlow
+          className="relative z-10"
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
