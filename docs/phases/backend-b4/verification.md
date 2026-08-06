@@ -21,7 +21,7 @@ cd backend
 uv run pytest
 ```
 
-Result: passed. 97 tests passed.
+Result: passed. 111 tests passed after merging latest `origin/main`.
 
 ```bash
 cd backend

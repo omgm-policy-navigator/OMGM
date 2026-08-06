@@ -8,18 +8,18 @@ The Python package root remains `backend/src/app` so local packaging and the exi
 
 ```text
 backend/
-?쒋?? src/
-??  ?붴?? app/
-??      ?쒋?? api/
-??      ?쒋?? core/
-??      ?쒋?? db/
-??      ?쒋?? modules/
-??      ??  ?붴?? eligibility/
-??      ?붴?? llm/
-?붴?? tests/
-    ?쒋?? unit/
-    ?쒋?? integration/
-    ?붴?? fixtures/
+????? src/
+??  ????? app/
+??      ????? api/
+??      ????? core/
+??      ????? db/
+??      ????? modules/
+??      ??  ????? eligibility/
+??      ????? llm/
+????? tests/
+    ????? unit/
+    ????? integration/
+    ????? fixtures/
 ```
 
 `app/modules/eligibility` is the first concrete feature module. It owns the evaluation use case boundary and keeps Rule Engine logic as pure domain code inside the module. Future feature modules are created only when implementation begins.
@@ -46,6 +46,7 @@ backend/
 | Anonymous session and user facts | `app/modules/sessions` | Implemented in B3 |
 | Conversation orchestration | Future `app/modules/conversation` | Mock API contract only |
 | Question engine | `app/modules/questions` | Implemented in B4 |
+| User fact extraction | `app/modules/user_facts` | A2 extraction and conflict review implemented; API and persistence deferred |
 | Policy catalog and detail lookup | Future `app/modules/policies` | Mock API contract only |
 | Eligibility evaluation | `app/modules/eligibility` | Rule core implemented, API contract only |
 | AI output contract | `app/llm` | Pydantic schema implemented, behavior contract documented |
@@ -96,6 +97,12 @@ Phase B1 introduces SQLAlchemy async engine setup in `app/db/session.py`, Alembi
 Phase A1 adds provider-swappable LLM runtime code under `app/llm`. `OllamaLLMProvider` owns local Ollama health checks, timeout handling, model-missing detection, non-thinking JSON generation, and `AIOutput` validation. `FakeLLMProvider` and `TemplateLLMProvider` allow tests and local fallback paths to avoid a live model.
 
 The LLM runtime is not wired into API routes in A1. Connection failures, timeouts, missing models, and invalid JSON are represented as provider errors or health statuses so they do not become backend process health failures.
+
+## Phase A2 User Fact Extraction
+
+`app/modules/user_facts` owns the pure extraction contract: constrained prompt construction, seven-key allowlist validation, evidence grounding against user text, confidence and ambiguity review, and conflict detection against confirmed existing-fact DTOs. Duplicate confirmed facts are rejected at this boundary. It depends on the LLM request DTO but not on FastAPI, SQLAlchemy models, or sessions.
+
+A2 does not persist candidates or expose an API. Candidate values remain explicitly marked as raw and requiring normalization. A later user-fact phase must normalize values and confirm ungrounded, ambiguous, low-confidence, or conflicting candidates before storage.
 
 ## Phase B3 Anonymous Sessions
 
