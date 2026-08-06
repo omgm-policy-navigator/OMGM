@@ -12,6 +12,8 @@ from types import MappingProxyType
 from typing import Protocol, TypeVar
 from urllib.parse import urlparse
 
+from app.modules.rag.document_processing import ChunkKind, ChunkQuality, DocumentType
+
 
 class PolicySeedError(ValueError):
     """Raised when the versioned policy seed violates its contract."""
@@ -55,10 +57,6 @@ class RelationType(StrEnum):
     ALTERNATIVE = "ALTERNATIVE"
     CONFLICT = "CONFLICT"
     REEVALUATE_AFTER = "REEVALUATE_AFTER"
-
-
-class DocumentType(StrEnum):
-    OVERVIEW = "OVERVIEW"
 
 
 class EvaluationMode(StrEnum):
@@ -143,6 +141,20 @@ REQUIRED_COLUMNS = {
         "title",
         "content",
         "source_url",
+        "embedding",
+    },
+    "10_policy_document_chunk.csv": {
+        "id",
+        "policy_id",
+        "document_id",
+        "document_type",
+        "chunk_kind",
+        "heading",
+        "content",
+        "source_url",
+        "source_location",
+        "quality_status",
+        "content_hash",
         "embedding",
     },
 }
@@ -234,6 +246,21 @@ class RagDocument:
 
 
 @dataclass(frozen=True)
+class RagChunk:
+    id: str
+    policy_id: str
+    document_id: str
+    document_type: DocumentType
+    chunk_kind: ChunkKind
+    heading: str
+    content: str
+    source_url: str
+    source_location: str
+    quality_status: ChunkQuality
+    content_hash: str
+
+
+@dataclass(frozen=True)
 class PolicySeedCatalog:
     categories: Mapping[str, Category]
     policies: Mapping[str, Policy]
@@ -241,6 +268,7 @@ class PolicySeedCatalog:
     rules: tuple[PolicyRule, ...]
     relations: tuple[PolicyRelation, ...]
     documents: tuple[RagDocument, ...]
+    chunks: tuple[RagChunk, ...]
 
     def deterministic_rules(self, policy_id: str) -> tuple[PolicyRule, ...]:
         return tuple(
@@ -260,6 +288,9 @@ class PolicySeedCatalog:
 
     def rag_documents(self) -> tuple[RagDocument, ...]:
         return self.documents
+
+    def embedding_seed(self) -> tuple[RagChunk, ...]:
+        return tuple(chunk for chunk in self.chunks if chunk.quality_status is ChunkQuality.APPROVED)
 
 
 def _verify_checksums(directory: Path) -> None:
@@ -466,6 +497,34 @@ def _require_references(catalog: PolicySeedCatalog) -> None:
     for document in catalog.documents:
         if document.policy_id not in catalog.policies:
             raise PolicySeedError(f"Document {document.id} references an unknown policy")
+    documents_by_id = {document.id: document for document in catalog.documents}
+    seen_chunk_ids: set[str] = set()
+    for chunk in catalog.chunks:
+        if chunk.id in seen_chunk_ids:
+            raise PolicySeedError(f"Duplicate chunk id: {chunk.id}")
+        seen_chunk_ids.add(chunk.id)
+        if chunk.policy_id not in catalog.policies:
+            raise PolicySeedError(f"Chunk {chunk.id} references an unknown policy")
+        document = documents_by_id.get(chunk.document_id)
+        if document is None:
+            raise PolicySeedError(f"Chunk {chunk.id} references an unknown document")
+        if document.policy_id != chunk.policy_id:
+            raise PolicySeedError(f"Chunk {chunk.id} policy does not match document {chunk.document_id}")
+        if document.document_type is not chunk.document_type:
+            raise PolicySeedError(
+                f"Chunk {chunk.id} document type does not match document {chunk.document_id}"
+            )
+        if document.source_url != chunk.source_url:
+            raise PolicySeedError(f"Chunk {chunk.id} source URL does not match document {chunk.document_id}")
+        actual_hash = hashlib.sha256(chunk.content.encode("utf-8")).hexdigest()
+        if chunk.content_hash != actual_hash:
+            raise PolicySeedError(f"Chunk {chunk.id} content hash does not match content")
+    chunked_document_ids = {chunk.document_id for chunk in catalog.chunks}
+    missing_chunk_documents = set(documents_by_id) - chunked_document_ids
+    if missing_chunk_documents:
+        raise PolicySeedError(
+            f"Documents without a RAG chunk: {', '.join(sorted(missing_chunk_documents))}"
+        )
     documented_policy_ids = {document.policy_id for document in catalog.documents}
     missing = set(catalog.policies) - documented_policy_ids
     if missing:
@@ -534,6 +593,24 @@ def load_policy_seed(directory: Path) -> PolicySeedCatalog:
         )
         for row in _read_rows(directory, "08_policy_document.csv")
     )
+    chunks = tuple(
+        RagChunk(
+            id=_require_text(row["id"], "chunk.id"),
+            policy_id=_require_text(row["policy_id"], f"chunk {row['id']}.policy_id"),
+            document_id=_require_text(row["document_id"], f"chunk {row['id']}.document_id"),
+            document_type=_require_enum(DocumentType, row["document_type"], f"chunk {row['id']}.document_type"),
+            chunk_kind=_require_enum(ChunkKind, row["chunk_kind"], f"chunk {row['id']}.chunk_kind"),
+            heading=_require_text(row["heading"], f"chunk {row['id']}.heading"),
+            content=_require_text(row["content"], f"chunk {row['id']}.content"),
+            source_url=_require_http_url(row["source_url"], f"chunk {row['id']}.source_url"),
+            source_location=_require_text(row["source_location"], f"chunk {row['id']}.source_location"),
+            quality_status=_require_enum(
+                ChunkQuality, row["quality_status"], f"chunk {row['id']}.quality_status"
+            ),
+            content_hash=_require_text(row["content_hash"], f"chunk {row['id']}.content_hash"),
+        )
+        for row in _read_rows(directory, "10_policy_document_chunk.csv")
+    )
     catalog = PolicySeedCatalog(
         categories=_mapping(categories, "category"),
         policies=_mapping(policies, "policy"),
@@ -541,6 +618,7 @@ def load_policy_seed(directory: Path) -> PolicySeedCatalog:
         rules=rules,
         relations=relations,
         documents=documents,
+        chunks=chunks,
     )
     _require_references(catalog)
     return catalog
