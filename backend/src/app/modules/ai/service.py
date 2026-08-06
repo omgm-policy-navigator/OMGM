@@ -185,8 +185,8 @@ def official_confirmation_answer(context: ExplanationContext) -> str:
     if context.policy is None:
         return DEFAULT_ANSWER
     return (
-        "No approved RAG evidence was found for this policy explanation. "
-        "The policy result requires official confirmation before AI explanation is shown."
+        "이 정책 설명에 사용할 수 있는 승인된 RAG 근거를 찾지 못했습니다. "
+        "공식 근거가 확인되기 전에는 AI 설명을 제공하지 않으며, 공식 안내 페이지에서 세부 조건을 확인해 주세요."
     )
 
 
@@ -213,16 +213,16 @@ def template_answer(
     evaluation: PolicyEvaluation | None,
 ) -> str:
     if evaluation_state == EvaluationState.STALE:
-        return "The saved rule evaluation is stale. Please recalculate the policy evaluation before relying on it."
+        return "저장된 정책 평가가 최신 답변 기준이 아닙니다. 정책 평가를 다시 계산한 뒤 확인해 주세요."
     evidence = evaluation.evidence if evaluation is not None else {}
     unmatched = _fact_keys(evidence.get("unsatisfied", []))
     missing = _fact_keys(evidence.get("needsConfirmation", []))
-    parts = [f"Rule Engine status is {eligibility_status}."]
+    parts = [f"Rule Engine 평가 상태는 {eligibility_status}입니다."]
     if unmatched:
-        parts.append("Unmatched required conditions: " + ", ".join(unmatched) + ".")
+        parts.append("충족하지 못한 필수 조건: " + ", ".join(unmatched) + ".")
     if missing:
-        parts.append("Missing confirmation conditions: " + ", ".join(missing) + ".")
-    parts.append("AI explanation is temporarily unavailable, so this template uses the stored JSON evidence.")
+        parts.append("추가 확인이 필요한 조건: " + ", ".join(missing) + ".")
+    parts.append("현재 AI 설명을 생성할 수 없어 저장된 평가 근거를 기준으로 안내합니다.")
     return " ".join(parts)
 
 

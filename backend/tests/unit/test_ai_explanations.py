@@ -136,7 +136,7 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.eligibility_status, "LIKELY_ELIGIBLE")
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine status is LIKELY_ELIGIBLE", response.answer)
+        self.assertIn("Rule Engine 평가 상태는 LIKELY_ELIGIBLE", response.answer)
         self.assertIn("income", response.answer)
         self.assertIn("asset", response.answer)
 
@@ -179,7 +179,7 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine status is LIKELY_INELIGIBLE", response.answer)
+        self.assertIn("Rule Engine 평가 상태는 LIKELY_INELIGIBLE", response.answer)
 
     async def test_invalid_structured_answer_falls_back(self) -> None:
         provider = FakeLLMProvider(

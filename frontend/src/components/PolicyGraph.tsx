@@ -250,6 +250,10 @@ function isApplicablePolicyNode(node: SessionGraphNode) {
   return normalizeBackendType(node.type) === "POLICY" && eligibleStatuses.has(String(node.data.eligibilityStatus));
 }
 
+function getPolicyIdFromGraphNode(node: SessionGraphNode) {
+  return typeof node.data.policyId === "string" ? node.data.policyId : node.id.replace(/^POLICY:/, "");
+}
+
 function policyGridPosition(index: number, total: number): GraphPoint {
   const columns = total > 8 ? 3 : total > 4 ? 2 : 1;
   const column = index % columns;
@@ -258,6 +262,27 @@ function policyGridPosition(index: number, total: number): GraphPoint {
   const x = columns === 1 ? 640 : columns === 2 ? 560 + column * 320 : 500 + column * 290;
   const y = spreadY(row, rows, 330, 170);
   return { x, y };
+}
+
+function sortPoliciesForGraph(
+  policies: PolicySummaryResponse[],
+  evaluationByPolicyId: Map<string, SessionGraphNode>,
+) {
+  return [...policies].sort((left, right) => {
+    const leftEvaluation = evaluationByPolicyId.get(left.policyId);
+    const rightEvaluation = evaluationByPolicyId.get(right.policyId);
+    const leftEligible = leftEvaluation && isApplicablePolicyNode(leftEvaluation) ? 1 : 0;
+    const rightEligible = rightEvaluation && isApplicablePolicyNode(rightEvaluation) ? 1 : 0;
+    if (leftEligible !== rightEligible) {
+      return rightEligible - leftEligible;
+    }
+    const leftScore = typeof leftEvaluation?.data.recommendationScore === "number" ? leftEvaluation.data.recommendationScore : 0;
+    const rightScore = typeof rightEvaluation?.data.recommendationScore === "number" ? rightEvaluation.data.recommendationScore : 0;
+    if (leftScore !== rightScore) {
+      return rightScore - leftScore;
+    }
+    return left.title.localeCompare(right.title, "ko-KR");
+  });
 }
 
 function conditionGridPosition(index: number, total: number): GraphPoint {
@@ -486,32 +511,38 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
           },
         };
       });
-      const policyNodesFromSession = sessionGraph.nodes.filter(isApplicablePolicyNode);
-      const visiblePolicyNodes = answered
-        ? policyNodesFromSession.map((graphNode, index) => {
-            const policyId = typeof graphNode.data.policyId === "string" ? graphNode.data.policyId : graphNode.id;
-            const summary = summariesById.get(policyId);
-            const baseNode: Node<GraphNodeData> = {
-              id: graphNode.id,
-              type: "policyNode",
-              position: policyGridPosition(index, policyNodesFromSession.length),
-              data: {
-                id: graphNode.id,
-                label: displayLabelForBackendNode(graphNode),
-                description: descriptionForBackendNode(graphNode),
-                icon: iconForBackendNode(graphNode),
-                status: statusForBackendNode(graphNode),
-                variant: "policy",
-                backendType: graphNode.type,
-                backendData: graphNode.data,
-              },
-            };
-            return enrichPolicyNode(baseNode, summary, index, policyNodesFromSession.length);
-          })
-        : policySummaries.map((policy, index) => createPolicyNodeFromSummary(policy, index, policySummaries.length));
+      const evaluationByPolicyId = new Map(
+        sessionGraph.nodes
+          .filter((graphNode) => normalizeBackendType(graphNode.type) === "POLICY")
+          .map((graphNode) => [getPolicyIdFromGraphNode(graphNode), graphNode]),
+      );
+      const visiblePolicySummaries = sortPoliciesForGraph(policySummaries, evaluationByPolicyId);
+      const visiblePolicyNodes = visiblePolicySummaries.map((summary, index) => {
+        const graphNode = evaluationByPolicyId.get(summary.policyId);
+        if (!graphNode) {
+          return createPolicyNodeFromSummary(summary, index, visiblePolicySummaries.length);
+        }
+        const baseNode: Node<GraphNodeData> = {
+          id: graphNode.id,
+          type: "policyNode",
+          position: policyGridPosition(index, visiblePolicySummaries.length),
+          data: {
+            id: graphNode.id,
+            label: displayLabelForBackendNode(graphNode),
+            description: descriptionForBackendNode(graphNode),
+            icon: iconForBackendNode(graphNode),
+            status: statusForBackendNode(graphNode),
+            variant: "policy",
+            backendType: graphNode.type,
+            backendData: graphNode.data,
+          },
+        };
+        return enrichPolicyNode(baseNode, summariesById.get(summary.policyId), index, visiblePolicySummaries.length);
+      });
       const liveNodesWithoutPolicies = liveNodes.filter((node) => node.data.variant !== "policy");
       const composedNodes = [...liveNodesWithoutPolicies, ...visiblePolicyNodes];
       const visibleDetailGraph = visiblePolicyNodes
+        .filter((node) => node.data.status === "eligible")
         .slice(0, answered ? 3 : 0)
         .map((node, index) => createPolicyDetailNodes(node, index));
       const detailNodes = visibleDetailGraph.flatMap((graph) => graph.nodes);
@@ -740,12 +771,6 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
         </ReactFlow>
       </div>
 
-      {hasSessionAnswers(sessionGraph) && nodes.every((node) => node.data.variant !== "policy") && (
-        <div className="pointer-events-none absolute inset-x-6 top-28 z-10 rounded-xl border border-brand-border bg-white/90 p-4 text-body-sm text-text-secondary shadow-card">
-          현재 답변 기준으로 신청 가능성이 확인된 정책이 아직 없습니다. 부족한 조건을 더 입력하면 그래프가 갱신됩니다.
-        </div>
-      )}
-
       {selectedPolicy && <PolicyModal policy={selectedPolicy} policyDetail={selectedPolicyDetail} onClose={() => setSelectedPolicy(null)} />}
     </section>
   );
@@ -760,15 +785,20 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
   const isDetail = data.variant === "detail" || data.variant === "action";
 
   if (isPolicy) {
+    const isEligible = data.status === "eligible";
     return (
-      <div className="relative flex min-h-[112px] w-[250px] cursor-pointer items-start gap-3 rounded-2xl border-2 border-brand-primary bg-white px-4 py-4 text-left text-text-primary shadow-card transition hover:-translate-y-1 hover:bg-brand-surface-container">
+      <div
+        className={`relative flex min-h-[112px] w-[250px] cursor-pointer items-start gap-3 rounded-2xl bg-white px-4 py-4 text-left text-text-primary shadow-card transition hover:-translate-y-1 hover:bg-brand-surface-container ${
+          isEligible ? "border-2 border-brand-primary" : "border border-brand-border opacity-80"
+        }`}
+      >
         {handlePositions.map(({ id, position }) => (
           <Handle key={`target-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="target" position={position} />
         ))}
         {handlePositions.map(({ id, position }) => (
           <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
         ))}
-        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-surface text-brand-primary">
+        <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isEligible ? "bg-brand-primary text-white" : "bg-brand-surface text-brand-primary"}`}>
           <Icon size={22} />
         </div>
         <div className="min-w-0">
@@ -873,8 +903,8 @@ function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData;
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[4px] brightness-95" onClick={onClose} />
-      <article className="fixed left-1/2 top-1/2 z-[101] max-h-[80vh] w-[min(480px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 scale-100 overflow-hidden rounded-3xl bg-white opacity-100 shadow-card animate-modal-in">
-        <header className="flex items-start justify-between gap-4 border-b border-brand-border bg-brand-surface p-6">
+      <article className="fixed left-1/2 top-1/2 z-[101] flex max-h-[calc(100vh-48px)] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 scale-100 flex-col overflow-hidden rounded-3xl bg-white opacity-100 shadow-card animate-modal-in">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-brand-border bg-brand-surface p-6">
           <div className="flex gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary text-white">
               <Icon size={24} />
@@ -888,7 +918,7 @@ function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData;
             <X size={20} />
           </button>
         </header>
-        <div className="space-y-5 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
           <p className="text-body-md text-text-secondary">{modalDescription}</p>
           {policyDetail && (
             <dl className="grid grid-cols-1 gap-3 text-body-sm text-text-secondary sm:grid-cols-2">
