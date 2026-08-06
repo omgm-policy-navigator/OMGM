@@ -140,6 +140,14 @@ export function selectCategory(categoryCode: string, signal?: AbortSignal) {
   return postJson<{ categoryCode: string; status: string }>("/api/v1/session/category", { categoryCode }, { signal });
 }
 
+export function resetCategorySession(categoryCode: string, signal?: AbortSignal) {
+  return postJson<{ categoryCode: string; status: string; deletedFacts: number; deletedEvaluations: number }>(
+    "/api/v1/session/category/reset",
+    { categoryCode },
+    { signal },
+  );
+}
+
 export function getNextQuestions(signal?: AbortSignal) {
   return getJson<NextQuestionsResponse>("/api/v1/session/questions/next", { signal });
 }

@@ -15,8 +15,8 @@ from app.modules.eligibility.rules import EligibilityStatus, EvaluationState
 
 LLM_TIMEOUT_SECONDS = 3
 DEFAULT_ANSWER = (
-    "Official evidence is required before an AI explanation can be trusted. "
-    "Please check the official source."
+    "현재 선택한 주제에서 설명할 정책을 찾지 못했습니다. "
+    "정책명을 포함해 다시 질문하거나, 그래프에서 정책을 선택해 주세요."
 )
 LLM_SYSTEM_PROMPT = (
     "Hard guardrail: evaluationState, eligibilityStatus, satisfied conditions, unsatisfied conditions, "
@@ -123,7 +123,7 @@ def retrieved_context(citations: list[CitationResponse]) -> str:
 
 async def explain_with_ai(context: ExplanationContext, provider: LLMProvider | None) -> AIExplanationResponse:
     policy_id = context.policy.id if context.policy is not None else None
-    citations = list(context.retrieved_citations)
+    citations = list(context.retrieved_citations) or catalog_citations(context)
     eligibility_status, evaluation_state = rule_status(context.evaluation)
 
     if not citations:
@@ -134,6 +134,16 @@ async def explain_with_ai(context: ExplanationContext, provider: LLMProvider | N
             aiStatus=AIResponseStatus.OFFICIAL_CONFIRMATION_REQUIRED,
             answer=official_confirmation_answer(context),
             citations=[],
+        )
+
+    if not context.retrieved_citations:
+        return AIExplanationResponse(
+            policyId=policy_id,
+            eligibilityStatus=eligibility_status,
+            evaluationState=evaluation_state,
+            aiStatus=AIResponseStatus.FALLBACK,
+            answer=catalog_answer(context, eligibility_status, evaluation_state),
+            citations=citations,
         )
 
     if provider is None:
@@ -188,6 +198,82 @@ def official_confirmation_answer(context: ExplanationContext) -> str:
         "이 정책 설명에 사용할 수 있는 승인된 RAG 근거를 찾지 못했습니다. "
         "공식 근거가 확인되기 전에는 AI 설명을 제공하지 않으며, 공식 안내 페이지에서 세부 조건을 확인해 주세요."
     )
+
+
+def catalog_citations(context: ExplanationContext) -> list[CitationResponse]:
+    policy = context.policy
+    if policy is None:
+        return []
+
+    document = context.documents[0] if context.documents else None
+    source_id = getattr(document, "id", None) or f"policy_catalog:{policy.id}"
+    title = getattr(document, "title", None) or policy.title
+    url = getattr(document, "url", None) or getattr(policy, "official_source_url", "")
+    if not url:
+        return []
+
+    return [
+        CitationResponse(
+            sourceId=source_id,
+            policyId=policy.id,
+            title=title,
+            url=url,
+            sourceLabel=getattr(document, "official_source", None) or getattr(policy, "source_label", "OFFICIAL"),
+            evidenceId=f"catalog:{source_id}",
+            excerpt=policy.summary,
+            sourceLocation="policy_catalog",
+            similarity=None,
+        )
+    ]
+
+
+def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluation_state: str | None) -> str:
+    policy = context.policy
+    if policy is None:
+        return DEFAULT_ANSWER
+
+    region = display_catalog_value(getattr(policy, "region", "공식 공고 확인"))
+    support_type = display_catalog_value(getattr(policy, "support_type", "공식 공고 확인"))
+    parts = [
+        f"{policy.title}은 검수된 정책 카탈로그에 등록된 정책입니다.",
+        f"주요 내용: {policy.summary}.",
+        (
+            f"담당 기관은 {getattr(policy, 'agency', '공식 기관')}이고, "
+            f"지역은 {region}입니다."
+        ),
+        (
+            f"지원 유형은 {support_type}이며, "
+            f"신청 기간은 {policy.application_period}입니다."
+        ),
+    ]
+
+    if context.evaluation is not None:
+        parts.append(f"현재 저장된 답변 기준의 Rule Engine 상태는 {eligibility_status}입니다.")
+        if evaluation_state == EvaluationState.STALE:
+            parts.append("다만 최근 답변 이후 평가가 오래되어 다시 계산이 필요합니다.")
+        evidence = context.evaluation.evidence
+        missing = _fact_keys(evidence.get("needsConfirmation", []))
+        unmatched = _fact_keys(evidence.get("unsatisfied", []))
+        if unmatched:
+            parts.append("충족하지 못한 조건은 " + ", ".join(unmatched) + "입니다.")
+        if missing:
+            parts.append("추가 확인이 필요한 조건은 " + ", ".join(missing) + "입니다.")
+    else:
+        parts.append("아직 이 정책에 대한 사용자 조건 평가는 완료되지 않았습니다.")
+
+    parts.append("세부 금액, 소득·자산 기준, 모집 가능 여부는 공식 안내 페이지에서 다시 확인해 주세요.")
+    return " ".join(parts)
+
+
+def display_catalog_value(value: object) -> str:
+    text = str(value)
+    return {
+        "Seoul": "서울",
+        "Gyeonggi": "경기",
+        "Incheon": "인천",
+        "Busan": "부산",
+        "National": "전국",
+    }.get(text, text)
 
 
 def fallback_response(

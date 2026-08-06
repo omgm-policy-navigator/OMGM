@@ -185,14 +185,18 @@ class AIExplanationApiTests(unittest.TestCase):
             )
 
         self.assertEqual(status, 200)
-        self.assertEqual(body["eligibilityStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
-        self.assertEqual(body["aiStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
-        self.assertEqual(body["citations"], [])
+        self.assertEqual(body["eligibilityStatus"], "LIKELY_ELIGIBLE")
+        self.assertEqual(body["aiStatus"], "FALLBACK")
+        self.assertEqual(body["citations"][0]["url"], "https://example.go.kr/policy/1")
+        self.assertIn("Housing support", body["answer"])
 
     def test_chat_without_policy_uses_top_session_evaluation(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(return_value=None),
+        ), patch(
             "app.modules.ai.api.get_top_session_policy_evidence_bundle",
             new=AsyncMock(return_value=policy_bundle()),
         ) as top_bundle, patch(
@@ -204,6 +208,29 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["aiStatus"], "GENERATED")
         top_bundle.assert_awaited_once_with(db, session_id=7)
+
+    def test_chat_without_policy_matches_catalog_policy_before_top_evaluation(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(return_value=policy_bundle()),
+        ) as finder, patch(
+            "app.modules.ai.api.get_top_session_policy_evidence_bundle",
+            new=AsyncMock(),
+        ) as top_bundle, patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(app, "POST", "/api/chat", body={"message": "Housing support 알려줘"})
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["aiStatus"], "FALLBACK")
+        self.assertEqual(body["policyId"], "policy_housing_001")
+        finder.assert_awaited_once_with(db, session_id=7, category_code="housing", message="Housing support 알려줘")
+        top_bundle.assert_not_awaited()
 
     def test_chat_stream_returns_sse_events(self) -> None:
         db = AsyncMock()

@@ -6,9 +6,9 @@ import { appConfig } from "../shared/config/appConfig";
 import {
   createEvaluations,
   createSession,
-  deleteSession,
   getNextQuestions,
   getSessionGraph,
+  resetCategorySession,
   selectCategory,
   sendChatMessage,
   submitAnswer,
@@ -321,28 +321,20 @@ function writeStoredMessages(messagesByCategory: Record<string, ChatMessage[]>) 
   }
 }
 
-function clearStoredMessages() {
-  try {
-    window.localStorage?.removeItem(CHAT_STORAGE_KEY);
-  } catch {
-    return;
-  }
-}
-
 export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, onGraphChange }: ChatAreaProps) {
   const selectedCategory = categories.find(({ id }) => id === selectedCategoryId) ?? categories[0];
   const isLiveMode = appConfig.apiMode === "live";
   const initialStoredMessages = useRef(readStoredMessages());
   const messageId = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const loadedCategoryIds = useRef(new Set(Object.keys(initialStoredMessages.current)));
+  const loadedCategoryIds = useRef(new Set<string>());
   const [messagesByCategory, setMessagesByCategory] = useState<Record<string, ChatMessage[]>>(() => initialStoredMessages.current);
   const [draft, setDraft] = useState("");
   const [activeQuestionsByCategory, setActiveQuestionsByCategory] = useState<Record<string, QuestionResponse | null>>({});
   const [loading, setLoading] = useState(false);
   const [liveIssuesByCategory, setLiveIssuesByCategory] = useState<Record<string, string | null>>({});
   const [sessionResetNonce, setSessionResetNonce] = useState(0);
-  const messages = messagesByCategory[selectedCategory.id] ?? fallbackMessages(selectedCategory);
+  const messages = messagesByCategory[selectedCategory.id] ?? (isLiveMode ? [] : fallbackMessages(selectedCategory));
   const activeQuestion = activeQuestionsByCategory[selectedCategory.id] ?? null;
   const liveIssue = liveIssuesByCategory[selectedCategory.id] ?? null;
   const appendMessage = useCallback((categoryId: string, from: ChatMessage["from"], text: string) => {
@@ -376,15 +368,17 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
       try {
         await createSession(controller.signal);
         await selectCategory(selectedCategory.backendCategoryCode, controller.signal);
-        const shouldInitializeConversation = !loadedCategoryIds.current.has(categoryId);
-        const [questions, graph] = await Promise.all([shouldInitializeConversation ? getNextQuestions(controller.signal) : Promise.resolve(null), getSessionGraph(selectedCategory.backendCategoryCode, controller.signal)]);
+        const [questions, graph] = await Promise.all([getNextQuestions(controller.signal), getSessionGraph(selectedCategory.backendCategoryCode, controller.signal)]);
         onGraphChange(graph);
-        if (questions) {
-          const nextQuestion = questions.items[0] ?? null;
-          setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
-          setMessagesByCategory((current) => ({
+        const nextQuestion = questions.items[0] ?? null;
+        setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
+        setMessagesByCategory((current) => {
+          if ((current[categoryId]?.length ?? 0) > 0 && loadedCategoryIds.current.has(categoryId)) {
+            return current;
+          }
+          return {
             ...current,
-            [categoryId]: [
+            [categoryId]: current[categoryId] ?? [
               {
                 id: `live-intro-${categoryId}`,
                 from: "bot",
@@ -392,9 +386,9 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
                 time: messageTime(),
               },
             ],
-          }));
-          loadedCategoryIds.current.add(categoryId);
-        }
+          };
+        });
+        loadedCategoryIds.current.add(categoryId);
       } catch {
         setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: "백엔드 세션 API에 연결하지 못해 목업 대화로 표시 중입니다." }));
         setMessagesByCategory((current) => ({
@@ -498,20 +492,24 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   }
 
   async function handleNewSession() {
+    const categoryId = selectedCategory.id;
     setLoading(true);
     try {
       if (isLiveMode) {
-        await deleteSession();
+        await resetCategorySession(selectedCategory.backendCategoryCode);
       }
     } catch {
-      // 세션 쿠키가 없거나 이미 만료된 경우에도 화면 상태는 새로 시작한다.
+      // 카테고리 초기화 API가 실패해도 현재 화면은 새 주제 대화로 다시 시작한다.
     } finally {
-      loadedCategoryIds.current.clear();
-      setMessagesByCategory({});
-      setActiveQuestionsByCategory({});
-      setLiveIssuesByCategory({});
+      loadedCategoryIds.current.delete(categoryId);
+      setMessagesByCategory((current) => {
+        const next = { ...current };
+        delete next[categoryId];
+        return next;
+      });
+      setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: null }));
+      setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: null }));
       setDraft("");
-      clearStoredMessages();
       onGraphChange(null);
       setSessionResetNonce((value) => value + 1);
       setLoading(false);

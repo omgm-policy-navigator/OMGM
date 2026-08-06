@@ -10,6 +10,7 @@ from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.modules.eligibility.repository import (
+    delete_session_evaluations_for_category,
     get_session_policy_evaluation,
     list_active_policies_for_category,
     list_session_evaluations,
@@ -28,6 +29,7 @@ from app.modules.graph.repository import (
 )
 from app.modules.graph.schemas import SessionGraphResponse
 from app.modules.questions.engine import (
+    category_questions,
     dependent_fact_keys,
     next_questions,
     progress,
@@ -45,7 +47,14 @@ from app.modules.questions.schemas import (
     SubmitAnswersRequest,
     SubmitAnswersResponse,
 )
-from app.modules.sessions.schemas import CreateSessionResponse, SessionResponse, UpsertUserFactRequest, UserFactResponse
+from app.modules.sessions.schemas import (
+    CreateSessionResponse,
+    ResetCategorySessionRequest,
+    ResetCategorySessionResponse,
+    SessionResponse,
+    UpsertUserFactRequest,
+    UserFactResponse,
+)
 from app.modules.sessions.security import validate_unsafe_origin
 from app.modules.sessions.service import (
     cleanup_expired_sessions,
@@ -234,6 +243,28 @@ async def select_category(
     session.selected_category_code = category_code
     await db.commit()
     return SelectCategoryResponse(categoryCode=category_code)
+
+
+@router.post("/category/reset", response_model=ResetCategorySessionResponse)
+async def reset_category_session(
+    payload: ResetCategorySessionRequest,
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> ResetCategorySessionResponse:
+    validate_unsafe_origin(request, allowed_origins(config))
+    category_code = validate_category_code(payload.category_code)
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    session.selected_category_code = category_code
+    fact_keys = {question.fact_key for question in category_questions(category_code)}
+    deleted_facts = await delete_session_facts_by_keys(db, session, fact_keys)
+    deleted_evaluations = await delete_session_evaluations_for_category(db, session.id, category_code)
+    await db.commit()
+    return ResetCategorySessionResponse(
+        categoryCode=category_code,
+        deletedFacts=deleted_facts,
+        deletedEvaluations=deleted_evaluations,
+    )
 
 
 @router.get("/facts", response_model=list[UserFactResponse])

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -98,6 +98,21 @@ async def get_session_policy_evaluation(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def delete_session_evaluations_for_category(db: AsyncSession, session_id: int, category_code: str) -> int:
+    policy_ids = select(Policy.id).where(
+        Policy.category_code == category_code,
+        Policy.status == PolicyStatus.APPROVED,
+        Policy.is_active.is_(True),
+    )
+    result = await db.execute(
+        delete(PolicyEvaluation).where(
+            PolicyEvaluation.session_id == session_id,
+            PolicyEvaluation.policy_id.in_(policy_ids),
+        )
+    )
+    return result.rowcount or 0
 
 
 async def mark_session_evaluations_stale(db: AsyncSession, session_id: int) -> int:

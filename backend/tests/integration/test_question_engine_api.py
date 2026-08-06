@@ -194,6 +194,39 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(session.selected_category_code, "housing")
         self.assertEqual(body["categoryCode"], "housing")
 
+    def test_reset_category_session_deletes_only_selected_category_state(self) -> None:
+        db = AsyncMock()
+        session = active_session("loan")
+        app = app_with_session(db)
+        with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=session)), patch(
+            "app.modules.sessions.api.delete_session_facts_by_keys",
+            new=AsyncMock(return_value=4),
+        ) as delete_facts, patch(
+            "app.modules.sessions.api.delete_session_evaluations_for_category",
+            new=AsyncMock(return_value=2),
+        ) as delete_evaluations:
+            status, _headers, body = asyncio.run(
+                asgi_request(
+                    app,
+                    "POST",
+                    "/api/v1/session/category/reset",
+                    body={"categoryCode": "housing"},
+                )
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(session.selected_category_code, "housing")
+        self.assertEqual(body["status"], "category_session_reset")
+        self.assertEqual(body["deletedFacts"], 4)
+        self.assertEqual(body["deletedEvaluations"], 2)
+        delete_facts.assert_awaited_once()
+        self.assertEqual(delete_facts.await_args.args[1], session)
+        self.assertEqual(
+            delete_facts.await_args.args[2],
+            {"region", "marital_status", "household_income_range", "housing_status", "lease_type"},
+        )
+        delete_evaluations.assert_awaited_once_with(db, session.id, "housing")
+
     def test_next_question_excludes_existing_facts(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)

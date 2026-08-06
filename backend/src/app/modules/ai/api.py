@@ -13,7 +13,11 @@ from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.llm import LLMProvider, create_available_llm_provider
-from app.modules.ai.repository import get_policy_evidence_bundle, get_top_session_policy_evidence_bundle
+from app.modules.ai.repository import (
+    find_policy_evidence_bundle_for_message,
+    get_policy_evidence_bundle,
+    get_top_session_policy_evidence_bundle,
+)
 from app.modules.ai.schemas import (
     AIExplanationResponse,
     ChatRequest,
@@ -157,8 +161,16 @@ async def build_context_for_top_policy(
     *,
     session_id: int,
     user_message: str,
+    category_code: str | None = None,
 ) -> ExplanationContext:
-    bundle = await get_top_session_policy_evidence_bundle(db, session_id=session_id)
+    bundle = await find_policy_evidence_bundle_for_message(
+        db,
+        session_id=session_id,
+        category_code=category_code,
+        message=user_message,
+    )
+    if bundle is None:
+        bundle = await get_top_session_policy_evidence_bundle(db, session_id=session_id)
     if bundle is None:
         return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
     return ExplanationContext(
@@ -193,7 +205,13 @@ async def chat(
             user_message=payload.message,
         )
     else:
-        context = await build_context_for_top_policy(db, request, session_id=session.id, user_message=payload.message)
+        context = await build_context_for_top_policy(
+            db,
+            request,
+            session_id=session.id,
+            user_message=payload.message,
+            category_code=session.selected_category_code,
+        )
     response = await explain_with_ai(context, await get_llm_provider(request))
     await db.commit()
     return response
@@ -239,7 +257,13 @@ async def chat_stream(
             user_message=message,
         )
     else:
-        context = await build_context_for_top_policy(db, request, session_id=session.id, user_message=message)
+        context = await build_context_for_top_policy(
+            db,
+            request,
+            session_id=session.id,
+            user_message=message,
+            category_code=session.selected_category_code,
+        )
     response = await explain_with_ai(context, await get_llm_provider(request))
     await db.commit()
 
