@@ -1,4 +1,4 @@
-﻿# Backend Phase B3 Plan
+# Backend Phase B3 Plan
 
 ## Goal
 
@@ -8,11 +8,11 @@ Connect anonymous user answers to the same browser session without login, using 
 
 - Add `anonymous_session` and `user_fact` persistence tables.
 - Add HttpOnly cookie session APIs:
-  - `POST /api/session`
-  - `GET /api/session`
-  - `DELETE /api/session`
-  - `GET /api/session/facts`
-  - `PUT /api/session/facts/{condition_key}`
+  - `POST /api/v1/session`
+  - `GET /api/v1/session`
+  - `DELETE /api/v1/session`
+  - `GET /api/v1/session/facts`
+  - `PUT /api/v1/session/facts/{condition_key}`
 - Store and update normalized user facts scoped to the current anonymous session.
 - Reject missing or expired sessions.
 - Delete facts through database cascade when a session is deleted.

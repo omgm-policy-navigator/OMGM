@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import json
 import unittest
 from collections.abc import AsyncIterator
@@ -11,6 +11,7 @@ from app.core.errors import AppError
 from app.db.session import get_db
 from app.main import create_app
 from app.modules.sessions.models import AnonymousSession, UserFact
+from app.modules.sessions.security import generate_session_token
 from app.modules.sessions.service import cleanup_expired_sessions, require_session
 
 TEST_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost:5432/test_db"
@@ -38,6 +39,8 @@ async def asgi_request(app, method: str, path: str, body=None, headers=None):
     messages = []
     payload = json.dumps(body).encode() if body is not None else b""
     header_pairs = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
+    if body is not None and "content-type" not in {k.lower() for k in (headers or {})}:
+        header_pairs.append((b"content-type", b"application/json"))
 
     async def receive():
         return {"type": "http.request", "body": payload, "more_body": False}
@@ -83,45 +86,58 @@ class AnonymousSessionApiTests(unittest.TestCase):
     def test_create_session_sets_httponly_cookie_without_json_session_id(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
-        expires_at = datetime(2026, 8, 7, tzinfo=UTC)
-        idle_expires_at = datetime(2026, 8, 6, 11, tzinfo=UTC)
-        session = SimpleNamespace(expires_at=expires_at, idle_expires_at=idle_expires_at)
+        session = SimpleNamespace(
+            expires_at=datetime(2026, 8, 7, tzinfo=UTC),
+            idle_expires_at=datetime(2026, 8, 6, 11, tzinfo=UTC),
+        )
         result = SimpleNamespace(session=session, token="server-generated-token", created=True)
 
         with patch("app.modules.sessions.api.cleanup_expired_sessions", new=AsyncMock(return_value=0)), patch(
             "app.modules.sessions.api.create_or_get_session", new=AsyncMock(return_value=result)
         ):
-            status, headers, body = asyncio.run(asgi_request(app, "POST", "/api/session"))
+            status, headers, body = asyncio.run(asgi_request(app, "POST", "/api/v1/session"))
 
         self.assertEqual(status, 201)
-        self.assertEqual(body, {"expiresAt": "2026-08-07T00:00:00Z", "idleExpiresAt": "2026-08-06T11:00:00Z"})
+        self.assertEqual(body, {"status": "session_created"})
         self.assertNotIn("sessionId", body)
+        self.assertNotIn("expiresAt", body)
         cookie = headers["set-cookie"]
         self.assertIn("anonymous_session=server-generated-token", cookie)
         self.assertIn("HttpOnly", cookie)
         self.assertIn("Secure", cookie)
         self.assertIn("SameSite=lax", cookie)
 
-    def test_client_supplied_json_session_id_is_ignored(self) -> None:
+    def test_client_supplied_json_session_id_is_rejected(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
-        session = SimpleNamespace(
-            expires_at=datetime(2026, 8, 7, tzinfo=UTC),
-            idle_expires_at=datetime(2026, 8, 6, 11, tzinfo=UTC),
-        )
-        result = SimpleNamespace(session=session, token="real-token", created=True)
-        mocked_create = AsyncMock(return_value=result)
+        mocked_create = AsyncMock()
 
         with patch("app.modules.sessions.api.cleanup_expired_sessions", new=AsyncMock(return_value=0)), patch(
             "app.modules.sessions.api.create_or_get_session", new=mocked_create
         ):
             status, _headers, body = asyncio.run(
-                asgi_request(app, "POST", "/api/session", body={"sessionId": "attacker-choice"})
+                asgi_request(app, "POST", "/api/v1/session", body={"sessionId": "attacker-choice"})
             )
 
-        self.assertEqual(status, 201)
-        self.assertNotIn("sessionId", body)
-        self.assertIsNone(mocked_create.await_args.args[2])
+        self.assertEqual(status, 422)
+        self.assertEqual(body["error"]["code"], "VALIDATION_ERROR")
+        mocked_create.assert_not_awaited()
+
+    def test_client_supplied_session_header_is_rejected(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        mocked_create = AsyncMock()
+
+        with patch("app.modules.sessions.api.cleanup_expired_sessions", new=AsyncMock(return_value=0)), patch(
+            "app.modules.sessions.api.create_or_get_session", new=mocked_create
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(app, "POST", "/api/v1/session", headers={"x-session-id": "attacker-choice"})
+            )
+
+        self.assertEqual(status, 422)
+        self.assertEqual(body["error"]["code"], "VALIDATION_ERROR")
+        mocked_create.assert_not_awaited()
 
     def test_delete_session_clears_cookie(self) -> None:
         db = AsyncMock()
@@ -129,7 +145,7 @@ class AnonymousSessionApiTests(unittest.TestCase):
 
         with patch("app.modules.sessions.api.delete_current_session", new=AsyncMock(return_value=True)):
             status, headers, body = asyncio.run(
-                asgi_request(app, "DELETE", "/api/session", headers={"cookie": "anonymous_session=abc"})
+                asgi_request(app, "DELETE", "/api/v1/session", headers={"cookie": "anonymous_session=abc"})
             )
 
         self.assertEqual(status, 204)
@@ -141,13 +157,26 @@ class AnonymousSessionApiTests(unittest.TestCase):
 class AnonymousSessionServiceTests(unittest.TestCase):
     def test_expired_session_is_rejected(self) -> None:
         db = AsyncMock()
+        config = AppConfig(app_env="test", database_url=TEST_DATABASE_URL)
         now = datetime(2026, 8, 6, 10, tzinfo=UTC)
         expired = SimpleNamespace(expires_at=now - timedelta(seconds=1), idle_expires_at=now + timedelta(minutes=1))
         with patch("app.modules.sessions.repository.get_session_by_token_hash", new=AsyncMock(return_value=expired)):
             with self.assertRaises(AppError) as context:
-                asyncio.run(require_session(db, "token", now=now))
+                asyncio.run(require_session(db, config, "token", now=now))
 
         self.assertEqual(context.exception.code, "SESSION_NOT_FOUND")
+
+    def test_active_session_refreshes_inactivity_timeout(self) -> None:
+        db = AsyncMock()
+        config = AppConfig(app_env="test", database_url=TEST_DATABASE_URL)
+        now = datetime(2026, 8, 6, 10, tzinfo=UTC)
+        session = SimpleNamespace(expires_at=now + timedelta(hours=20), idle_expires_at=now + timedelta(minutes=1))
+        with patch("app.modules.sessions.repository.get_session_by_token_hash", new=AsyncMock(return_value=session)):
+            resolved = asyncio.run(require_session(db, config, "token", now=now))
+
+        self.assertIs(resolved, session)
+        self.assertEqual(session.last_seen_at, now)
+        self.assertEqual(session.idle_expires_at, now + timedelta(minutes=60))
 
     def test_cleanup_expired_sessions_delegates_expiry_delete(self) -> None:
         db = AsyncMock()
@@ -173,3 +202,10 @@ class AnonymousSessionServiceTests(unittest.TestCase):
         self.assertEqual(foreign_key.ondelete, "CASCADE")
         relationship = AnonymousSession.__mapper__.relationships["facts"]
         self.assertIn("delete-orphan", relationship.cascade)
+
+
+class SessionTokenTests(unittest.TestCase):
+    def test_generated_session_token_is_uuid4(self) -> None:
+        token = generate_session_token()
+        self.assertEqual(len(token), 36)
+        self.assertEqual(token[14], "4")

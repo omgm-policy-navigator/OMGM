@@ -1,4 +1,4 @@
-﻿# Backend Phase B3 Verification
+# Backend Phase B3 Verification
 
 ## Local Backend Checks
 
@@ -7,14 +7,14 @@ cd backend
 uv run pytest tests\integration\test_anonymous_session_api.py
 ```
 
-Result: passed. 7 tests passed.
+Result: passed. 10 tests passed.
 
 ```bash
 cd backend
 uv run pytest
 ```
 
-Result: passed. 86 tests passed.
+Result: passed. 89 tests passed.
 
 ```bash
 cd backend

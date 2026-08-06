@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -37,6 +37,11 @@ def is_expired(session: AnonymousSession, now: datetime) -> bool:
     return session.expires_at <= now or session.idle_expires_at <= now
 
 
+def refresh_session_access(session: AnonymousSession, now: datetime, config: AppConfig) -> None:
+    session.last_seen_at = now
+    session.idle_expires_at = min(session.expires_at, _idle_expires_at(now, config))
+
+
 async def create_or_get_session(
     db: AsyncSession,
     config: AppConfig,
@@ -47,8 +52,7 @@ async def create_or_get_session(
     if existing_token:
         existing = await repository.get_session_by_token_hash(db, hash_session_token(existing_token))
         if existing is not None and not is_expired(existing, current_time):
-            existing.last_seen_at = current_time
-            existing.idle_expires_at = min(existing.expires_at, _idle_expires_at(current_time, config))
+            refresh_session_access(existing, current_time, config)
             return SessionWithToken(existing, None, created=False)
 
     token = generate_session_token()
@@ -64,6 +68,7 @@ async def create_or_get_session(
 
 async def require_session(
     db: AsyncSession,
+    config: AppConfig,
     token: str | None,
     now: datetime | None = None,
 ) -> AnonymousSession:
@@ -73,7 +78,7 @@ async def require_session(
     session = await repository.get_session_by_token_hash(db, hash_session_token(token))
     if session is None or is_expired(session, current_time):
         raise AppError("SESSION_NOT_FOUND", "Anonymous session was not found.", status_code=HTTPStatus.NOT_FOUND)
-    session.last_seen_at = current_time
+    refresh_session_access(session, current_time, config)
     return session
 
 

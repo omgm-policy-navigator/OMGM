@@ -1,4 +1,4 @@
-﻿# 蹂댁븞 ?ㅺ퀎
+# 蹂댁븞 ?ㅺ퀎
 
 ## 蹂댄샇 ???
 
@@ -85,7 +85,7 @@ The local LLM runtime uses provider-level timeouts and validates generated JSON 
 
 ## Backend B3 Anonymous Session Implementation
 
-B3 implements anonymous session storage with a backend-generated `anonymous_session` cookie. The raw token is sent only in the HttpOnly cookie and is not returned in JSON or stored in the database; PostgreSQL stores a SHA-256 token hash.
+B3 implements anonymous session storage with a backend-generated `anonymous_session` cookie. The raw UUID4 token is sent only in the HttpOnly cookie and is not accepted in request JSON, headers, or URLs. It is not returned in JSON or stored in the database; PostgreSQL stores a SHA-256 token hash.
 
 Cookie defaults are `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Max-Age=86400`. `Secure` is enabled outside `APP_ENV=local`. Absolute expiry defaults to 24 hours and idle expiry defaults to 60 minutes. Unsafe cookie-authenticated session methods validate `Origin` against configured frontend origins.
 

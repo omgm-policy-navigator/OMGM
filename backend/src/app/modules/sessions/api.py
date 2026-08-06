@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from http import HTTPStatus
 
@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import AppConfig
+from app.core.errors import AppError
 from app.db.session import get_db
-from app.modules.sessions.schemas import SessionResponse, UpsertUserFactRequest, UserFactResponse
+from app.modules.sessions.schemas import CreateSessionResponse, SessionResponse, UpsertUserFactRequest, UserFactResponse
 from app.modules.sessions.security import validate_unsafe_origin
 from app.modules.sessions.service import (
     cleanup_expired_sessions,
@@ -18,7 +19,9 @@ from app.modules.sessions.service import (
     upsert_session_fact,
 )
 
-router = APIRouter(prefix="/api/session", tags=["session"])
+router = APIRouter(prefix="/api/v1/session", tags=["session"])
+
+FORBIDDEN_SESSION_INPUTS = {"session_id", "sessionId", "anonymous_session", "x-session-id"}
 
 
 def get_config(request: Request) -> AppConfig:
@@ -59,14 +62,33 @@ def clear_session_cookie(response: Response, config: AppConfig) -> None:
     )
 
 
-@router.post("", response_model=SessionResponse, status_code=HTTPStatus.CREATED)
+def reject_session_identifier() -> None:
+    raise AppError(
+        "VALIDATION_ERROR",
+        "Session identifiers must be sent only by cookie.",
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+    )
+
+
+async def reject_client_session_injection(request: Request) -> None:
+    if any(name in request.headers for name in ("x-session-id", "x-anonymous-session")):
+        reject_session_identifier()
+    if not request.headers.get("content-type", "").startswith("application/json"):
+        return
+    payload = await request.json()
+    if isinstance(payload, dict) and FORBIDDEN_SESSION_INPUTS.intersection(payload):
+        reject_session_identifier()
+
+
+@router.post("", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
     request: Request,
     response: Response,
     db: AsyncSession = DB_DEPENDENCY,
     config: AppConfig = CONFIG_DEPENDENCY,
-) -> SessionResponse:
+) -> CreateSessionResponse:
     validate_unsafe_origin(request, allowed_origins(config))
+    await reject_client_session_injection(request)
     await cleanup_expired_sessions(db)
     result = await create_or_get_session(
         db,
@@ -78,7 +100,8 @@ async def create_session(
         set_session_cookie(response, config, result.token)
     if not result.created:
         response.status_code = HTTPStatus.OK
-    return SessionResponse(expiresAt=result.session.expires_at, idleExpiresAt=result.session.idle_expires_at)
+        return CreateSessionResponse(status="session_active")
+    return CreateSessionResponse(status="session_created")
 
 
 @router.get("", response_model=SessionResponse)
@@ -87,7 +110,7 @@ async def get_session(
     db: AsyncSession = DB_DEPENDENCY,
     config: AppConfig = CONFIG_DEPENDENCY,
 ) -> SessionResponse:
-    session = await require_session(db, request.cookies.get(config.anonymous_session_cookie_name))
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     await db.commit()
     return SessionResponse(expiresAt=session.expires_at, idleExpiresAt=session.idle_expires_at)
 
@@ -113,7 +136,7 @@ async def get_facts(
     db: AsyncSession = DB_DEPENDENCY,
     config: AppConfig = CONFIG_DEPENDENCY,
 ) -> list[UserFactResponse]:
-    session = await require_session(db, request.cookies.get(config.anonymous_session_cookie_name))
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     facts = await list_session_facts(db, session)
     await db.commit()
     return [
@@ -137,7 +160,7 @@ async def put_fact(
     config: AppConfig = CONFIG_DEPENDENCY,
 ) -> UserFactResponse:
     validate_unsafe_origin(request, allowed_origins(config))
-    session = await require_session(db, request.cookies.get(config.anonymous_session_cookie_name))
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     fact = await upsert_session_fact(
         db,
         session,

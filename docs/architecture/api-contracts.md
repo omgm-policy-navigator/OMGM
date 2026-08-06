@@ -8,7 +8,7 @@ Base URL for local development: `http://localhost:8000`.
 
 ## API Version Strategy
 
-MVP endpoints use `/api/...` without a version prefix. Breaking changes after MVP must add a new prefix such as `/api/v2/...` while keeping `/api/...` stable until clients migrate.
+MVP backend endpoints use the `/api/v1/...` prefix for versioned application APIs. Health endpoints remain unversioned because they are infrastructure probes.
 
 ## Common Rules
 
@@ -214,18 +214,17 @@ Response `200`:
 
 ## Implemented Anonymous Session Endpoints
 
-### `POST /api/session`
+### `POST /api/v1/session`
 
-Creates or returns the current anonymous session. The backend generates the session token and returns it only in the `anonymous_session` cookie. Clients must not send or receive session IDs in JSON.
+Creates or returns the current anonymous session. The backend generates a cryptographic UUID4 session token and returns it only in the `anonymous_session` cookie. Clients must not send or receive session IDs in JSON, headers, or URLs.
 
-Request body is ignored.
+Request body is optional, but any client-supplied session identifier such as `sessionId`, `session_id`, or `anonymous_session` is rejected with `VALIDATION_ERROR`. Client-supplied session headers such as `X-Session-Id` are also rejected.
 
 Response `201` when a new session is created, or `200` when the existing cookie session is still valid:
 
 ```json
 {
-  "expiresAt": "2026-08-07T00:00:00Z",
-  "idleExpiresAt": "2026-08-06T11:00:00Z"
+  "status": "session_created"
 }
 ```
 
@@ -237,40 +236,34 @@ Set-Cookie: anonymous_session=<random>; HttpOnly; Secure; SameSite=Lax; Path=/; 
 
 Production and non-local environments set `Secure`. `APP_ENV=local` may omit `Secure` for local HTTP development. Absolute expiry defaults to 24 hours. Idle expiry defaults to 60 minutes and never extends beyond the absolute expiry.
 
-### `GET /api/session`
+### `GET /api/v1/session`
 
 Returns expiry metadata for the current anonymous session resolved from the cookie. Missing, deleted, or expired sessions return `SESSION_NOT_FOUND` with HTTP 404.
 
-### `DELETE /api/session`
+### `DELETE /api/v1/session`
 
 Deletes the current anonymous session and clears the cookie. Linked `user_fact` rows are deleted by database cascade.
 
 Response `204`: no body.
 
-### `GET /api/session/facts`
+### `GET /api/v1/session/facts`
 
 Returns facts for the current anonymous session only.
 
 Response `200`:
 
 ```json
-[
-  {
-    "conditionKey": "region",
-    "value": "Seoul",
-    "source": "manual",
-    "confirmed": true,
-    "updatedAt": "2026-08-06T10:00:00Z"
-  }
-]
+{
+  "status": "session_created"
+}
 ```
 
-### `PUT /api/session/facts/{condition_key}`
+### `PUT /api/v1/session/facts/{condition_key}`
 
 Creates or updates a fact for the current anonymous session only. The route path condition key is authoritative; clients cannot set another session or owner in JSON.
 ## Draft Endpoints
 
-### `POST /api/session/reset`
+### `POST /api/v1/session/reset`
 
 Starts a new diagnostic session by invalidating the existing anonymous session and issuing a new cookie. Existing conversation state, user facts, and evaluations are not accessible from the new session.
 
@@ -280,7 +273,7 @@ Response `201`:
 
 ```json
 {
-  "expiresAt": "2026-08-06T12:00:00Z"
+  "status": "session_created"
 }
 ```
 
@@ -315,17 +308,7 @@ Response `200`:
 
 ```json
 {
-  "items": [
-    {
-      "policyId": "policy_123",
-      "title": "?좏샎遺遺 二쇨굅 吏??,
-      "agency": "?쒖슱??,
-      "region": "?쒖슱",
-      "status": "ACTIVE",
-      "policyVersionId": "policy_version_123"
-    }
-  ],
-  "nextCursor": null
+  "status": "session_created"
 }
 ```
 
@@ -337,17 +320,7 @@ Response `200`:
 
 ```json
 {
-  "policyId": "policy_123",
-  "title": "?좏샎遺遺 二쇨굅 吏??,
-  "agency": "?쒖슱??,
-  "region": "?쒖슱",
-  "status": "ACTIVE",
-  "policyVersionId": "policy_version_123",
-  "source": {
-    "url": "https://example.go.kr/policy/123",
-    "collectedAt": "2026-08-05T00:00:00Z",
-    "documentHash": "sha256:..."
-  }
+  "status": "session_created"
 }
 ```
 
@@ -359,7 +332,7 @@ Request:
 
 ```json
 {
-  "initialMessage": "?쒖슱 ?좏샎遺遺 ?꾩꽭 吏?먯쓣 李얘퀬 ?띠뼱??
+  "status": "session_created"
 }
 ```
 
@@ -369,21 +342,7 @@ Response `201`:
 
 ```json
 {
-  "conversationId": "conv_123",
-  "nextQuestions": [
-    {
-      "questionId": "q_region",
-      "factKey": "region",
-      "prompt": "嫄곗＜ 吏??쓣 ?뺤씤??二쇱꽭??",
-      "answerType": "single_select",
-      "required": true,
-      "options": [
-        {"label": "?쒖슱", "value": "SEOUL"},
-        {"label": "寃쎄린", "value": "GYEONGGI"},
-        {"label": "?몄쿇", "value": "INCHEON"}
-      ]
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -395,14 +354,7 @@ Request:
 
 ```json
 {
-  "answers": [
-    {
-      "questionId": "q_region",
-      "factKey": "region",
-      "value": "SEOUL",
-      "confirmed": true
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -410,9 +362,7 @@ Response `200`:
 
 ```json
 {
-  "factVersion": "facts_v2",
-  "conflicts": [],
-  "nextQuestions": []
+  "status": "session_created"
 }
 ```
 
@@ -430,7 +380,7 @@ Request:
 
 ```json
 {
-  "policyIds": ["policy_123"]
+  "status": "session_created"
 }
 ```
 
@@ -447,24 +397,7 @@ Response `200`:
 
 ```json
 {
-  "items": [
-    {
-      "evaluationId": "eval_123",
-      "policyId": "policy_123",
-      "eligibilityStatus": "NEEDS_CONFIRMATION",
-      "evaluationState": "ACTIVE",
-      "policyVersionId": "policy_version_123",
-      "factVersion": "facts_v2",
-      "coverage": {
-        "requiredKnown": 2,
-        "requiredTotal": 3
-      },
-      "satisfied": ["region"],
-      "unsatisfied": [],
-      "needsConfirmation": ["HOUSEHOLD_INCOME_RANGE"],
-      "nextQuestions": ["Q_HOUSEHOLD_INCOME_RANGE"]
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -491,20 +424,7 @@ Response `200`:
 
 ```json
 {
-  "evaluationId": "eval_123",
-  "policyId": "policy_123",
-  "eligibilityStatus": "NEEDS_CONFIRMATION",
-  "evaluationState": "ACTIVE",
-  "policyVersionId": "policy_version_123",
-  "factVersion": "facts_v2",
-  "evidence": [
-    {
-      "conditionId": "cond_income",
-      "sourceUrl": "https://example.go.kr/policy/123",
-      "sourceLabel": "?뚮뱷 湲곗?",
-      "policyVersionId": "policy_version_123"
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -516,14 +436,7 @@ Response `200`:
 
 ```json
 {
-  "nodes": [
-    {
-      "id": "policy_123",
-      "type": "policy",
-      "label": "?좏샎遺遺 二쇨굅 吏??
-    }
-  ],
-  "edges": []
+  "status": "session_created"
 }
 ```
 
@@ -543,10 +456,7 @@ Response `200`:
 
 ```json
 {
-  "status": "ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "connected"
+  "status": "session_created"
 }
 ```
 
@@ -554,10 +464,7 @@ Response `503` when PostgreSQL cannot be reached:
 
 ```json
 {
-  "status": "not_ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "unavailable"
+  "status": "session_created"
 }
 ```
 
@@ -565,9 +472,6 @@ Response `503` when PostgreSQL does not respond within the readiness timeout:
 
 ```json
 {
-  "status": "not_ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "timeout"
+  "status": "session_created"
 }
 ```

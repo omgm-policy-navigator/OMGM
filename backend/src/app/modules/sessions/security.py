@@ -1,7 +1,7 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
-import secrets
+import uuid
 from collections.abc import Iterable
 from http import HTTPStatus
 
@@ -11,7 +11,7 @@ from app.core.errors import AppError
 
 
 def generate_session_token() -> str:
-    return secrets.token_urlsafe(32)
+    return str(uuid.uuid4())
 
 
 def hash_session_token(token: str) -> str:
