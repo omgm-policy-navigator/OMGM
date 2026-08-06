@@ -115,13 +115,13 @@ Response `200`:
   {
     "policyId": "policy_housing_001",
     "categoryCode": "housing",
-    "title": "Newlywed Rent Deposit Support",
-    "agency": "Seoul Housing Office",
+    "title": "서울시 신혼부부 임차보증금 이자지원",
+    "agency": "서울특별시",
     "region": "Seoul",
-    "applicationPeriod": "2026-01-01 to 2026-12-31",
+    "applicationPeriod": "공식 공고 확인",
     "status": "APPROVED",
-    "officialSourceUrl": "https://example.go.kr/policies/housing-001",
-    "reviewedAt": "2026-08-01"
+    "officialSourceUrl": "https://housing.seoul.go.kr/site/main/content/sh01_0400800",
+    "reviewedAt": "2026-08-05"
   }
 ]
 ```
@@ -136,17 +136,17 @@ Response `200`:
 {
   "policyId": "policy_housing_001",
   "categoryCode": "housing",
-  "title": "Newlywed Rent Deposit Support",
-  "agency": "Seoul Housing Office",
+  "title": "서울시 신혼부부 임차보증금 이자지원",
+  "agency": "서울특별시",
   "region": "Seoul",
-  "summary": "Rent deposit interest support for newlywed households.",
-  "applicationPeriod": "2026-01-01 to 2026-12-31",
-  "supportType": "Interest subsidy",
+  "summary": "서울 거주 신혼부부·예비신혼부부의 임차보증금 대출 이자를 지원",
+  "applicationPeriod": "공식 공고 확인",
+  "supportType": "주거 지원",
   "status": "APPROVED",
   "source": {
-    "label": "Official notice",
-    "url": "https://example.go.kr/policies/housing-001",
-    "reviewedAt": "2026-08-01"
+    "label": "공식 신청/안내 페이지",
+    "url": "https://housing.seoul.go.kr/site/main/content/sh01_0400800",
+    "reviewedAt": "2026-08-05"
   }
 }
 ```
@@ -162,11 +162,11 @@ Response `200`:
   {
     "documentId": "doc_policy_housing_001",
     "policyId": "policy_housing_001",
-    "title": "Newlywed Rent Deposit Support Source Document",
-    "url": "https://example.go.kr/policies/housing-001",
-    "documentType": "official_notice",
-    "officialSource": "Official notice",
-    "reviewedAt": "2026-08-01",
+    "title": "서울시 신혼부부 임차보증금 이자지원 개요",
+    "url": "https://housing.seoul.go.kr/site/main/content/sh01_0400800",
+    "documentType": "OVERVIEW",
+    "officialSource": "공식 출처",
+    "reviewedAt": "2026-08-05",
     "collectedAt": "2026-08-05T00:00:00Z",
     "documentHash": "sha256:policy_housing_001"
   }
@@ -415,6 +415,8 @@ Supported node types are `USER`, `CATEGORY`, `CONDITION`, `POLICY`, and `ACTION`
 ### `POST /api/v1/session/evaluations`
 
 Evaluates approved active policies in the currently selected session category using stored `user_fact` values and deterministic policy rules. The session is identified only by the HttpOnly anonymous-session cookie. The response never exposes the session id.
+
+`recommendationScore` is an internal sort key, not a user-facing eligibility grade. Current scoring starts from the eligibility status band, then adds matched-condition weight and subtracts missing, official-confirmation, or failed-condition penalties. UI should explain the status and evidence instead of exposing the raw number without context.
 
 Response `200`:
 

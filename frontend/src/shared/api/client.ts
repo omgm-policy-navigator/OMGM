@@ -30,3 +30,41 @@ export async function getJson<TResponse>(path: string, options: RequestOptions =
 
   return response.json() as Promise<TResponse>;
 }
+
+export async function postJson<TResponse, TBody extends object | undefined = object>(
+  path: string,
+  body?: TBody,
+  options: RequestOptions = {},
+): Promise<TResponse> {
+  const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
+    method: "POST",
+    credentials: "include",
+    signal: options.signal,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+
+  if (!response.ok) {
+    throw new ApiClientError(`Request failed with status ${response.status}`, response.status);
+  }
+
+  return response.json() as Promise<TResponse>;
+}
+
+export async function deleteJson(path: string, options: RequestOptions = {}): Promise<void> {
+  const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
+    method: "DELETE",
+    credentials: "include",
+    signal: options.signal,
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiClientError(`Request failed with status ${response.status}`, response.status);
+  }
+}

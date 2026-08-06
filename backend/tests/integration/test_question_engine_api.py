@@ -82,6 +82,10 @@ def fact(key, value, confirmed=True):
     return SimpleNamespace(condition_key=key, value=value, confirmed=confirmed)
 
 
+def scoped_fact(category_code, key, value, confirmed=True):
+    return fact(f"{category_code}:{key}", value, confirmed)
+
+
 class QuestionEngineUnitTests(unittest.TestCase):
     def test_next_questions_prioritize_category_required_unanswered(self) -> None:
         questions = next_questions("housing", {})
@@ -194,12 +198,56 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(session.selected_category_code, "housing")
         self.assertEqual(body["categoryCode"], "housing")
 
+    def test_reset_category_session_deletes_only_selected_category_state(self) -> None:
+        db = AsyncMock()
+        session = active_session("loan")
+        app = app_with_session(db)
+        with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=session)), patch(
+            "app.modules.sessions.api.delete_session_facts_by_keys",
+            new=AsyncMock(return_value=4),
+        ) as delete_facts, patch(
+            "app.modules.sessions.api.delete_session_evaluations_for_category",
+            new=AsyncMock(return_value=2),
+        ) as delete_evaluations:
+            status, _headers, body = asyncio.run(
+                asgi_request(
+                    app,
+                    "POST",
+                    "/api/v1/session/category/reset",
+                    body={"categoryCode": "housing"},
+                )
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(session.selected_category_code, "housing")
+        self.assertEqual(body["status"], "category_session_reset")
+        self.assertEqual(body["deletedFacts"], 4)
+        self.assertEqual(body["deletedEvaluations"], 2)
+        delete_facts.assert_awaited_once()
+        self.assertEqual(delete_facts.await_args.args[1], session)
+        self.assertEqual(
+            delete_facts.await_args.args[2],
+            {
+                "region",
+                "marital_status",
+                "household_income_range",
+                "housing_status",
+                "lease_type",
+                "housing:region",
+                "housing:marital_status",
+                "housing:household_income_range",
+                "housing:housing_status",
+                "housing:lease_type",
+            },
+        )
+        delete_evaluations.assert_awaited_once_with(db, session.id, "housing")
+
     def test_next_question_excludes_existing_facts(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.sessions.api.list_session_facts",
-            new=AsyncMock(return_value=[fact("region", "Seoul")]),
+            new=AsyncMock(return_value=[scoped_fact("housing", "region", "Seoul")]),
         ):
             status, _headers, body = asyncio.run(asgi_request(app, "GET", "/api/v1/session/questions/next"))
 
@@ -207,12 +255,27 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(body["items"][0]["factKey"], "marital_status")
         self.assertFalse(body["complete"])
 
+    def test_next_question_ignores_other_category_facts(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch(
+            "app.modules.sessions.api.require_session",
+            new=AsyncMock(return_value=active_session("cash")),
+        ), patch(
+            "app.modules.sessions.api.list_session_facts",
+            new=AsyncMock(return_value=[scoped_fact("loan", "region", "Seoul")]),
+        ):
+            status, _headers, body = asyncio.run(asgi_request(app, "GET", "/api/v1/session/questions/next"))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["items"][0]["factKey"], "region")
+
     def test_submit_answers_returns_conflict_reconfirmation_question(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.sessions.api.list_session_facts",
-            new=AsyncMock(return_value=[fact("region", "Seoul")]),
+            new=AsyncMock(return_value=[scoped_fact("housing", "region", "Seoul")]),
         ), patch("app.modules.sessions.api.upsert_session_fact", new=AsyncMock()) as upsert:
             status, _headers, body = asyncio.run(
                 asgi_request(
@@ -242,11 +305,11 @@ class QuestionEngineApiTests(unittest.TestCase):
         db = AsyncMock()
         app = app_with_session(db)
         facts = [
-            fact("region", "Seoul"),
-            fact("marital_status", "newlywed"),
-            fact("household_income_range", "50m_to_80m"),
-            fact("housing_status", "no_home"),
-            fact("lease_type", "jeonse"),
+            scoped_fact("housing", "region", "Seoul"),
+            scoped_fact("housing", "marital_status", "newlywed"),
+            scoped_fact("housing", "household_income_range", "50m_to_80m"),
+            scoped_fact("housing", "housing_status", "no_home"),
+            scoped_fact("housing", "lease_type", "jeonse"),
         ]
         with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.sessions.api.list_session_facts",
@@ -261,7 +324,10 @@ class QuestionEngineApiTests(unittest.TestCase):
     def test_changed_parent_answer_invalidates_dependent_child_facts(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
-        existing = [fact("marriage_registered", True), fact("marriage_registration_date", "2026-01-01")]
+        existing = [
+            scoped_fact("cash", "marriage_registered", True),
+            scoped_fact("cash", "marriage_registration_date", "2026-01-01"),
+        ]
         require_session = AsyncMock(return_value=active_session("cash"))
         with patch("app.modules.sessions.api.require_session", new=require_session), patch(
             "app.modules.sessions.api.list_session_facts",
@@ -291,13 +357,16 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(body["status"], "stored")
         upsert.assert_awaited_once()
         delete_facts.assert_awaited_once()
-        self.assertEqual(delete_facts.await_args.args[2], {"marriage_registration_date"})
+        self.assertEqual(delete_facts.await_args.args[2], {"cash:marriage_registration_date"})
         next_fact_keys = [question["factKey"] for question in body["nextQuestions"]]
         self.assertNotIn("marriage_registration_date", next_fact_keys)
     def test_submit_answer_does_not_commit_when_dependent_invalidation_fails(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
-        existing = [fact("marriage_registered", True), fact("marriage_registration_date", "2026-01-01")]
+        existing = [
+            scoped_fact("cash", "marriage_registered", True),
+            scoped_fact("cash", "marriage_registration_date", "2026-01-01"),
+        ]
         with patch(
             "app.modules.sessions.api.require_session",
             new=AsyncMock(return_value=active_session("cash")),

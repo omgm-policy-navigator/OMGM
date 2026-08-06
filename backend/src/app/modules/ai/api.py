@@ -13,7 +13,12 @@ from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.llm import LLMProvider, create_available_llm_provider
-from app.modules.ai.repository import get_policy_evidence_bundle, get_top_session_policy_evidence_bundle
+from app.modules.ai.repository import (
+    find_policy_evidence_bundle_for_message,
+    get_policy_evidence_bundle,
+    get_ranked_session_policy_evidence_bundle,
+    get_top_session_policy_evidence_bundle,
+)
 from app.modules.ai.schemas import (
     AIExplanationResponse,
     ChatRequest,
@@ -130,6 +135,57 @@ def rag_query_for_bundle(bundle) -> str:
     keywords = [policy.title, policy.category_code, policy.support_type, *condition_keys]
     return " ".join(str(keyword) for keyword in keywords if str(keyword).strip())
 
+
+TOP_POLICY_FALLBACK_PATTERNS = (
+    "가장 적절",
+    "추천",
+    "맞는 정책",
+    "가능한 정책",
+    "신청 가능",
+    "나한테 맞",
+    "우리에게 맞",
+    "뭐가 좋아",
+    "어떤 정책",
+    "which policy",
+    "recommend",
+    "best policy",
+)
+ORDINAL_POLICY_RANKS = (
+    ("2번째", 2),
+    ("두번째", 2),
+    ("두 번째", 2),
+    ("둘째", 2),
+    ("second", 2),
+    ("3번째", 3),
+    ("세번째", 3),
+    ("세 번째", 3),
+    ("셋째", 3),
+    ("third", 3),
+    ("4번째", 4),
+    ("네번째", 4),
+    ("네 번째", 4),
+    ("넷째", 4),
+    ("fourth", 4),
+    ("5번째", 5),
+    ("다섯번째", 5),
+    ("다섯 번째", 5),
+    ("fifth", 5),
+)
+
+
+def should_use_top_policy_fallback(message: str) -> bool:
+    normalized = message.casefold()
+    return any(pattern in normalized for pattern in TOP_POLICY_FALLBACK_PATTERNS)
+
+
+def requested_policy_rank(message: str) -> int | None:
+    normalized = message.casefold().replace(" ", "")
+    for pattern, rank in ORDINAL_POLICY_RANKS:
+        if pattern.replace(" ", "") in normalized:
+            return rank
+    return None
+
+
 async def build_context_for_policy(
     db: AsyncSession,
     request: Request,
@@ -157,8 +213,65 @@ async def build_context_for_top_policy(
     *,
     session_id: int,
     user_message: str,
+    category_code: str | None = None,
 ) -> ExplanationContext:
-    bundle = await get_top_session_policy_evidence_bundle(db, session_id=session_id)
+    requested_rank = requested_policy_rank(user_message)
+    if requested_rank is not None:
+        bundle = await get_ranked_session_policy_evidence_bundle(
+            db,
+            session_id=session_id,
+            category_code=category_code,
+            rank=requested_rank,
+        )
+        if bundle is None and category_code is not None:
+            bundle = await get_ranked_session_policy_evidence_bundle(
+                db,
+                session_id=session_id,
+                category_code=None,
+                rank=requested_rank,
+            )
+        if bundle is None:
+            return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
+        return ExplanationContext(
+            policy=bundle.policy,
+            evaluation=bundle.evaluation,
+            documents=bundle.documents,
+            retrieved_citations=await retrieve_rag_citations(
+                db,
+                request,
+                policy_id=bundle.policy.id,
+                question=rag_query_for_bundle(bundle),
+            ),
+            user_message=user_message,
+        )
+
+    bundle = await find_policy_evidence_bundle_for_message(
+        db,
+        session_id=session_id,
+        category_code=category_code,
+        message=user_message,
+    )
+    if bundle is None and category_code is not None:
+        bundle = await find_policy_evidence_bundle_for_message(
+            db,
+            session_id=session_id,
+            category_code=None,
+            message=user_message,
+        )
+    if bundle is None:
+        if not should_use_top_policy_fallback(user_message):
+            return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
+        bundle = await get_top_session_policy_evidence_bundle(
+            db,
+            session_id=session_id,
+            category_code=category_code,
+        )
+        if bundle is None and category_code is not None:
+            bundle = await get_top_session_policy_evidence_bundle(
+                db,
+                session_id=session_id,
+                category_code=None,
+            )
     if bundle is None:
         return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
     return ExplanationContext(
@@ -193,7 +306,13 @@ async def chat(
             user_message=payload.message,
         )
     else:
-        context = await build_context_for_top_policy(db, request, session_id=session.id, user_message=payload.message)
+        context = await build_context_for_top_policy(
+            db,
+            request,
+            session_id=session.id,
+            user_message=payload.message,
+            category_code=session.selected_category_code,
+        )
     response = await explain_with_ai(context, await get_llm_provider(request))
     await db.commit()
     return response
@@ -239,7 +358,13 @@ async def chat_stream(
             user_message=message,
         )
     else:
-        context = await build_context_for_top_policy(db, request, session_id=session.id, user_message=message)
+        context = await build_context_for_top_policy(
+            db,
+            request,
+            session_id=session.id,
+            user_message=message,
+            category_code=session.selected_category_code,
+        )
     response = await explain_with_ai(context, await get_llm_provider(request))
     await db.commit()
 

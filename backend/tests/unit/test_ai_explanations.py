@@ -20,6 +20,11 @@ def policy(policy_id="policy_housing_001"):
         title="Housing support",
         summary="Rent support",
         application_period="2026-01-01 to 2026-12-31",
+        agency="Seoul Housing Office",
+        region="Seoul",
+        support_type="rent",
+        official_source_url="https://example.go.kr/policy/1",
+        source_label="OFFICIAL",
     )
 
 
@@ -115,7 +120,7 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.ai_status, AIResponseStatus.GENERATED)
         self.assertEqual(response.citations[0].source_id, "chunk_doc_1")
 
-    async def test_no_rag_evidence_requires_confirmation_without_llm(self) -> None:
+    async def test_no_rag_evidence_uses_catalog_fallback_without_llm(self) -> None:
         provider = FakeLLMProvider()
 
         response = await explain_with_ai(
@@ -123,9 +128,13 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
             provider,
         )
 
-        self.assertEqual(response.eligibility_status, "OFFICIAL_CONFIRMATION_REQUIRED")
-        self.assertEqual(response.ai_status, AIResponseStatus.OFFICIAL_CONFIRMATION_REQUIRED)
-        self.assertEqual(response.citations, [])
+        self.assertEqual(response.eligibility_status, "LIKELY_ELIGIBLE")
+        self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
+        self.assertEqual(response.citations[0].url, "https://example.go.kr/policy/1")
+        self.assertIn("Housing support", response.answer)
+        self.assertIn("신청 가능성이 높아 보입니다", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_ELIGIBLE", response.answer)
         self.assertEqual(provider.requests, [])
 
     async def test_llm_failure_keeps_rule_decision_available_with_template_evidence(self) -> None:
@@ -136,9 +145,11 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.eligibility_status, "LIKELY_ELIGIBLE")
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine status is LIKELY_ELIGIBLE", response.answer)
-        self.assertIn("income", response.answer)
-        self.assertIn("asset", response.answer)
+        self.assertIn("신청 가능성이 높아 보입니다", response.answer)
+        self.assertIn("소득 구간", response.answer)
+        self.assertIn("자산 기준", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_ELIGIBLE", response.answer)
 
     async def test_llm_timeout_uses_fallback_template(self) -> None:
         response = await explain_with_ai(
@@ -179,7 +190,9 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine status is LIKELY_INELIGIBLE", response.answer)
+        self.assertIn("맞지 않는 조건이 있습니다", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_INELIGIBLE", response.answer)
 
     async def test_invalid_structured_answer_falls_back(self) -> None:
         provider = FakeLLMProvider(

@@ -10,6 +10,7 @@ from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.modules.eligibility.repository import (
+    delete_session_evaluations_for_category,
     get_session_policy_evaluation,
     list_active_policies_for_category,
     list_session_evaluations,
@@ -28,13 +29,14 @@ from app.modules.graph.repository import (
 )
 from app.modules.graph.schemas import SessionGraphResponse
 from app.modules.questions.engine import (
+    category_questions,
     dependent_fact_keys,
     next_questions,
     progress,
     question_for_fact,
     supported_category,
 )
-from app.modules.questions.mappers import facts_to_dict, question_to_response
+from app.modules.questions.mappers import question_to_response
 from app.modules.questions.schemas import (
     AnswerConflictResponse,
     NextQuestionsResponse,
@@ -45,7 +47,14 @@ from app.modules.questions.schemas import (
     SubmitAnswersRequest,
     SubmitAnswersResponse,
 )
-from app.modules.sessions.schemas import CreateSessionResponse, SessionResponse, UpsertUserFactRequest, UserFactResponse
+from app.modules.sessions.schemas import (
+    CreateSessionResponse,
+    ResetCategorySessionRequest,
+    ResetCategorySessionResponse,
+    SessionResponse,
+    UpsertUserFactRequest,
+    UserFactResponse,
+)
 from app.modules.sessions.security import validate_unsafe_origin
 from app.modules.sessions.service import (
     cleanup_expired_sessions,
@@ -60,6 +69,7 @@ from app.modules.sessions.service import (
 router = APIRouter(prefix="/api/v1/session", tags=["session"])
 
 FORBIDDEN_SESSION_INPUTS = {"session_id", "sessionId", "anonymous_session", "x-session-id"}
+FACT_SCOPE_SEPARATOR = ":"
 
 
 def get_config(request: Request) -> AppConfig:
@@ -137,6 +147,28 @@ def validate_category_code(category_code: str) -> str:
             HTTPStatus.UNPROCESSABLE_ENTITY,
         )
     return normalized
+
+
+def scoped_fact_key(category_code: str, fact_key: str) -> str:
+    return f"{category_code}{FACT_SCOPE_SEPARATOR}{fact_key}"
+
+
+def scoped_fact_keys(category_code: str, fact_keys: set[str]) -> set[str]:
+    return {scoped_fact_key(category_code, fact_key) for fact_key in fact_keys}
+
+
+def legacy_and_scoped_fact_keys(category_code: str, fact_keys: set[str]) -> set[str]:
+    return fact_keys | scoped_fact_keys(category_code, fact_keys)
+
+
+def facts_to_category_dict(facts: list[Any], category_code: str) -> dict[str, Any]:
+    prefix = f"{category_code}{FACT_SCOPE_SEPARATOR}"
+    scoped: dict[str, Any] = {}
+    for fact in facts:
+        condition_key = str(fact.condition_key)
+        if condition_key.startswith(prefix):
+            scoped[condition_key.removeprefix(prefix)] = fact.value
+    return scoped
 
 
 def conflict_question_response(question: QuestionResponse, fact_key: str) -> QuestionResponse:
@@ -236,6 +268,32 @@ async def select_category(
     return SelectCategoryResponse(categoryCode=category_code)
 
 
+@router.post("/category/reset", response_model=ResetCategorySessionResponse)
+async def reset_category_session(
+    payload: ResetCategorySessionRequest,
+    request: Request,
+    db: AsyncSession = DB_DEPENDENCY,
+    config: AppConfig = CONFIG_DEPENDENCY,
+) -> ResetCategorySessionResponse:
+    validate_unsafe_origin(request, allowed_origins(config))
+    category_code = validate_category_code(payload.category_code)
+    session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
+    session.selected_category_code = category_code
+    fact_keys = {question.fact_key for question in category_questions(category_code)}
+    deleted_facts = await delete_session_facts_by_keys(
+        db,
+        session,
+        legacy_and_scoped_fact_keys(category_code, fact_keys),
+    )
+    deleted_evaluations = await delete_session_evaluations_for_category(db, session.id, category_code)
+    await db.commit()
+    return ResetCategorySessionResponse(
+        categoryCode=category_code,
+        deletedFacts=deleted_facts,
+        deletedEvaluations=deleted_evaluations,
+    )
+
+
 @router.get("/facts", response_model=list[UserFactResponse])
 async def get_facts(
     request: Request,
@@ -295,7 +353,7 @@ async def get_next_questions(
 ) -> NextQuestionsResponse:
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     category_code = require_category_code(session.selected_category_code)
-    facts = facts_to_dict(await list_session_facts(db, session))
+    facts = facts_to_category_dict(await list_session_facts(db, session), category_code)
     _answered, _total, complete = progress(category_code, facts)
     await db.commit()
     return NextQuestionsResponse(
@@ -316,7 +374,7 @@ async def submit_answers(
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     category_code = require_category_code(session.selected_category_code)
     current_facts = await list_session_facts(db, session)
-    existing_facts = facts_to_dict(current_facts)
+    existing_facts = facts_to_category_dict(current_facts, category_code)
     submitted_facts = {answer.fact_key: answer.value for answer in payload.answers}
     conflicts = detect_answer_conflicts(category_code, existing_facts, submitted_facts)
     if conflicts:
@@ -327,8 +385,20 @@ async def submit_answers(
     invalidated: set[str] = set()
     for answer in payload.answers:
         changed = answer.fact_key in existing_facts and existing_facts[answer.fact_key] != answer.value
-        stale_fact_keys = dependent_fact_keys(category_code, answer.fact_key) if changed else set()
-        await upsert_session_fact(db, session, answer.fact_key, answer.value, "question_engine", answer.confirmed, None)
+        stale_fact_keys = (
+            scoped_fact_keys(category_code, dependent_fact_keys(category_code, answer.fact_key))
+            if changed
+            else set()
+        )
+        await upsert_session_fact(
+            db,
+            session,
+            scoped_fact_key(category_code, answer.fact_key),
+            answer.value,
+            f"question_engine:{category_code}",
+            answer.confirmed,
+            None,
+        )
         await delete_session_facts_by_keys(db, session, stale_fact_keys)
         invalidated.update(stale_fact_keys)
         stored.append(answer.fact_key)
@@ -351,7 +421,7 @@ async def get_question_progress(
 ) -> QuestionProgressResponse:
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     category_code = require_category_code(session.selected_category_code)
-    facts = facts_to_dict(await list_session_facts(db, session))
+    facts = facts_to_category_dict(await list_session_facts(db, session), category_code)
     answered, total, complete = progress(category_code, facts)
     await db.commit()
     return QuestionProgressResponse(
@@ -374,7 +444,11 @@ async def get_session_graph(
 ) -> SessionGraphResponse:
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     selected_category = validate_category_code(category) if category is not None else session.selected_category_code
-    facts = facts_to_dict(await list_session_facts(db, session))
+    facts = (
+        facts_to_category_dict(await list_session_facts(db, session), selected_category)
+        if selected_category is not None
+        else {}
+    )
     centered_policy_ids = None
     if policy_id is not None:
         centered_policy_ids = await list_centered_graph_policy_ids(
@@ -390,7 +464,7 @@ async def get_session_graph(
         centered_policy_ids,
     )
     visible_policy_ids = {policy.id for policy in policies}
-    evaluations = await list_graph_evaluations(db, session.id, visible_policy_ids)
+    evaluations = await list_graph_evaluations(db, session.id, visible_policy_ids) if facts else []
     relations = await list_graph_relations(db, visible_policy_ids)
     graph = build_session_graph(
         facts=facts,
@@ -415,7 +489,7 @@ async def create_session_evaluations(
     validate_unsafe_origin(request, allowed_origins(config))
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     category_code = require_category_code(session.selected_category_code)
-    facts = facts_to_dict(await list_session_facts(db, session))
+    facts = facts_to_category_dict(await list_session_facts(db, session), category_code)
     policies = await list_active_policies_for_category(db, category_code)
     stored = []
     for policy in policies:
