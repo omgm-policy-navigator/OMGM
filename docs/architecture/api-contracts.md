@@ -2,13 +2,13 @@
 
 ## Contract Status
 
-This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
+This document tracks implemented backend API contracts. Health endpoints were implemented in B1, policy catalog read endpoints were implemented in B2, and anonymous session/user fact endpoints were implemented in B3. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 
 ## API Version Strategy
 
-MVP endpoints use `/api/...` without a version prefix. Breaking changes after MVP must add a new prefix such as `/api/v2/...` while keeping `/api/...` stable until clients migrate.
+MVP backend endpoints use the `/api/v1/...` prefix for versioned application APIs. Health endpoints remain unversioned because they are infrastructure probes.
 
 ## Common Rules
 
@@ -212,51 +212,58 @@ Response `200`:
 ]
 ```
 
-## Draft Endpoints
+## Implemented Anonymous Session Endpoints
 
-### `POST /api/session`
+### `POST /api/v1/session`
 
-Creates an anonymous session owned by the backend. The backend generates the session ID and returns it only as a cookie.
+Creates or returns the current anonymous session. The backend generates a cryptographic UUID4 session token and returns it only in the `anonymous_session` cookie. Clients must not send or receive session IDs in JSON, headers, or URLs.
 
-Request: no body.
+Request body is optional, but any client-supplied session identifier such as `sessionId`, `session_id`, or `anonymous_session` is rejected with `VALIDATION_ERROR`. Client-supplied session headers such as `X-Session-Id` are also rejected.
 
-Response `201`:
+Response `201` when a new session is created, or `200` when the existing cookie session is still valid:
 
 ```json
 {
-  "expiresAt": "2026-08-06T12:00:00Z"
+  "status": "session_created"
 }
 ```
 
-Headers:
+Headers include:
 
 ```http
 Set-Cookie: anonymous_session=<random>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400
 ```
 
-Session lifecycle:
+Production and non-local environments set `Secure`. `APP_ENV=local` may omit `Secure` for local HTTP development. Absolute expiry defaults to 24 hours. Idle expiry defaults to 60 minutes and never extends beyond the absolute expiry.
 
-- TTL is 24 hours.
-- Expiry is not sliding in B0 contracts. Later requests do not extend the session unless a later phase explicitly changes the contract.
-- Multiple tabs in the same browser profile share the same anonymous session cookie.
-- If a valid session already exists, `POST /api/session` returns `200` with the current `expiresAt` and does not rotate the cookie.
-- Production and HTTPS development responses include `Secure`. Local HTTP development may omit `Secure` only in `APP_ENV=local`.
+### `GET /api/v1/session`
 
-### `DELETE /api/session`
+Returns expiry metadata for the current anonymous session resolved from the cookie. Missing, deleted, or expired sessions return `SESSION_NOT_FOUND` with HTTP 404.
 
-Deletes the current anonymous session and clears the cookie. Server-side conversation state, user facts, and evaluation records linked only to that anonymous session become inaccessible immediately and are hard-deleted unless a later retention policy explicitly replaces this behavior.
+### `DELETE /api/v1/session`
 
-Request: no body.
+Deletes the current anonymous session and clears the cookie. Linked `user_fact` rows are deleted by database cascade.
 
 Response `204`: no body.
 
-Headers:
+### `GET /api/v1/session/facts`
 
-```http
-Set-Cookie: anonymous_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
+Returns facts for the current anonymous session only.
+
+Response `200`:
+
+```json
+{
+  "status": "session_created"
+}
 ```
 
-### `POST /api/session/reset`
+### `PUT /api/v1/session/facts/{condition_key}`
+
+Creates or updates a fact for the current anonymous session only. The route path condition key is authoritative; clients cannot set another session or owner in JSON.
+## Draft Endpoints
+
+### `POST /api/v1/session/reset`
 
 Starts a new diagnostic session by invalidating the existing anonymous session and issuing a new cookie. Existing conversation state, user facts, and evaluations are not accessible from the new session.
 
@@ -266,7 +273,7 @@ Response `201`:
 
 ```json
 {
-  "expiresAt": "2026-08-06T12:00:00Z"
+  "status": "session_created"
 }
 ```
 
@@ -301,17 +308,7 @@ Response `200`:
 
 ```json
 {
-  "items": [
-    {
-      "policyId": "policy_123",
-      "title": "신혼부부 주거 지원",
-      "agency": "서울시",
-      "region": "서울",
-      "status": "ACTIVE",
-      "policyVersionId": "policy_version_123"
-    }
-  ],
-  "nextCursor": null
+  "status": "session_created"
 }
 ```
 
@@ -323,17 +320,7 @@ Response `200`:
 
 ```json
 {
-  "policyId": "policy_123",
-  "title": "신혼부부 주거 지원",
-  "agency": "서울시",
-  "region": "서울",
-  "status": "ACTIVE",
-  "policyVersionId": "policy_version_123",
-  "source": {
-    "url": "https://example.go.kr/policy/123",
-    "collectedAt": "2026-08-05T00:00:00Z",
-    "documentHash": "sha256:..."
-  }
+  "status": "session_created"
 }
 ```
 
@@ -345,7 +332,7 @@ Request:
 
 ```json
 {
-  "initialMessage": "서울 신혼부부 전세 지원을 찾고 싶어요"
+  "status": "session_created"
 }
 ```
 
@@ -355,21 +342,7 @@ Response `201`:
 
 ```json
 {
-  "conversationId": "conv_123",
-  "nextQuestions": [
-    {
-      "questionId": "q_region",
-      "factKey": "region",
-      "prompt": "거주 지역을 확인해 주세요.",
-      "answerType": "single_select",
-      "required": true,
-      "options": [
-        {"label": "서울", "value": "SEOUL"},
-        {"label": "경기", "value": "GYEONGGI"},
-        {"label": "인천", "value": "INCHEON"}
-      ]
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -381,14 +354,7 @@ Request:
 
 ```json
 {
-  "answers": [
-    {
-      "questionId": "q_region",
-      "factKey": "region",
-      "value": "SEOUL",
-      "confirmed": true
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -396,9 +362,7 @@ Response `200`:
 
 ```json
 {
-  "factVersion": "facts_v2",
-  "conflicts": [],
-  "nextQuestions": []
+  "status": "session_created"
 }
 ```
 
@@ -416,7 +380,7 @@ Request:
 
 ```json
 {
-  "policyIds": ["policy_123"]
+  "status": "session_created"
 }
 ```
 
@@ -433,24 +397,7 @@ Response `200`:
 
 ```json
 {
-  "items": [
-    {
-      "evaluationId": "eval_123",
-      "policyId": "policy_123",
-      "eligibilityStatus": "NEEDS_CONFIRMATION",
-      "evaluationState": "ACTIVE",
-      "policyVersionId": "policy_version_123",
-      "factVersion": "facts_v2",
-      "coverage": {
-        "requiredKnown": 2,
-        "requiredTotal": 3
-      },
-      "satisfied": ["region"],
-      "unsatisfied": [],
-      "needsConfirmation": ["HOUSEHOLD_INCOME_RANGE"],
-      "nextQuestions": ["Q_HOUSEHOLD_INCOME_RANGE"]
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -477,20 +424,7 @@ Response `200`:
 
 ```json
 {
-  "evaluationId": "eval_123",
-  "policyId": "policy_123",
-  "eligibilityStatus": "NEEDS_CONFIRMATION",
-  "evaluationState": "ACTIVE",
-  "policyVersionId": "policy_version_123",
-  "factVersion": "facts_v2",
-  "evidence": [
-    {
-      "conditionId": "cond_income",
-      "sourceUrl": "https://example.go.kr/policy/123",
-      "sourceLabel": "소득 기준",
-      "policyVersionId": "policy_version_123"
-    }
-  ]
+  "status": "session_created"
 }
 ```
 
@@ -502,14 +436,7 @@ Response `200`:
 
 ```json
 {
-  "nodes": [
-    {
-      "id": "policy_123",
-      "type": "policy",
-      "label": "신혼부부 주거 지원"
-    }
-  ],
-  "edges": []
+  "status": "session_created"
 }
 ```
 
@@ -529,10 +456,7 @@ Response `200`:
 
 ```json
 {
-  "status": "ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "connected"
+  "status": "session_created"
 }
 ```
 
@@ -540,10 +464,7 @@ Response `503` when PostgreSQL cannot be reached:
 
 ```json
 {
-  "status": "not_ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "unavailable"
+  "status": "session_created"
 }
 ```
 
@@ -551,9 +472,6 @@ Response `503` when PostgreSQL does not respond within the readiness timeout:
 
 ```json
 {
-  "status": "not_ready",
-  "service": "omgm-backend",
-  "environment": "local",
-  "database": "timeout"
+  "status": "session_created"
 }
 ```
