@@ -12,6 +12,9 @@ Implemented on branch `phase-a2-user-condition-extraction`.
 - Added strict validation for keys, values, confidence, ambiguity, evidence, extra fields, and duplicate keys.
 - Added backend-owned confirmation rules with a `0.8` confidence threshold.
 - Added confirmed-fact conflict detection and resolution-required output.
+- Added user-text evidence grounding so unsupported model candidates always require confirmation.
+- Rejected duplicate confirmed facts instead of silently choosing one by input order.
+- Marked reviewed values as raw and requiring later domain normalization.
 - Added focused tests for prompt constraints, invalid keys, ambiguity, confidence, and conflicts.
 - Updated AI, backend, module-boundary, data-ownership, and security documentation.
 
@@ -20,4 +23,4 @@ Implemented on branch `phase-a2-user-condition-extraction`.
 - API exposure and conversation orchestration.
 - User-fact persistence and migrations.
 - Runtime-specific extraction invocation and retry orchestration.
-- Domain-specific canonical value normalization.
+- Domain-specific canonical value normalization; A2 explicitly marks candidates as requiring it.

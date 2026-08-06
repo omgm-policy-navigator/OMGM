@@ -64,9 +64,10 @@ class ReviewedFactCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fact_key: AllowedFactKey
-    value: str
+    raw_value: str
     confidence: float
     requires_confirmation: bool
+    requires_normalization: bool = True
 
 
 class FactConflictCandidate(BaseModel):
@@ -91,11 +92,7 @@ class ConditionExtractionError(ValueError):
 
 
 def build_condition_extraction_request(user_text: str) -> LLMRequest:
-    text = user_text.strip()
-    if not text:
-        raise ValueError("user_text must not be blank")
-    if len(text) > MAX_USER_INPUT_LENGTH:
-        raise ValueError(f"user_text must be at most {MAX_USER_INPUT_LENGTH} characters")
+    text = _validate_user_text(user_text)
 
     allowed_keys = ", ".join(key.value for key in AllowedFactKey)
     system = (
@@ -135,26 +132,31 @@ def parse_condition_extraction(raw_output: str) -> ConditionExtractionModelOutpu
 
 def review_condition_extraction(
     output: ConditionExtractionModelOutput,
+    user_text: str,
     existing_facts: list[ExistingUserFact] | None = None,
 ) -> ConditionExtractionResult:
-    confirmed_by_key = {
-        fact.fact_key: fact for fact in (existing_facts or []) if fact.confirmed
-    }
+    normalized_user_text = _normalize_surface_text(_validate_user_text(user_text))
+    confirmed_by_key = _index_confirmed_facts(existing_facts or [])
     reviewed: list[ReviewedFactCandidate] = []
     conflicts: list[FactConflictCandidate] = []
 
     for candidate in output.candidates:
         existing = confirmed_by_key.get(candidate.fact_key)
-        has_conflict = existing is not None and _comparable(existing.value) != _comparable(candidate.value)
+        evidence_is_grounded = _normalize_surface_text(candidate.evidence) in normalized_user_text
+        has_conflict = (
+            existing is not None
+            and _normalize_surface_text(existing.value) != _normalize_surface_text(candidate.value)
+        )
         requires_confirmation = (
-            candidate.is_ambiguous
+            not evidence_is_grounded
+            or candidate.is_ambiguous
             or candidate.confidence < CONFIDENCE_CONFIRMATION_THRESHOLD
             or has_conflict
         )
         reviewed.append(
             ReviewedFactCandidate(
                 fact_key=candidate.fact_key,
-                value=candidate.value,
+                raw_value=candidate.value,
                 confidence=candidate.confidence,
                 requires_confirmation=requires_confirmation,
             )
@@ -175,5 +177,26 @@ def review_condition_extraction(
     )
 
 
-def _comparable(value: str) -> str:
-    return value.strip().casefold()
+def _index_confirmed_facts(existing_facts: list[ExistingUserFact]) -> dict[AllowedFactKey, ExistingUserFact]:
+    confirmed_by_key: dict[AllowedFactKey, ExistingUserFact] = {}
+    for fact in existing_facts:
+        if not fact.confirmed:
+            continue
+        if fact.fact_key in confirmed_by_key:
+            raise ValueError(f"duplicate confirmed fact: {fact.fact_key.value}")
+        confirmed_by_key[fact.fact_key] = fact
+    return confirmed_by_key
+
+
+def _validate_user_text(user_text: str) -> str:
+    text = user_text.strip()
+    if not text:
+        raise ValueError("user_text must not be blank")
+    if len(text) > MAX_USER_INPUT_LENGTH:
+        raise ValueError(f"user_text must be at most {MAX_USER_INPUT_LENGTH} characters")
+    return text
+
+
+def _normalize_surface_text(value: str) -> str:
+    """Normalize whitespace and case only; this is not semantic value normalization."""
+    return " ".join(value.split()).casefold()

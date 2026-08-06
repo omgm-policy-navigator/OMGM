@@ -66,18 +66,26 @@ class ConditionExtractionContractTests(unittest.TestCase):
 
 
 class ConditionExtractionReviewTests(unittest.TestCase):
+    user_text = "서울에 살고 있어요"
+
     def test_high_confidence_unambiguous_candidate_does_not_require_confirmation(self) -> None:
         output = parse_condition_extraction(model_output())
 
-        result = review_condition_extraction(output)
+        result = review_condition_extraction(output, self.user_text)
 
         self.assertFalse(result.needs_confirmation)
         self.assertFalse(result.candidates[0].requires_confirmation)
+        self.assertEqual(result.candidates[0].raw_value, "SEOUL")
+        self.assertTrue(result.candidates[0].requires_normalization)
         self.assertEqual(result.conflicts, [])
 
     def test_low_confidence_or_ambiguous_candidate_requires_confirmation(self) -> None:
-        low_confidence = review_condition_extraction(parse_condition_extraction(model_output(confidence=0.79)))
-        ambiguous = review_condition_extraction(parse_condition_extraction(model_output(isAmbiguous=True)))
+        low_confidence = review_condition_extraction(
+            parse_condition_extraction(model_output(confidence=0.79)), self.user_text
+        )
+        ambiguous = review_condition_extraction(
+            parse_condition_extraction(model_output(isAmbiguous=True)), self.user_text
+        )
 
         self.assertTrue(low_confidence.candidates[0].requires_confirmation)
         self.assertTrue(ambiguous.candidates[0].requires_confirmation)
@@ -92,7 +100,7 @@ class ConditionExtractionReviewTests(unittest.TestCase):
             )
         ]
 
-        result = review_condition_extraction(output, existing)
+        result = review_condition_extraction(output, self.user_text, existing)
 
         self.assertTrue(result.needs_confirmation)
         self.assertTrue(result.candidates[0].requires_confirmation)
@@ -110,7 +118,7 @@ class ConditionExtractionReviewTests(unittest.TestCase):
             )
         ]
 
-        result = review_condition_extraction(output, existing)
+        result = review_condition_extraction(output, self.user_text, existing)
 
         self.assertEqual(result.conflicts, [])
         self.assertFalse(result.needs_confirmation)
@@ -125,6 +133,50 @@ class ConditionExtractionReviewTests(unittest.TestCase):
             )
         ]
 
-        result = review_condition_extraction(output, existing)
+        result = review_condition_extraction(output, self.user_text, existing)
 
         self.assertEqual(result.conflicts, [])
+
+    def test_ungrounded_evidence_requires_confirmation(self) -> None:
+        output = parse_condition_extraction(
+            model_output(
+                factKey="MARRIAGE_STATUS",
+                value="MARRIED",
+                confidence=0.99,
+                isAmbiguous=False,
+                evidence="결혼했어요",
+            )
+        )
+
+        result = review_condition_extraction(output, user_text="서울에 거주하고 있어요")
+
+        self.assertTrue(result.needs_confirmation)
+        self.assertTrue(result.candidates[0].requires_confirmation)
+
+    def test_evidence_comparison_normalizes_whitespace_and_case(self) -> None:
+        output = parse_condition_extraction(model_output(evidence="SEOUL RESIDENT"))
+
+        result = review_condition_extraction(output, user_text="I am a  seoul\nresident.")
+
+        self.assertFalse(result.needs_confirmation)
+
+    def test_duplicate_confirmed_existing_facts_are_rejected(self) -> None:
+        existing = [
+            ExistingUserFact(
+                fact_key=AllowedFactKey.RESIDENCE_REGION,
+                value="SEOUL",
+                confirmed=True,
+            ),
+            ExistingUserFact(
+                fact_key=AllowedFactKey.RESIDENCE_REGION,
+                value="BUSAN",
+                confirmed=True,
+            ),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "duplicate confirmed fact: RESIDENCE_REGION"):
+            review_condition_extraction(
+                parse_condition_extraction(model_output()),
+                self.user_text,
+                existing,
+            )

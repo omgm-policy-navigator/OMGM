@@ -7,7 +7,7 @@ cd backend
 python -m pytest -q --basetemp <workspace-temp> -p no:cacheprovider
 ```
 
-Result: passed. 90 tests passed.
+Result before review fixes: passed. 90 tests passed. The complete suite is rerun after review fixes below.
 
 ```bash
 cd backend
@@ -59,3 +59,7 @@ A2 introduces no database schema or persistence changes. Alembic metadata valida
 
 - Tests use synthetic, non-sensitive statements and fact values.
 - No reusable runtime failure or repository-specific incident was discovered, so no troubleshooting document was added.
+
+## PR Review Follow-up
+
+Focused extraction tests passed with 14 tests after adding evidence grounding, duplicate confirmed-fact rejection, and explicit raw-value normalization state. The full pytest suite passed with 93 tests, Ruff passed, Markdown link validation passed, and `git diff --check` passed.

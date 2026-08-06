@@ -99,6 +99,6 @@ The LLM runtime is not wired into API routes in A1. Connection failures, timeout
 
 ## Phase A2 User Fact Extraction
 
-`app/modules/user_facts` owns the pure extraction contract: constrained prompt construction, seven-key allowlist validation, confidence and ambiguity review, and conflict detection against confirmed existing-fact DTOs. It depends on the LLM request DTO but not on FastAPI, SQLAlchemy models, or sessions.
+`app/modules/user_facts` owns the pure extraction contract: constrained prompt construction, seven-key allowlist validation, evidence grounding against user text, confidence and ambiguity review, and conflict detection against confirmed existing-fact DTOs. Duplicate confirmed facts are rejected at this boundary. It depends on the LLM request DTO but not on FastAPI, SQLAlchemy models, or sessions.
 
-A2 does not persist candidates or expose an API. A later user-fact phase must confirm ambiguous, low-confidence, or conflicting candidates before storage.
+A2 does not persist candidates or expose an API. Candidate values remain explicitly marked as raw and requiring normalization. A later user-fact phase must normalize values and confirm ungrounded, ambiguous, low-confidence, or conflicting candidates before storage.

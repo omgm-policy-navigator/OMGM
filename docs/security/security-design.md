@@ -85,4 +85,4 @@ The local LLM runtime uses provider-level timeouts and validates generated JSON 
 
 ## AI A2 Extraction Security Note
 
-Condition extraction accepts only the documented seven fact keys and rejects the complete model response when an unknown key or extra field is present. The module does not log user text, evidence phrases, income ranges, or model output. Ambiguous, low-confidence, and conflicting values require confirmation before a later persistence phase may store them.
+Condition extraction accepts only the documented seven fact keys and rejects the complete model response when an unknown key or extra field is present. Evidence phrases must occur in the normalized user text or the candidate requires confirmation. The module does not log user text, evidence phrases, income ranges, or model output. Ungrounded, ambiguous, low-confidence, and conflicting values require confirmation, and raw values require domain normalization before a later persistence phase may store them.
