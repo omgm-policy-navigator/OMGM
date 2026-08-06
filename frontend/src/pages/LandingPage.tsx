@@ -18,12 +18,14 @@ export function LandingPage({ onStart, isLeaving }: LandingPageProps) {
             <Sparkles size={16} className="text-brand-primary" />
             서울 예비·신혼부부 정책 내비게이터
           </div>
-          <h1 className="text-[40px] font-extrabold leading-[52px] tracking-[-0.02em] md:text-h1">
-            나만 결혼해?!
+          <h1 className="text-[42px] font-extrabold leading-[54px] tracking-[-0.02em] md:text-h1">
+            나만 결혼 혜택?!
             <br />
-            결혼 준비부터 신혼 생활까지
-            <br />
-            <span className="text-brand-primary">정책을 한눈에.</span>
+            <span className="mt-3 inline-block text-[28px] font-bold leading-10 tracking-[-0.01em] text-text-primary md:text-h2">
+              결혼 준비부터 신혼 생활까지
+              <br />
+              <span className="text-brand-primary">정책을 한눈에.</span>
+            </span>
           </h1>
           <p className="mt-6 max-w-[520px] text-body-lg text-text-secondary">
             주거, 대출, 웨딩, 세제 혜택, 출산/육아 정책을 대화로 확인하고 우리 부부에게 연결되는 정책 그래프를 바로 탐색하세요.
