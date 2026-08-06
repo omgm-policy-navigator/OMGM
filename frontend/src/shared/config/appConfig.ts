@@ -1,6 +1,12 @@
 type ApiMode = "mock" | "live";
 type RequiredEnvName = "VITE_API_BASE_URL" | "VITE_SSE_BASE_URL" | "VITE_API_MODE";
 
+const defaultEnv = {
+  VITE_API_BASE_URL: "http://localhost:8000",
+  VITE_SSE_BASE_URL: "http://localhost:8000",
+  VITE_API_MODE: "mock",
+} as const satisfies Record<RequiredEnvName, string>;
+
 function readRequiredEnv(name: RequiredEnvName) {
   const env = import.meta.env;
   let value: string;
@@ -18,7 +24,7 @@ function readRequiredEnv(name: RequiredEnvName) {
   }
 
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`Missing required frontend environment variable: ${name}`);
+    return defaultEnv[name];
   }
 
   return value;

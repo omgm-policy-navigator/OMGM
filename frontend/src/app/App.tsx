@@ -15,7 +15,13 @@ export function App() {
   const [isLeavingLanding, setIsLeavingLanding] = useState(false);
 
   useEffect(() => {
-    const handlePopState = () => setRoute(getRoute());
+    const handlePopState = () => {
+      const nextRoute = getRoute();
+      setRoute(nextRoute);
+      if (nextRoute === "/") {
+        setIsLeavingLanding(false);
+      }
+    };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
@@ -23,10 +29,16 @@ export function App() {
   const navigate = (nextRoute: Route, hash?: string) => {
     window.history.pushState({}, "", `${nextRoute}${hash ? `#${hash}` : ""}`);
     setRoute(nextRoute);
+    if (nextRoute === "/") {
+      setIsLeavingLanding(false);
+    }
 
     if (hash) {
       window.requestAnimationFrame(() => {
-        document.getElementById(hash)?.scrollIntoView({ block: "start" });
+        const target = document.getElementById(hash);
+        if (typeof target?.scrollIntoView === "function") {
+          target.scrollIntoView({ block: "start" });
+        }
       });
     }
   };
