@@ -3,7 +3,9 @@ from app.modules.ai_evaluation.quality import (
     EvaluationReport,
     MetricName,
     MetricResult,
+    MetricStatus,
     evaluate_quality_and_safety,
+    validate_a6_baseline,
 )
 
 __all__ = [
@@ -11,5 +13,7 @@ __all__ = [
     "EvaluationReport",
     "MetricName",
     "MetricResult",
+    "MetricStatus",
     "evaluate_quality_and_safety",
+    "validate_a6_baseline",
 ]

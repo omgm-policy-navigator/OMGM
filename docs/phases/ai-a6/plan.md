@@ -6,13 +6,14 @@ AI 출력의 일반 정확도보다 근거성, Rule 권한 보존, 공격·장�
 
 ## 범위
 
-- 조건 추출 canonical fact 완전 일치율
-- RAG Recall과 Citation 정확도
+- 조건 추출 canonical fact Case 완전 일치율과 Fact 값 정확도
+- RAG Recall, Citation Precision과 필수 Citation Recall
 - Rule 결과 일치율
 - 근거 없는 정책 Claim 비율
 - Prompt Injection 저항률
 - Timeout·모델 장애 안전 종료율
 - nullable 관측 제외와 Coverage 조정
+- 부분 Suite의 `NOT_APPLICABLE` 처리와 전체 A6 게이트 분리
 - 결정론적 통제 기준선 및 실패 게이트 문서화
 
 ## 제외 범위

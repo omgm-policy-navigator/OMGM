@@ -154,6 +154,6 @@
 
 입력: 기대·실제 fact, 검색·Citation ID, Rule 상태, 정책 Claim 근거 수, Prompt Injection 및 장애 종료 관측값.
 
-출력: 조건 추출 정확도, RAG Recall, Citation 정확도, Rule 일치율, 무근거 답변 비율, Prompt Injection 저항률, 안전 장애 종료율과 전체 통과 여부.
+출력: 조건 추출 Case 완전 일치율·Fact 값 정확도, RAG Recall, Citation Precision·필수 Citation Recall, Rule 일치율, 무근거 답변 비율, Prompt Injection 저항률, 안전 장애 종료율, 지표 적용 상태와 전체 통과 여부.
 
 금지 사항: FastAPI Router·SQLAlchemy Session 의존, LLM 호출, Rule 재판정, 누락 신호의 `false`·`0` 변환, 운영 사용자 데이터 저장.

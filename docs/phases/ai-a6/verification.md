@@ -2,8 +2,8 @@
 
 ## 검증 결과
 
-- A6 집중 테스트: `5 passed`
-- 전체 백엔드 테스트: `210 passed, 1 skipped`
+- A6 집중 테스트: `10 passed`
+- 전체 백엔드 테스트: `215 passed, 1 skipped`
 - Ruff (`src/app`, `tests`): 통과
 - Compose 설정 렌더링: 통과
 - Alembic 단일 Head: `20260806_0006`
