@@ -292,6 +292,13 @@ function fallbackMessages(category: PolicyCategory) {
   return categoryMessages[category.id] ?? categoryMessages.housing;
 }
 
+function questionMatchesCategory(question: QuestionResponse | null, category: PolicyCategory) {
+  if (!question) {
+    return true;
+  }
+  return question.questionId.startsWith(`q_${category.backendCategoryCode}_`);
+}
+
 function readStoredMessages(): Record<string, ChatMessage[]> {
   try {
     const raw = window.localStorage?.getItem(CHAT_STORAGE_KEY);
@@ -328,6 +335,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   const messageId = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const loadedCategoryIds = useRef(new Set<string>());
+  const loadRequestId = useRef(0);
   const [messagesByCategory, setMessagesByCategory] = useState<Record<string, ChatMessage[]>>(() => initialStoredMessages.current);
   const [draft, setDraft] = useState("");
   const [activeQuestionsByCategory, setActiveQuestionsByCategory] = useState<Record<string, QuestionResponse | null>>({});
@@ -359,6 +367,10 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   useEffect(() => {
     const controller = new AbortController();
     const categoryId = selectedCategory.id;
+    const categoryCode = selectedCategory.backendCategoryCode;
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
+    const isCurrentRequest = () => loadRequestId.current === requestId && !controller.signal.aborted;
 
     async function loadLiveCategory() {
       setLoading(true);
@@ -367,8 +379,17 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
 
       try {
         await createSession(controller.signal);
-        await selectCategory(selectedCategory.backendCategoryCode, controller.signal);
-        const [questions, graph] = await Promise.all([getNextQuestions(controller.signal), getSessionGraph(selectedCategory.backendCategoryCode, controller.signal)]);
+        if (!isCurrentRequest()) {
+          return;
+        }
+        await selectCategory(categoryCode, controller.signal);
+        if (!isCurrentRequest()) {
+          return;
+        }
+        const [questions, graph] = await Promise.all([getNextQuestions(controller.signal), getSessionGraph(categoryCode, controller.signal)]);
+        if (!isCurrentRequest()) {
+          return;
+        }
         onGraphChange(graph);
         const nextQuestion = questions.items[0] ?? null;
         setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
@@ -390,13 +411,18 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
         });
         loadedCategoryIds.current.add(categoryId);
       } catch {
+        if (!isCurrentRequest()) {
+          return;
+        }
         setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: "백엔드 세션 API에 연결하지 못해 목업 대화로 표시 중입니다." }));
         setMessagesByCategory((current) => ({
           ...current,
           [categoryId]: current[categoryId] ?? fallbackMessages(selectedCategory),
         }));
       } finally {
-        setLoading(false);
+        if (isCurrentRequest()) {
+          setLoading(false);
+        }
       }
     }
 
@@ -437,55 +463,81 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
     }
 
     setDraft("");
-    appendMessage(selectedCategory.id, "user", answerText);
+    const category = selectedCategory;
+    const categoryId = category.id;
+    const categoryCode = category.backendCategoryCode;
+    const question = activeQuestion;
+    appendMessage(categoryId, "user", answerText);
 
     if (!isLiveMode) {
-      appendMessage(selectedCategory.id, "bot", "현재 실제 답변을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      appendMessage(categoryId, "bot", "현재 실제 답변을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
 
-    if (!activeQuestion) {
+    if (!question) {
       setLoading(true);
       try {
+        await selectCategory(categoryCode);
         const response = await sendChatMessage(answerText);
-        appendMessage(selectedCategory.id, "bot", response.answer || "연결된 정책 기준으로 답변할 내용을 찾지 못했습니다.");
+        appendMessage(categoryId, "bot", response.answer || "연결된 정책 기준으로 답변할 내용을 찾지 못했습니다.");
       } catch {
-        appendMessage(selectedCategory.id, "bot", "추가 질문 답변 중 문제가 발생했습니다. 백엔드 실행 상태를 확인해 주세요.");
+        appendMessage(categoryId, "bot", "추가 질문 답변 중 문제가 발생했습니다. 백엔드 실행 상태를 확인해 주세요.");
       } finally {
         setLoading(false);
       }
       return;
     }
 
-    const value = normalizeAnswer(answerText, activeQuestion);
+    if (!questionMatchesCategory(question, category)) {
+      setLoading(true);
+      try {
+        await selectCategory(categoryCode);
+        const questions = await getNextQuestions();
+        const nextQuestion = questions.items[0] ?? null;
+        setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
+        appendMessage(
+          categoryId,
+          "bot",
+          nextQuestion ? formatQuestion(nextQuestion) : "현재 주제에서 추가 질문이 없습니다. 궁금한 정책을 입력하면 연결된 정책 기준으로 답변해드릴게요.",
+        );
+      } catch {
+        appendMessage(categoryId, "bot", "현재 주제 질문을 불러오지 못했습니다. 백엔드 실행 상태를 확인해 주세요.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    const value = normalizeAnswer(answerText, question);
     if (value === null) {
-      appendMessage(selectedCategory.id, "bot", optionHint ? `입력 형식이 맞지 않습니다.\n${optionHint}` : "입력 형식이 맞지 않습니다. 질문에 맞는 값을 짧게 입력해 주세요.");
+      appendMessage(categoryId, "bot", optionHint ? `입력 형식이 맞지 않습니다.\n${optionHint}` : "입력 형식이 맞지 않습니다. 질문에 맞는 값을 짧게 입력해 주세요.");
       return;
     }
 
     setLoading(true);
     try {
-      const result = await submitAnswer(activeQuestion, value);
+      await selectCategory(categoryCode);
+      const result = await submitAnswer(question, value);
       if (result.conflicts.length > 0) {
         const conflictQuestion = result.conflicts[0]?.question;
-        setActiveQuestionsByCategory((current) => ({ ...current, [selectedCategory.id]: conflictQuestion ?? activeQuestion }));
-        appendMessage(selectedCategory.id, "bot", conflictQuestion ? `이전 답변과 충돌합니다.\n${formatQuestion(conflictQuestion)}` : "이전 답변과 충돌합니다. 기존 조건을 먼저 확인해 주세요.");
+        setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: conflictQuestion ?? question }));
+        appendMessage(categoryId, "bot", conflictQuestion ? `이전 답변과 충돌합니다.\n${formatQuestion(conflictQuestion)}` : "이전 답변과 충돌합니다. 기존 조건을 먼저 확인해 주세요.");
         return;
       }
 
       const nextQuestion = result.nextQuestions[0] ?? null;
-      setActiveQuestionsByCategory((current) => ({ ...current, [selectedCategory.id]: nextQuestion }));
+      setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
       if (nextQuestion) {
-        appendMessage(selectedCategory.id, "bot", formatQuestion(nextQuestion));
+        appendMessage(categoryId, "bot", formatQuestion(nextQuestion));
         return;
       }
 
       await createEvaluations();
-      const graph = await getSessionGraph(selectedCategory.backendCategoryCode);
+      const graph = await getSessionGraph(categoryCode);
       onGraphChange(graph);
-      appendMessage(selectedCategory.id, "bot", "답변을 저장했고 정책 그래프를 갱신했어요. 우측 그래프에서 연결된 정책과 근거를 확인해보세요.");
+      appendMessage(categoryId, "bot", "답변을 저장했고 정책 그래프를 갱신했어요. 우측 그래프에서 연결된 정책과 근거를 확인해보세요.");
     } catch {
-      appendMessage(selectedCategory.id, "bot", "답변 저장 중 문제가 발생했습니다. 백엔드 실행 상태와 세션 설정을 확인해 주세요.");
+      appendMessage(categoryId, "bot", "답변 저장 중 문제가 발생했습니다. 백엔드 실행 상태와 세션 설정을 확인해 주세요.");
     } finally {
       setLoading(false);
     }

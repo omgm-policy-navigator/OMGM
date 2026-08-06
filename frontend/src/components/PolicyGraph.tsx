@@ -18,6 +18,7 @@ type GraphNodeData = PolicyNodeData & {
   variant: "central" | "policy" | "condition" | "category" | "action" | "detail";
   backendType?: string;
   backendData?: Record<string, unknown>;
+  tone?: "positive" | "negative" | "neutral";
 };
 
 type GraphPoint = {
@@ -108,6 +109,7 @@ const valueLabels: Record<string, string> = {
 };
 
 const eligibleStatuses = new Set(["LIKELY_ELIGIBLE", "eligible", "ELIGIBLE"]);
+const ineligibleStatuses = new Set(["LIKELY_INELIGIBLE", "INELIGIBLE", "ineligible"]);
 
 function normalizeBackendType(type: string): BackendNodeType | "UNKNOWN" {
   const normalized = type.toUpperCase();
@@ -227,6 +229,36 @@ function statusForBackendNode(node: SessionGraphNode): PolicyNodeData["status"] 
   return "checking";
 }
 
+function eligibilityStatusValue(node: SessionGraphNode | undefined) {
+  const status = node?.data.eligibilityStatus;
+  return typeof status === "string" ? status : "";
+}
+
+function policyToneForBackendNode(node: SessionGraphNode): GraphNodeData["tone"] {
+  if (normalizeBackendType(node.type) !== "POLICY") {
+    return "neutral";
+  }
+  const status = eligibilityStatusValue(node);
+  if (eligibleStatuses.has(status)) {
+    return "positive";
+  }
+  if (ineligibleStatuses.has(status)) {
+    return "negative";
+  }
+  return "neutral";
+}
+
+function conditionToneForNode(nodeId: string, edges: SessionGraphResponse["edges"]): GraphNodeData["tone"] {
+  const relatedEdges = edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+  if (relatedEdges.some((edge) => edge.type === "MATCHES")) {
+    return "positive";
+  }
+  if (relatedEdges.some((edge) => edge.type === "FAILED_CONDITION")) {
+    return "negative";
+  }
+  return "neutral";
+}
+
 function spreadY(index: number, total: number, centerY: number, spacing: number) {
   return centerY + (index - (total - 1) / 2) * spacing;
 }
@@ -248,20 +280,24 @@ function hasSessionAnswers(sessionGraph: SessionGraphResponse | null) {
 }
 
 function isApplicablePolicyNode(node: SessionGraphNode) {
-  return normalizeBackendType(node.type) === "POLICY" && eligibleStatuses.has(String(node.data.eligibilityStatus));
+  return normalizeBackendType(node.type) === "POLICY" && eligibleStatuses.has(eligibilityStatusValue(node));
+}
+
+function isIneligiblePolicyNode(node: SessionGraphNode | undefined) {
+  return node !== undefined && normalizeBackendType(node.type) === "POLICY" && ineligibleStatuses.has(eligibilityStatusValue(node));
 }
 
 function getPolicyIdFromGraphNode(node: SessionGraphNode) {
   return typeof node.data.policyId === "string" ? node.data.policyId : node.id.replace(/^POLICY:/, "");
 }
 
-function policyGridPosition(index: number, total: number): GraphPoint {
-  const columns = total > 8 ? 3 : total > 4 ? 2 : 1;
+function policyGridPosition(index: number, total: number, answered = false): GraphPoint {
+  const columns = answered ? (total > 10 ? 2 : 1) : total > 8 ? 3 : total > 4 ? 2 : 1;
   const column = index % columns;
   const row = Math.floor(index / columns);
   const rows = Math.ceil(total / columns);
-  const x = columns === 1 ? 640 : columns === 2 ? 560 + column * 320 : 500 + column * 290;
-  const y = spreadY(row, rows, 330, 170);
+  const x = columns === 1 ? 660 : columns === 2 ? 560 + column * 500 : 500 + column * 360;
+  const y = spreadY(row, rows, 360, answered ? 220 : 190);
   return { x, y };
 }
 
@@ -277,6 +313,11 @@ function sortPoliciesForGraph(
     if (leftEligible !== rightEligible) {
       return rightEligible - leftEligible;
     }
+    const leftIneligible = isIneligiblePolicyNode(leftEvaluation) ? 1 : 0;
+    const rightIneligible = isIneligiblePolicyNode(rightEvaluation) ? 1 : 0;
+    if (leftIneligible !== rightIneligible) {
+      return leftIneligible - rightIneligible;
+    }
     const leftScore = typeof leftEvaluation?.data.recommendationScore === "number" ? leftEvaluation.data.recommendationScore : 0;
     const rightScore = typeof rightEvaluation?.data.recommendationScore === "number" ? rightEvaluation.data.recommendationScore : 0;
     if (leftScore !== rightScore) {
@@ -287,7 +328,7 @@ function sortPoliciesForGraph(
 }
 
 function conditionGridPosition(index: number, total: number): GraphPoint {
-  return { x: 90, y: spreadY(index, total, 330, 112) };
+  return { x: 90, y: spreadY(index, total, 360, 132) };
 }
 
 function eligibilityStatusLabel(status: unknown) {
@@ -313,11 +354,11 @@ function policySummaryById(policySummaries: PolicySummaryResponse[]) {
   return new Map(policySummaries.map((policy) => [policy.policyId, policy]));
 }
 
-function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: number, total: number): Node<GraphNodeData> {
+function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: number, total: number, answered = false): Node<GraphNodeData> {
   return {
     id: `POLICY:${policy.policyId}`,
     type: "policyNode",
-    position: policyGridPosition(index, total),
+    position: policyGridPosition(index, total, answered),
     data: {
       id: `POLICY:${policy.policyId}`,
       label: policy.title,
@@ -325,6 +366,7 @@ function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: numbe
       icon: Landmark,
       status: "recommended",
       variant: "policy",
+      tone: "neutral",
       backendType: "POLICY",
       backendData: {
         policyId: policy.policyId,
@@ -340,14 +382,14 @@ function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: numbe
   };
 }
 
-function enrichPolicyNode(node: Node<GraphNodeData>, summary: PolicySummaryResponse | undefined, index: number, total: number): Node<GraphNodeData> {
+function enrichPolicyNode(node: Node<GraphNodeData>, summary: PolicySummaryResponse | undefined, index: number, total: number, answered = false): Node<GraphNodeData> {
   if (!summary) {
-    return { ...node, position: policyGridPosition(index, total) };
+    return { ...node, position: policyGridPosition(index, total, answered) };
   }
 
   return {
     ...node,
-    position: policyGridPosition(index, total),
+    position: policyGridPosition(index, total, answered),
     data: {
       ...node.data,
       label: summary.title,
@@ -379,21 +421,21 @@ function layoutLiveNode(graphNode: SessionGraphNode, index: number, total: numbe
   const type = normalizeBackendType(graphNode.type);
 
   if (type === "USER") {
-    return { x: 250, y: 330 };
+    return { x: 230, y: 360 };
   }
   if (type === "CATEGORY") {
-    return { x: 420, y: 330 };
+    return { x: 430, y: 360 };
   }
   if (type === "POLICY") {
-    return { x: 590, y: spreadY(index, total, 290, 150) };
+    return { x: 660, y: spreadY(index, total, 360, 220) };
   }
   if (type === "CONDITION") {
     return conditionGridPosition(index, total);
   }
   if (type === "ACTION") {
-    return { x: 860, y: spreadY(index, total, 290, 150) };
+    return { x: 1160, y: spreadY(index, total, 360, 190) };
   }
-  return { x: 590, y: spreadY(index, total, 540, 96) };
+  return { x: 660, y: spreadY(index, total, 540, 120) };
 }
 
 function edgeStyleForType(edgeType: string): Edge["style"] {
@@ -422,7 +464,7 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
     { id: "support", label: `지원 내용\n${supportType}`, value: supportType },
     { id: "apply", label: `신청 기간\n${applicationPeriod}`, value: applicationPeriod },
   ];
-  const detailX = policyNode.position.x + 260;
+  const detailX = policyNode.position.x + 330;
 
   return {
     nodes: details.map((detail, detailIndex) => ({
@@ -430,7 +472,7 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
       type: "policyNode",
       position: {
         x: detailX,
-        y: policyNode.position.y + (detailIndex - 1) * 46,
+        y: policyNode.position.y + (detailIndex - 1) * 64,
       },
       data: {
         id: `POLICY_DETAIL:${policyId}:${detail.id}`,
@@ -439,6 +481,7 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
         icon: ListChecks,
         status: policyNode.data.status,
         variant: "detail",
+        tone: "positive",
         backendType: "POLICY_DETAIL",
         backendData: {
           ...policyNode.data.backendData,
@@ -502,7 +545,10 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
     if (sessionGraph && sessionGraph.nodes.length > 0) {
       const totalByType = countNodesByType(sessionGraph.nodes);
       const indexByType = new Map<BackendNodeType | "UNKNOWN", number>();
-      const sourceNodes = answered ? sessionGraph.nodes.filter((graphNode) => normalizeBackendType(graphNode.type) !== "POLICY") : sessionGraph.nodes;
+      const sourceNodes = sessionGraph.nodes.filter((graphNode) => {
+        const type = normalizeBackendType(graphNode.type);
+        return type !== "POLICY" && type !== "ACTION";
+      });
       const liveNodes: Node<GraphNodeData>[] = sourceNodes.map((graphNode) => {
         const type = normalizeBackendType(graphNode.type);
         const typeIndex = indexByType.get(type) ?? 0;
@@ -520,6 +566,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             variant: variantForBackendNode(graphNode.type),
             backendType: graphNode.type,
             backendData: graphNode.data,
+            tone: type === "CONDITION" ? conditionToneForNode(graphNode.id, sessionGraph.edges) : "neutral",
           },
         };
       });
@@ -532,12 +579,12 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
       const visiblePolicyNodes = visiblePolicySummaries.map((summary, index) => {
         const graphNode = evaluationByPolicyId.get(summary.policyId);
         if (!graphNode) {
-          return createPolicyNodeFromSummary(summary, index, visiblePolicySummaries.length);
+          return createPolicyNodeFromSummary(summary, index, visiblePolicySummaries.length, answered);
         }
         const baseNode: Node<GraphNodeData> = {
           id: graphNode.id,
           type: "policyNode",
-          position: policyGridPosition(index, visiblePolicySummaries.length),
+          position: policyGridPosition(index, visiblePolicySummaries.length, answered),
           data: {
             id: graphNode.id,
             label: displayLabelForBackendNode(graphNode),
@@ -547,9 +594,10 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             variant: "policy",
             backendType: graphNode.type,
             backendData: graphNode.data,
+            tone: policyToneForBackendNode(graphNode),
           },
         };
-        return enrichPolicyNode(baseNode, summariesById.get(summary.policyId), index, visiblePolicySummaries.length);
+        return enrichPolicyNode(baseNode, summariesById.get(summary.policyId), index, visiblePolicySummaries.length, answered);
       });
       const liveNodesWithoutPolicies = liveNodes.filter((node) => node.data.variant !== "policy");
       const composedNodes = [...liveNodesWithoutPolicies, ...visiblePolicyNodes];
@@ -806,10 +854,21 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
 
   if (isPolicy) {
     const isEligible = data.status === "eligible";
+    const isIneligible = data.tone === "negative";
+    const policyBorderClass = isEligible
+      ? "border-2 border-brand-primary"
+      : isIneligible
+        ? "border-2 border-[#C05A4B] bg-[#FFF7F5]"
+        : "border border-brand-border opacity-85";
+    const policyIconClass = isEligible
+      ? "bg-brand-primary text-white"
+      : isIneligible
+        ? "bg-[#F7DEDA] text-[#C05A4B]"
+        : "bg-brand-surface text-brand-primary";
     return (
       <div
         className={`relative flex min-h-[112px] w-[250px] cursor-pointer items-start gap-3 rounded-2xl bg-white px-4 py-4 text-left text-text-primary shadow-card transition hover:-translate-y-1 hover:bg-brand-surface-container ${
-          isEligible ? "border-2 border-brand-primary" : "border border-brand-border opacity-80"
+          policyBorderClass
         }`}
       >
         {handlePositions.map(({ id, position }) => (
@@ -818,7 +877,7 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
         {handlePositions.map(({ id, position }) => (
           <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
         ))}
-        <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isEligible ? "bg-brand-primary text-white" : "bg-brand-surface text-brand-primary"}`}>
+        <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${policyIconClass}`}>
           <Icon size={22} />
         </div>
         <div className="min-w-0">
@@ -829,6 +888,15 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
     );
   }
 
+  const conditionToneClass =
+    data.tone === "positive"
+      ? "border-2 border-brand-primary bg-white"
+      : data.tone === "negative"
+        ? "border-2 border-[#C05A4B] bg-[#FFF7F5]"
+        : "border border-dashed border-brand-primary bg-white";
+  const detailToneClass = data.tone === "positive" ? "border-brand-primary bg-white" : "border-brand-border bg-white";
+  const iconToneClass = data.tone === "negative" ? "text-[#C05A4B]" : "text-brand-primary";
+
   return (
     <div
       className={`relative flex items-center justify-center text-center shadow-card ${
@@ -836,12 +904,12 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
           ? "h-[136px] w-[136px] flex-col rounded-full border-2 border-brand-primary bg-white text-text-primary"
           : `cursor-pointer text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
               isCondition
-                  ? "h-[96px] w-[96px] flex-col rounded-full border border-dashed border-brand-primary bg-white px-3"
-                  : isCategory
-                    ? "h-[112px] w-[112px] flex-col rounded-full border border-brand-border bg-brand-surface px-3"
-                    : isDetail
-                      ? "min-h-[40px] w-[142px] rounded-full border border-brand-border bg-white px-3 py-2"
-                      : "h-[96px] w-[96px] flex-col rounded-full border border-brand-border bg-white px-3"
+                ? `h-[104px] w-[104px] flex-col rounded-full px-3 ${conditionToneClass}`
+                : isCategory
+                  ? "h-[112px] w-[112px] flex-col rounded-full border border-brand-border bg-brand-surface px-3"
+                  : isDetail
+                    ? `min-h-[48px] w-[168px] rounded-full border px-3 py-2 ${detailToneClass}`
+                    : "h-[96px] w-[96px] flex-col rounded-full border border-brand-border bg-white px-3"
             }`
       }`}
     >
@@ -851,7 +919,7 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
       {handlePositions.map(({ id, position }) => (
         <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
       ))}
-      <Icon size={isCentral ? 34 : isDetail ? 16 : 24} className={`${isDetail ? "mr-2 shrink-0" : "mb-2"} text-brand-primary`} />
+      <Icon size={isCentral ? 34 : isDetail ? 16 : 24} className={`${isDetail ? "mr-2 shrink-0" : "mb-2"} ${iconToneClass}`} />
       <span className={`${isCentral ? "text-body-sm font-semibold" : isDetail ? "whitespace-pre-line text-left text-[11px] font-medium leading-4" : "whitespace-pre-line text-[11px] font-medium leading-4"}`}>
         {data.label}
       </span>
