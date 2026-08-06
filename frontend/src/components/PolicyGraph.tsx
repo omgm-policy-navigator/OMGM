@@ -1,4 +1,4 @@
-import { Background, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
+import { Background, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
@@ -8,9 +8,43 @@ type GraphNodeData = PolicyNodeData & {
   variant: "central" | "policy";
 };
 
+type GraphPoint = {
+  x: number;
+  y: number;
+};
+
 const nodeTypes = {
   policyNode: PolicyNode,
 };
+
+const handlePositions = [
+  { id: "top", position: Position.Top },
+  { id: "right", position: Position.Right },
+  { id: "bottom", position: Position.Bottom },
+  { id: "left", position: Position.Left },
+] as const;
+
+function getClosestHandle(from: GraphPoint, to: GraphPoint) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? "right" : "left";
+  }
+
+  return dy > 0 ? "bottom" : "top";
+}
+
+function getOppositeHandle(handle: string) {
+  const opposites: Record<string, string> = {
+    top: "bottom",
+    right: "left",
+    bottom: "top",
+    left: "right",
+  };
+
+  return opposites[handle];
+}
 
 export function PolicyGraph() {
   const [selectedPolicy, setSelectedPolicy] = useState<PolicyNodeData | null>(null);
@@ -46,20 +80,33 @@ export function PolicyGraph() {
       };
     });
 
-    const graphEdges: Edge[] = policyNodes.map((policy) => ({
-      id: `couple-${policy.id}`,
-      source: "couple",
-      target: policy.id,
-      type: "straight",
-      animated: false,
-      style: {
-        stroke: "#6FA77E",
-        strokeWidth: 2,
-        strokeDasharray: "4",
-      },
-    }));
+    const graphNodePositions = new Map<string, GraphPoint>([center, ...policyGraphNodes].map((node) => [node.id, node.position]));
 
-    return { nodes: [center, ...policyGraphNodes], edges: graphEdges };
+    const createEdge = (source: string, target: string, style: Edge["style"]): Edge => {
+      const sourcePosition = graphNodePositions.get(source);
+      const targetPosition = graphNodePositions.get(target);
+      const sourceHandle = sourcePosition && targetPosition ? getClosestHandle(sourcePosition, targetPosition) : "right";
+
+      return {
+        id: `${source}-${target}`,
+        source,
+        target,
+        sourceHandle,
+        targetHandle: getOppositeHandle(sourceHandle),
+        type: "straight",
+        animated: false,
+        style,
+      };
+    };
+
+    const radialEdges: Edge[] = policyNodes.map((policy) =>
+      createEdge("couple", policy.id, {
+        stroke: "rgba(111, 167, 126, 0.62)",
+        strokeWidth: 0.75,
+      }),
+    );
+
+    return { nodes: [center, ...policyGraphNodes], edges: radialEdges };
   }, []);
 
   return (
@@ -80,7 +127,13 @@ export function PolicyGraph() {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
-          panOnScroll
+          edgesFocusable={false}
+          nodesFocusable={false}
+          panOnScroll={false}
+          panOnDrag={false}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          preventScrolling
           onNodeClick={(_, node) => {
             const data = node.data as GraphNodeData;
             if (data.variant === "policy") {
@@ -103,12 +156,18 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
 
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-full text-center shadow-card ${
+      className={`relative flex flex-col items-center justify-center rounded-full text-center shadow-card ${
         isCentral
           ? "h-[120px] w-[120px] border-2 border-brand-primary bg-white text-text-primary"
           : "h-[100px] w-[100px] cursor-pointer border border-brand-border bg-brand-surface text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container"
       }`}
     >
+      {handlePositions.map(({ id, position }) => (
+        <Handle key={`target-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="target" position={position} />
+      ))}
+      {handlePositions.map(({ id, position }) => (
+        <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
+      ))}
       <Icon size={isCentral ? 30 : 24} className="mb-2 text-brand-primary" />
       <span className={`${isCentral ? "text-caption" : "px-2 text-[11px] font-medium leading-4"}`}>{data.label}</span>
     </div>
