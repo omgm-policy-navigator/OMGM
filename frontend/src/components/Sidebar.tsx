@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, ChevronRight, Heart, Home, LogOut, Menu, MessageCircle, Settings } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Heart, Home, Menu, MessageCircle, Settings } from "lucide-react";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -75,7 +75,7 @@ export function Sidebar({ collapsed, currentPath, onNavigate, onToggle }: Sideba
       </nav>
 
       <div className="border-t border-brand-border p-4">
-        {[{ label: "Settings", icon: Settings }, { label: "Logout", icon: LogOut }].map(({ label, icon: Icon }) => (
+        {[{ label: "Settings", icon: Settings }].map(({ label, icon: Icon }) => (
           <a
             href="#chat"
             key={label}
