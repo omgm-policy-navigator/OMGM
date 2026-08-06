@@ -165,3 +165,11 @@ Default Ollama generation settings:
 Runtime health checks report `READY`, `MODEL_NOT_INSTALLED`, or `UNAVAILABLE`. Provider failures are contained inside the LLM boundary and must not make the backend process unhealthy by themselves. `create_available_llm_provider` falls back to the template provider when the configured provider is not ready. `RobustLLMManager` wraps generation so primary failure, fallback failure, and static safety-net fallback all return validated `AIOutput` instead of propagating provider exceptions to API callers.
 
 Ollama uses an explicit async `httpx.Timeout` with the configured timeout value. Ollama JSON responses are extracted from pure JSON, fenced JSON, or surrounding explanatory text and then validated as `AIOutput`. Invalid JSON or schema violations are treated as provider failures, not as eligibility evidence. The LLM runtime must not log prompts, raw sensitive user facts, or full raw model responses.
+
+## Phase A2 User Condition Extraction
+
+Phase A2 adds the `app.modules.user_facts` prompt and strict output contract. The only allowed extraction keys are `MARRIAGE_STATUS`, `RESIDENCE_REGION`, `HOME_OWNERSHIP`, `HOUSEHOLD_INCOME_RANGE`, `CONTRACT_STATUS`, `PREGNANCY_STAGE`, and `CHILD_AGE_RANGE`.
+
+Each candidate contains `factKey`, `value`, `confidence`, `isAmbiguous`, and a short user-supported `evidence` phrase. Unknown keys, extra fields, duplicate keys, blank values, and confidence outside `0..1` invalidate the complete model response. Missing facts are omitted rather than inferred or converted to `false` or `0`.
+
+Backend code requires confirmation when confidence is below `0.8`, the candidate is ambiguous, or it differs from an existing confirmed fact. A2 returns candidate and conflict-review DTOs only; it adds no API, persistence, eligibility calculation, or `user_fact` table.

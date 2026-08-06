@@ -82,3 +82,7 @@ Phase 0는 로컬 실행과 Health Check만 제공한다. 운영 배포 전 인�
 ## AI A1 Runtime Security Note
 
 The local LLM runtime uses provider-level timeouts and validates generated JSON against `AIOutput` before any downstream use. Provider failures, missing models, invalid JSON, and connection failures are handled inside the LLM boundary. Prompts, raw sensitive user facts, and full raw model responses must not be logged.
+
+## AI A2 Extraction Security Note
+
+Condition extraction accepts only the documented seven fact keys and rejects the complete model response when an unknown key or extra field is present. The module does not log user text, evidence phrases, income ranges, or model output. Ambiguous, low-confidence, and conflicting values require confirmation before a later persistence phase may store them.

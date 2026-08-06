@@ -45,7 +45,7 @@ backend/
 | Error response handling | `app/core/errors.py`, `app/main.py` | Implemented minimum, documented in API contracts |
 | Anonymous session | Future `app/modules/sessions` | Mock API contract only |
 | Conversation orchestration | Future `app/modules/conversation` | Mock API contract only |
-| Question engine and user facts | Future `app/modules/user_facts` | Mock API contract only |
+| Question engine and user facts | `app/modules/user_facts` | A2 extraction and conflict review implemented; API and persistence deferred |
 | Policy catalog and detail lookup | Future `app/modules/policies` | Mock API contract only |
 | Eligibility evaluation | `app/modules/eligibility` | Rule core implemented, API contract only |
 | AI output contract | `app/llm` | Pydantic schema implemented, behavior contract documented |
@@ -96,3 +96,9 @@ Phase B1 introduces SQLAlchemy async engine setup in `app/db/session.py`, Alembi
 Phase A1 adds provider-swappable LLM runtime code under `app/llm`. `OllamaLLMProvider` owns local Ollama health checks, timeout handling, model-missing detection, non-thinking JSON generation, and `AIOutput` validation. `FakeLLMProvider` and `TemplateLLMProvider` allow tests and local fallback paths to avoid a live model.
 
 The LLM runtime is not wired into API routes in A1. Connection failures, timeouts, missing models, and invalid JSON are represented as provider errors or health statuses so they do not become backend process health failures.
+
+## Phase A2 User Fact Extraction
+
+`app/modules/user_facts` owns the pure extraction contract: constrained prompt construction, seven-key allowlist validation, confidence and ambiguity review, and conflict detection against confirmed existing-fact DTOs. It depends on the LLM request DTO but not on FastAPI, SQLAlchemy models, or sessions.
+
+A2 does not persist candidates or expose an API. A later user-fact phase must confirm ambiguous, low-confidence, or conflicting candidates before storage.
