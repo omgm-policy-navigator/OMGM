@@ -26,6 +26,8 @@ backend/
 
 `app/modules/rag` owns document processing, embedding/indexing, and policy-scoped retrieval contracts. SQLAlchemy persistence stays in the RAG repository adapter; indexing and search services depend on provider and repository protocols rather than FastAPI or database sessions.
 
+`app/modules/explanations` owns A5 Rule-grounded answer composition. It consumes Rule, RAG, and graph DTOs through immutable input contracts, uses the LLM only for a checked explanation draft, and has no FastAPI or SQLAlchemy dependency.
+
 ## Responsibility Map
 
 | Responsibility | Owner | May depend on | Must not do |

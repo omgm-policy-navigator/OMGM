@@ -34,6 +34,8 @@ LLM은 질문 이해, 조건 추출 보조, 행정 용어 설명, Rule 결과 �
 
 LLM 출력은 `app.llm.AIOutput` 계약을 따른다. 근거가 부족하면 `INSUFFICIENT_EVIDENCE`, LLM 호출이 실패하면 `LLM_UNAVAILABLE`, 추가 정보가 필요하면 `NEEDS_CONFIRMATION`을 반환하고 정책 사실을 생성하지 않는다.
 
+A5의 최종 설명 DTO는 Rule 상태와 조건 목록을 구조화 입력에서 그대로 조립한다. LLM 초안이 반대 판정, 입력에 없는 조건·Citation 또는 공식 Chunk에 없는 정책 수치를 포함하면 폐기한다. Citation이 없으면 정책 세부 설명 대신 공식 확인 필요 상태를 반환하며 정책 설명과 일반 안내를 별도 필드로 구분한다.
+
 ## 근거 없는 생성 방지
 
 출처 URL과 근거 문구가 없는 조건은 확정 판정 근거로 사용하지 않는다. Rule의 명시적 `evaluation_mode`가 `OFFICIAL_CONFIRMATION_REQUIRED`이면 기대값 문자열과 무관하게 결정형 계산에서 제외한다. 설명은 판정 결과를 바꾸지 않는다.

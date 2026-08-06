@@ -86,6 +86,18 @@
 
 테스트 범위: 정보 부족, 필수 조건 불충족, 충족, 답변 충돌, 정책 버전 변경.
 
+## `backend/src/app/modules/explanations`
+
+책임: 이미 계산된 Rule 결과와 검색된 공식 근거를 설명 DTO로 조립하고 LLM 설명 초안을 검증한다.
+
+입력: 사용자 질문·조건, `EvaluationResult`, RAG Citation, 선택 그래프 노드.
+
+출력: 판정 요약, 충족·확인 조건, 신청 시점, 공식 출처, 다음 행동, 분리된 정책 설명과 일반 안내.
+
+금지 의존성: FastAPI Router, SQLAlchemy Session, 판정 재계산, Citation 생성, 근거 없는 정책 수치 생성.
+
+테스트 범위: 반대 판정 차단, 조건·Citation 고정, 무근거 수치 차단, 근거 부족과 LLM 실패 fallback.
+
 ## `backend/src/app/modules/policies`
 
 책임: `backend/data/policy-seed`의 검수된 CSV를 읽기 전용으로 로딩하고 ID·참조·URL·RAG 문서 연결을 검증한다.
