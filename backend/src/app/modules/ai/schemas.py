@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from enum import StrEnum
 
@@ -21,6 +21,8 @@ class CitationResponse(BaseModel):
     source_label: str = Field(alias="sourceLabel")
     evidence_id: str = Field(alias="evidenceId")
     excerpt: str | None = None
+    source_location: str | None = Field(default=None, alias="sourceLocation")
+    similarity: float | None = None
 
 
 class ChatRequest(BaseModel):

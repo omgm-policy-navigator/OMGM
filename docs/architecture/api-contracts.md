@@ -453,11 +453,11 @@ Returns one stored evaluation for the current session and policy. Missing evalua
 User fact changes through session answer/fact endpoints mark existing current-session evaluations `STALE`; callers should create evaluations again to refresh them.
 ## Phase B7 RAG and LLM Explanation APIs
 
-All B7 endpoints identify the anonymous user only through the HttpOnly anonymous-session cookie. Request bodies and URLs must not carry a session id. Rule Engine evaluations remain the source of eligibility status; RAG supplies official citations, and the LLM supplies explanatory text only.
+All B7 endpoints identify the anonymous user only through the HttpOnly anonymous-session cookie. Request bodies and URLs must not carry a session id. Rule Engine evaluations remain the source of eligibility status; RAG supplies approved official citations from the pgvector-backed document chunk index when available, and the LLM supplies explanatory text only.
 
 ### `POST /api/chat`
 
-Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support.
+Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official chunk or document evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support.
 
 Request:
 
@@ -485,7 +485,9 @@ Response `200`:
       "url": "https://example.go.kr/policy/1",
       "sourceLabel": "Example Office",
       "evidenceId": "hash_1",
-      "excerpt": null
+      "excerpt": null,
+      "sourceLocation": null,
+      "similarity": null
     }
   ]
 }

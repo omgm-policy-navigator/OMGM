@@ -26,6 +26,7 @@ class ExplanationContext:
     policy: Policy | None
     evaluation: PolicyEvaluation | None
     documents: tuple[PolicyDocument, ...]
+    retrieved_citations: tuple[CitationResponse, ...] = ()
     user_message: str | None = None
 
 
@@ -91,7 +92,13 @@ def build_prompt(context: ExplanationContext, citations: list[CitationResponse])
 
 async def explain_with_ai(context: ExplanationContext, provider: LLMProvider | None) -> AIExplanationResponse:
     policy_id = context.policy.id if context.policy is not None else None
-    citations = citations_from_documents(context.documents, policy_id or "UNKNOWN") if policy_id is not None else []
+    citations = (
+        list(context.retrieved_citations)
+        if context.retrieved_citations
+        else citations_from_documents(context.documents, policy_id or "UNKNOWN")
+        if policy_id is not None
+        else []
+    )
     eligibility_status, evaluation_state = rule_status(context.evaluation)
 
     if not citations:

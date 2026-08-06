@@ -131,6 +131,6 @@ Phase B6 adds `app/modules/graph` for frontend graph projection. It derives grap
 The session API exposes `/api/v1/session/graph` with category filtering, selected-policy centering, batched policy/evaluation reads, relation edges, action nodes, priority-based node trimming, BFS depth limits, dangling-edge cleanup, and bounded node counts for frontend rendering.
 ## Phase B7 RAG and LLM Explanation API
 
-Phase B7 adds `app/modules/ai` for session-scoped AI explanations. The module reads approved active policy metadata, official policy documents, and current-session `policy_evaluation` rows, then returns structured responses with citations. Rule Engine results remain authoritative: LLM output is used only as explanatory text and cannot replace or mutate `eligibilityStatus`.
+Phase B7 adds `app/modules/ai` for session-scoped AI explanations. The module reads approved active policy metadata, approved official RAG chunks or policy documents, and current-session `policy_evaluation` rows, then returns structured responses with citations. Rule Engine results remain authoritative: LLM output is used only as explanatory text and cannot replace or mutate `eligibilityStatus`.
 
 The API exposes `POST /api/chat`, `POST /api/policies/{policy_id}/explain`, and `GET /api/chat/stream`. If approved official evidence is unavailable, the explanation response reports `OFFICIAL_CONFIRMATION_REQUIRED`. If the LLM provider is unavailable or returns a fallback status, the API still returns the existing Rule Engine decision and approved citations with `aiStatus: FALLBACK`.

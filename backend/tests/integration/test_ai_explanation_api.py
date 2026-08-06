@@ -125,7 +125,10 @@ class AIExplanationApiTests(unittest.TestCase):
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.ai.api.get_policy_evidence_bundle",
             new=AsyncMock(return_value=policy_bundle()),
-        ) as get_bundle:
+        ) as get_bundle, patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
             status, _headers, body = asyncio.run(
                 asgi_request(app, "POST", "/api/policies/policy_housing_001/explain", body={"question": "Explain"})
             )
@@ -143,7 +146,10 @@ class AIExplanationApiTests(unittest.TestCase):
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.ai.api.get_top_session_policy_evidence_bundle",
             new=AsyncMock(return_value=policy_bundle()),
-        ) as top_bundle:
+        ) as top_bundle, patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
             status, _headers, body = asyncio.run(asgi_request(app, "POST", "/api/chat", body={"message": "Tell me"}))
 
         self.assertEqual(status, 200)
@@ -156,6 +162,9 @@ class AIExplanationApiTests(unittest.TestCase):
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.ai.api.get_policy_evidence_bundle",
             new=AsyncMock(return_value=policy_bundle()),
+        ), patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
         ):
             status, headers, body = asyncio.run(
                 asgi_request(
