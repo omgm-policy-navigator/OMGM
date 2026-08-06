@@ -28,7 +28,9 @@ MVP 실행 기준 데이터는 `backend/data/policy-seed/`에 저장한다. 현�
 - CSV는 읽기 전용이며 API 요청 중 변경하지 않는다.
 - 사용자 사실 및 평가 template CSV는 스키마 참고용 빈 파일이며 개인정보를 저장하지 않는다.
 
-D0 [Raw Policy Schema](raw-policy-schema.md)는 과거 수집 계약 기록으로 남지만 현재 런타임 경로에는 사용하지 않는다. 제공된 CSV에는 원문 파일 해시가 없으므로 자동 변경 감지는 지원하지 않으며 `verified_at`과 저장소 diff로 변경을 검수한다.
+D0 [Raw Policy Schema](raw-policy-schema.md)는 과거 수집 계약 기록으로 남으며 런타임 요청 경로에는 사용하지
+않는다. D6 오프라인 워크플로는 별도로 보관한 기준 원문 SHA-256과 새 API/HTML/PDF exact bytes를 비교하고,
+변경 후보와 영향 리포트를 생성한다. 승인된 후보도 활성 기준본을 덮어쓰지 않고 별도 staging Seed로 생성한다.
 
 수동 원문 재검수와 Seed 갱신은 [정책 Seed 운영 가이드](policy-seed-operations.md)를 따른다.
 

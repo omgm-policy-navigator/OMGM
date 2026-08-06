@@ -118,3 +118,21 @@ Body enforcement counts actual ASGI request chunks, so missing or rewritten `Con
 client addresses are ignored unless the immediate peer is explicitly configured as a trusted proxy. Expired rate-limit
 buckets are removed. Migration defaults all legacy Rule/document rows to `DRAFT` and promotes only exact reviewed Seed
 rows written by B7; missing approval metadata is handled fail-closed. Policies without an approved Rule are not evaluated.
+## Analysis D6 collection and approval security
+
+D6 collection is offline and restricted to an explicitly configured official host. Redirects and unsupported media
+types are rejected, response bytes are streamed under a size bound, and request/response credentials or headers are
+not stored in snapshots or review reports. Raw candidate content cannot enter Rule Engine or RAG paths.
+
+Official collection requires HTTPS by default and uses a constructor-provided host allowlist. HTML and PDF collection
+requires an explicit extractor; missing extraction is never interpreted as field deletion. Extractor identity/version,
+field-mapping version, and Diff content participate in the review report ID.
+
+Every changed source is `OUTDATED` and must pass `REVIEWING` before approval. Seed regeneration is blocked for all
+other states, writes outside the active Seed directory, recalculates checksums, and validates the full candidate. The
+workflow outputs affected Rule and Chunk IDs plus explicit reindex/reevaluation actions; it does not execute those
+actions or mutate operating data before administrator promotion.
+
+Approval validates and freezes non-empty Seed patches against the reviewed policy, affected Rule/Chunk IDs, and field
+Diff values. Regeneration applies only those embedded patches and writes a report/Seed hash manifest, preventing an
+approved report from acting as authority for unrelated or empty Seed changes.
