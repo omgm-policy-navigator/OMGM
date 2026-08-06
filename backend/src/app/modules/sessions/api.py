@@ -9,12 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import AppConfig
 from app.core.errors import AppError
 from app.db.session import get_db
-from app.modules.questions.engine import next_questions, progress, question_for_fact, supported_category
+from app.modules.questions.engine import (
+    dependent_fact_keys,
+    next_questions,
+    progress,
+    question_for_fact,
+    supported_category,
+)
 from app.modules.questions.mappers import facts_to_dict, question_to_response
 from app.modules.questions.schemas import (
     AnswerConflictResponse,
     NextQuestionsResponse,
     QuestionProgressResponse,
+    QuestionResponse,
     SelectCategoryRequest,
     SelectCategoryResponse,
     SubmitAnswersRequest,
@@ -26,6 +33,7 @@ from app.modules.sessions.service import (
     cleanup_expired_sessions,
     create_or_get_session,
     delete_current_session,
+    delete_session_facts_by_keys,
     list_session_facts,
     require_session,
     upsert_session_fact,
@@ -113,6 +121,12 @@ def validate_category_code(category_code: str) -> str:
     return normalized
 
 
+def conflict_question_response(question: QuestionResponse, fact_key: str) -> QuestionResponse:
+    question.is_conflict_resolution = True
+    question.conflict_reason = f"Submitted answer conflicts with the existing confirmed fact for {fact_key}."
+    return question
+
+
 def detect_answer_conflicts(
     category_code: str,
     existing_facts: dict[str, Any],
@@ -124,13 +138,16 @@ def detect_answer_conflicts(
     for fact_key, submitted_value in submitted_facts.items():
         if fact_key not in existing_facts or existing_facts[fact_key] == submitted_value:
             continue
+        if dependent_fact_keys(category_code, fact_key):
+            continue
         question = question_for_fact(category_code, fact_key, combined)
+        question_response = question_to_response(question) if question else None
         conflicts.append(
             AnswerConflictResponse(
                 factKey=fact_key,
                 existingValue=existing_facts[fact_key],
                 submittedValue=submitted_value,
-                question=question_to_response(question) if question else None,
+                question=conflict_question_response(question_response, fact_key) if question_response else None,
             )
         )
     return conflicts
@@ -260,9 +277,8 @@ async def get_next_questions(
     session = await require_session(db, config, request.cookies.get(config.anonymous_session_cookie_name))
     category_code = require_category_code(session.selected_category_code)
     facts = facts_to_dict(await list_session_facts(db, session))
-    answered, total, complete = progress(category_code, facts)
+    _answered, _total, complete = progress(category_code, facts)
     await db.commit()
-    del answered, total
     return NextQuestionsResponse(
         categoryCode=category_code,
         items=[question_to_response(question) for question in next_questions(category_code, facts)],
@@ -289,11 +305,18 @@ async def submit_answers(
         return SubmitAnswersResponse(status="conflicted", stored=[], conflicts=conflicts, nextQuestions=[])
 
     stored: list[str] = []
+    invalidated: set[str] = set()
     for answer in payload.answers:
+        changed = answer.fact_key in existing_facts and existing_facts[answer.fact_key] != answer.value
+        stale_fact_keys = dependent_fact_keys(category_code, answer.fact_key) if changed else set()
         await upsert_session_fact(db, session, answer.fact_key, answer.value, "question_engine", answer.confirmed, None)
+        await delete_session_facts_by_keys(db, session, stale_fact_keys)
+        invalidated.update(stale_fact_keys)
         stored.append(answer.fact_key)
     merged_facts = dict(existing_facts)
     merged_facts.update(submitted_facts)
+    for fact_key in invalidated:
+        merged_facts.pop(fact_key, None)
     follow_ups = [question_to_response(question) for question in next_questions(category_code, merged_facts)]
     await db.commit()
     return SubmitAnswersResponse(status="stored", stored=stored, conflicts=[], nextQuestions=follow_ups)

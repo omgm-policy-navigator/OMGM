@@ -112,6 +112,6 @@ The module exposes cookie lifecycle endpoints and fact list/upsert endpoints und
 
 ## Phase B4 Question Engine
 
-Phase B4 adds `app/modules/questions` for deterministic question selection. The module owns MVP question templates, priority ordering, parent-child visibility through `showCondition`, answered-question exclusion, completion progress, and conflict detection support. It uses plain facts and category codes as input and does not depend on FastAPI routers or SQLAlchemy sessions.
+Phase B4 adds `app/modules/questions` for deterministic question selection. The module owns MVP question templates, priority ordering, parent-child visibility through `showCondition`, DAG validation, answered-question exclusion, completion progress, conflict detection support, and dependent child fact invalidation guidance. It uses plain facts and category codes as input and does not depend on FastAPI routers or SQLAlchemy sessions.
 
 The session API stores the selected category on `anonymous_session` and stores submitted answers as session-scoped `user_fact` rows. B4 does not evaluate policy eligibility or mark evaluations `STALE` because evaluation persistence is not implemented yet.

@@ -9,12 +9,13 @@ Implemented on branch `backend-b4-question-engine`.
 - Added `app/modules/questions` with static MVP question templates and pure question selection logic.
 - Added category-specific core questions for housing, loan, cash, childcare, and education.
 - Added priority and discriminator-score ordering.
-- Added parent-child question handling through `showCondition`.
+- Added parent-child question handling through `showCondition` and mandatory DAG cycle validation.
 - Added selected-category storage on `anonymous_session`.
 - Added APIs under `/api/v1/session` for category selection, next question retrieval, answer submission, and progress.
 - Stored submitted answers as session-scoped `user_fact` rows through existing B3 storage.
-- Added conflict detection for submitted answers that differ from existing confirmed facts.
-- Added tests for priority, answered-question exclusion, conditional child questions, completion progress, API category selection, next question, and conflict responses.
+- Added conflict detection for submitted answers that differ from existing confirmed facts, with explicit conflict-resolution response fields.
+- Added tests for priority, answered-question exclusion, conditional child questions, completion progress, API category selection, next question, conflict responses, DAG cycle rejection, and dependent child fact invalidation.
+- Added cascade invalidation that deletes dependent child `user_fact` rows when a parent answer changes.
 
 ## Deferred
 

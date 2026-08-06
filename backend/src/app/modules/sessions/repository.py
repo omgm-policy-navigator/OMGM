@@ -84,3 +84,15 @@ async def upsert_fact(
     )
     result = await db.execute(statement)
     return result.scalar_one()
+
+
+async def delete_facts_by_keys(db: AsyncSession, session_id: int, condition_keys: set[str]) -> int:
+    if not condition_keys:
+        return 0
+    result = await db.execute(
+        delete(UserFact).where(
+            UserFact.session_id == session_id,
+            UserFact.condition_key.in_(condition_keys),
+        )
+    )
+    return result.rowcount or 0

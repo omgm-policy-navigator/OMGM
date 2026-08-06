@@ -272,7 +272,7 @@ Response `200`:
 
 ### `GET /api/v1/session/questions/next`
 
-Returns the next unanswered required question for the selected category. Questions are ordered by category relevance, required status, priority, discriminator score, and visible parent conditions. Already answered facts are excluded.
+Returns the next unanswered required question for the selected category. Questions are ordered by category relevance, required status, priority, discriminator score, and visible parent conditions. Already answered facts are excluded. Conflict-resolution questions set `isConflictResolution` and `conflictReason` explicitly so clients can render reconfirmation UI.
 
 Response `200`:
 
@@ -292,7 +292,9 @@ Response `200`:
       "options": [
         {"label": "Seoul", "value": "Seoul"},
         {"label": "Gyeonggi", "value": "Gyeonggi"}
-      ]
+      ],
+      "isConflictResolution": false,
+      "conflictReason": null
     }
   ],
   "complete": false
@@ -301,7 +303,7 @@ Response `200`:
 
 ### `POST /api/v1/session/answers`
 
-Stores answers as user facts for the current anonymous session. If a submitted answer conflicts with an existing confirmed fact, no facts from that request are stored and a reconfirmation question is returned.
+Stores answers as user facts for the current anonymous session. If a submitted answer conflicts with an existing confirmed fact, no facts from that request are stored and a reconfirmation question is returned. If an existing parent answer changes, dependent child facts are deleted in the same transaction so hidden or stale child answers cannot be reused by later engines.
 
 Request:
 
@@ -349,7 +351,9 @@ Response `200` when conflicted:
         "priority": 10,
         "parentQuestionId": null,
         "showCondition": null,
-        "options": []
+        "options": [],
+        "isConflictResolution": true,
+        "conflictReason": "Submitted answer conflicts with the existing confirmed fact for region."
       }
     }
   ],

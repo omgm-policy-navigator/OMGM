@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -251,6 +251,77 @@ QUESTION_BANK: tuple[QuestionTemplate, ...] = (
 )
 
 
+
+
+def questions_by_id(questions: tuple[QuestionTemplate, ...] = QUESTION_BANK) -> dict[str, QuestionTemplate]:
+    return {question.question_id: question for question in questions}
+
+
+def fact_to_question_ids(questions: tuple[QuestionTemplate, ...] = QUESTION_BANK) -> dict[str, set[str]]:
+    mapping: dict[str, set[str]] = {}
+    for question in questions:
+        mapping.setdefault(question.fact_key, set()).add(question.question_id)
+    return mapping
+
+
+def dependency_edges(questions: tuple[QuestionTemplate, ...] = QUESTION_BANK) -> dict[str, set[str]]:
+    by_id = questions_by_id(questions)
+    by_fact = fact_to_question_ids(questions)
+    edges: dict[str, set[str]] = {question.question_id: set() for question in questions}
+    for question in questions:
+        parent_ids: set[str] = set()
+        if question.parent_question_id is not None:
+            if question.parent_question_id not in by_id:
+                raise ValueError(f"Unknown parent question: {question.parent_question_id}")
+            parent_ids.add(question.parent_question_id)
+        if question.show_condition is not None:
+            parent_ids.update(by_fact.get(question.show_condition.fact_key, set()))
+        for parent_id in parent_ids:
+            if by_id[parent_id].category_code == question.category_code:
+                edges[parent_id].add(question.question_id)
+    return edges
+
+
+def validate_question_dag(questions: tuple[QuestionTemplate, ...] = QUESTION_BANK) -> None:
+    edges = dependency_edges(questions)
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(question_id: str) -> None:
+        if question_id in visited:
+            return
+        if question_id in visiting:
+            raise ValueError(f"Circular question dependency detected at {question_id}")
+        visiting.add(question_id)
+        for child_id in edges[question_id]:
+            visit(child_id)
+        visiting.remove(question_id)
+        visited.add(question_id)
+
+    for question_id in edges:
+        visit(question_id)
+
+
+def dependent_fact_keys(category_code: str, changed_fact_key: str) -> set[str]:
+    by_fact = fact_to_question_ids()
+    parent_ids = {
+        question_id
+        for question_id in by_fact.get(changed_fact_key, set())
+        if questions_by_id()[question_id].category_code == category_code
+    }
+    edges = dependency_edges()
+    dependent_question_ids: set[str] = set()
+    pending = list(parent_ids)
+    while pending:
+        question_id = pending.pop()
+        for child_id in edges.get(question_id, set()):
+            if child_id in dependent_question_ids:
+                continue
+            dependent_question_ids.add(child_id)
+            pending.append(child_id)
+    by_id = questions_by_id()
+    return {by_id[question_id].fact_key for question_id in dependent_question_ids}
+
 def category_questions(category_code: str) -> list[QuestionTemplate]:
     return sorted(
         (question for question in QUESTION_BANK if question.category_code == category_code),
@@ -296,3 +367,6 @@ def question_for_fact(category_code: str, fact_key: str, facts: dict[str, Any]) 
 
 def supported_category(category_code: str) -> bool:
     return any(question.category_code == category_code for question in QUESTION_BANK)
+
+
+validate_question_dag()

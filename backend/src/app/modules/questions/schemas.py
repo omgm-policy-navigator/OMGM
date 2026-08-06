@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any
 
@@ -34,6 +34,8 @@ class QuestionResponse(BaseModel):
     parent_question_id: str | None = Field(default=None, alias="parentQuestionId")
     show_condition: ShowConditionResponse | None = Field(default=None, alias="showCondition")
     options: list[QuestionOptionResponse] = []
+    is_conflict_resolution: bool = Field(default=False, alias="isConflictResolution")
+    conflict_reason: str | None = Field(default=None, alias="conflictReason")
 
 
 class NextQuestionsResponse(BaseModel):

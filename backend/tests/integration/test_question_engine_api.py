@@ -9,7 +9,13 @@ from unittest.mock import AsyncMock, patch
 from app.core.config import AppConfig
 from app.db.session import get_db
 from app.main import create_app
-from app.modules.questions.engine import next_questions, progress
+from app.modules.questions.engine import (
+    QuestionTemplate,
+    ShowCondition,
+    next_questions,
+    progress,
+    validate_question_dag,
+)
 
 TEST_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost:5432/test_db"
 
@@ -112,6 +118,36 @@ class QuestionEngineUnitTests(unittest.TestCase):
         self.assertTrue(complete)
 
 
+
+    def test_question_graph_rejects_circular_dependency(self) -> None:
+        questions = (
+            QuestionTemplate(
+                "q_a",
+                "housing",
+                "a",
+                "A?",
+                "boolean",
+                True,
+                10,
+                10,
+                show_condition=ShowCondition("b", True),
+            ),
+            QuestionTemplate(
+                "q_b",
+                "housing",
+                "b",
+                "B?",
+                "boolean",
+                True,
+                20,
+                10,
+                show_condition=ShowCondition("a", True),
+            ),
+        )
+
+        with self.assertRaises(ValueError):
+            validate_question_dag(questions)
+
 class QuestionEngineApiTests(unittest.TestCase):
     def test_select_category_stores_session_category(self) -> None:
         db = AsyncMock()
@@ -190,3 +226,39 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(body["answeredRequired"], 5)
         self.assertEqual(body["totalRequired"], 5)
         self.assertTrue(body["complete"])
+    def test_changed_parent_answer_invalidates_dependent_child_facts(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        existing = [fact("marriage_registered", True), fact("marriage_registration_date", "2026-01-01")]
+        require_session = AsyncMock(return_value=active_session("cash"))
+        with patch("app.modules.sessions.api.require_session", new=require_session), patch(
+            "app.modules.sessions.api.list_session_facts",
+            new=AsyncMock(return_value=existing),
+        ), patch("app.modules.sessions.api.upsert_session_fact", new=AsyncMock()) as upsert, patch(
+            "app.modules.sessions.api.delete_session_facts_by_keys", new=AsyncMock(return_value=1)
+        ) as delete_facts:
+            status, _headers, body = asyncio.run(
+                asgi_request(
+                    app,
+                    "POST",
+                    "/api/v1/session/answers",
+                    body={
+                        "answers": [
+                            {
+                                "questionId": "q_cash_marriage_registered",
+                                "factKey": "marriage_registered",
+                                "value": False,
+                                "confirmed": True,
+                            }
+                        ]
+                    },
+                )
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "stored")
+        upsert.assert_awaited_once()
+        delete_facts.assert_awaited_once()
+        self.assertEqual(delete_facts.await_args.args[2], {"marriage_registration_date"})
+        next_fact_keys = [question["factKey"] for question in body["nextQuestions"]]
+        self.assertNotIn("marriage_registration_date", next_fact_keys)
