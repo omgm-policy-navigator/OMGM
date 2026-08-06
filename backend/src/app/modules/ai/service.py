@@ -224,8 +224,8 @@ def validated_generated_answer(raw_answer: str, eligibility_status: str) -> str:
 
 
 def format_structured_explanation(explanation: StructuredExplanation) -> str:
-    reasons = " ".join(f"Reason: {reason}" for reason in explanation.reasons)
-    next_steps = " ".join(f"Next step: {step}" for step in explanation.next_steps)
+    reasons = " ".join(explanation.reasons)
+    next_steps = " ".join(explanation.next_steps)
     return f"{explanation.summary} {reasons} {next_steps} {explanation.disclaimer}"
 
 
@@ -282,7 +282,7 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
     region = display_catalog_value(getattr(policy, "region", "공식 공고 확인"))
     support_type = display_catalog_value(getattr(policy, "support_type", "공식 공고 확인"))
     parts = [
-        f"{policy.title}{topic_particle(policy.title)} 검수된 정책 카탈로그에 등록된 정책입니다.",
+        f"{policy.title}{topic_particle(policy.title)} 확인된 정책입니다.",
         f"주요 내용: {policy.summary}.",
         (
             f"담당 기관은 {getattr(policy, 'agency', '공식 기관')}이고, "
@@ -295,9 +295,9 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
     ]
 
     if context.evaluation is not None:
-        parts.append(f"현재 저장된 답변 기준의 Rule Engine 상태는 {eligibility_status}입니다.")
+        parts.append(eligibility_answer_sentence(eligibility_status))
         if evaluation_state == EvaluationState.STALE:
-            parts.append("다만 최근 답변 이후 평가가 오래되어 다시 계산이 필요합니다.")
+            parts.append("다만 최근 답변이 아직 반영되지 않았을 수 있어 다시 확인이 필요합니다.")
         evidence = context.evaluation.evidence
         satisfied = _fact_labels(evidence.get("satisfied", []))
         missing = _fact_labels(evidence.get("needsConfirmation", []))
@@ -311,19 +311,19 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
             if missing:
                 condition_parts.append("추가 확인 조건: " + ", ".join(missing))
             if condition_parts:
-                parts.append("신청 조건은 현재 입력한 답변 기준으로 " + "; ".join(condition_parts) + "입니다.")
+                parts.append("신청 조건은 입력한 답변 기준으로 " + "; ".join(condition_parts) + "입니다.")
         if unmatched:
             parts.append("충족하지 못한 조건은 " + ", ".join(unmatched) + "입니다.")
         if missing:
             parts.append("추가 확인이 필요한 조건은 " + ", ".join(missing) + "입니다.")
     else:
-        parts.append("아직 이 정책에 대한 사용자 조건 평가는 완료되지 않았습니다.")
+        parts.append("아직 입력된 조건이 충분하지 않아 신청 가능 여부는 확정하기 어렵습니다.")
         if wants_condition_details(context.user_message):
             rule_descriptions = policy_rule_descriptions(policy)
             if rule_descriptions:
-                parts.append("카탈로그에 등록된 신청 조건 확인 항목은 " + ", ".join(rule_descriptions) + "입니다.")
+                parts.append("현재 확인 가능한 신청 조건은 " + ", ".join(rule_descriptions) + "입니다.")
             else:
-                parts.append("카탈로그에 등록된 상세 조건 항목이 없어 공식 안내 페이지 확인이 필요합니다.")
+                parts.append("상세 조건은 공식 안내 페이지 확인이 필요합니다.")
 
     parts.append("세부 금액, 소득·자산 기준, 모집 가능 여부는 공식 안내 페이지에서 다시 확인해 주세요.")
     return " ".join(parts)
@@ -358,10 +358,20 @@ def application_period_answer(policy: Policy) -> str:
     period = display_catalog_value(getattr(policy, "application_period", "공식 공고 확인"))
     if period == "공식 공고 확인":
         return (
-            f"{policy.title}의 신청 기간은 현재 카탈로그에 구체 날짜가 등록돼 있지 않고 "
+            f"{policy.title}의 신청 기간은 현재 구체 날짜가 등록돼 있지 않고 "
             "공식 공고 확인으로 표시되어 있습니다. 모집 시작일과 마감일은 공식 안내 페이지에서 확인해 주세요."
         )
     return f"{policy.title}의 신청 기간은 {period}입니다. 모집 가능 여부는 공식 안내 페이지에서 다시 확인해 주세요."
+
+
+def eligibility_answer_sentence(eligibility_status: str) -> str:
+    return {
+        EligibilityStatus.LIKELY_ELIGIBLE: "입력한 답변 기준으로 신청 가능성이 높아 보입니다.",
+        EligibilityStatus.NEEDS_CONFIRMATION: "입력한 답변만으로는 아직 추가 확인이 필요합니다.",
+        EligibilityStatus.LIKELY_INELIGIBLE: "입력한 답변 기준으로는 맞지 않는 조건이 있습니다.",
+        EligibilityStatus.AVAILABLE_LATER: "이 정책은 이후 신청 가능 시점을 다시 확인해야 합니다.",
+        EligibilityStatus.OFFICIAL_CONFIRMATION_REQUIRED: "공식 안내에서 추가 확인이 필요한 정책입니다.",
+    }.get(eligibility_status, "입력한 답변 기준으로 추가 확인이 필요합니다.")
 
 
 def fallback_response(
@@ -387,16 +397,16 @@ def template_answer(
     evaluation: PolicyEvaluation | None,
 ) -> str:
     if evaluation_state == EvaluationState.STALE:
-        return "저장된 정책 평가가 최신 답변 기준이 아닙니다. 정책 평가를 다시 계산한 뒤 확인해 주세요."
+        return "최근 답변이 아직 반영되지 않았을 수 있습니다. 조건을 다시 확인한 뒤 안내드릴게요."
     evidence = evaluation.evidence if evaluation is not None else {}
-    unmatched = _fact_keys(evidence.get("unsatisfied", []))
-    missing = _fact_keys(evidence.get("needsConfirmation", []))
-    parts = [f"Rule Engine 평가 상태는 {eligibility_status}입니다."]
+    unmatched = _fact_labels(evidence.get("unsatisfied", []))
+    missing = _fact_labels(evidence.get("needsConfirmation", []))
+    parts = [eligibility_answer_sentence(eligibility_status)]
     if unmatched:
-        parts.append("충족하지 못한 필수 조건: " + ", ".join(unmatched) + ".")
+        parts.append("맞지 않는 조건: " + ", ".join(unmatched) + ".")
     if missing:
         parts.append("추가 확인이 필요한 조건: " + ", ".join(missing) + ".")
-    parts.append("현재 AI 설명을 생성할 수 없어 저장된 평가 근거를 기준으로 안내합니다.")
+    parts.append("세부 기준은 공식 안내 페이지에서 다시 확인해 주세요.")
     return " ".join(parts)
 
 

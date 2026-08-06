@@ -132,7 +132,9 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
         self.assertEqual(response.citations[0].url, "https://example.go.kr/policy/1")
         self.assertIn("Housing support", response.answer)
-        self.assertIn("Rule Engine 상태는 LIKELY_ELIGIBLE", response.answer)
+        self.assertIn("신청 가능성이 높아 보입니다", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_ELIGIBLE", response.answer)
         self.assertEqual(provider.requests, [])
 
     async def test_llm_failure_keeps_rule_decision_available_with_template_evidence(self) -> None:
@@ -143,9 +145,11 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.eligibility_status, "LIKELY_ELIGIBLE")
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine 평가 상태는 LIKELY_ELIGIBLE", response.answer)
-        self.assertIn("income", response.answer)
-        self.assertIn("asset", response.answer)
+        self.assertIn("신청 가능성이 높아 보입니다", response.answer)
+        self.assertIn("소득 구간", response.answer)
+        self.assertIn("자산 기준", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_ELIGIBLE", response.answer)
 
     async def test_llm_timeout_uses_fallback_template(self) -> None:
         response = await explain_with_ai(
@@ -186,7 +190,9 @@ class AIExplanationServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.ai_status, AIResponseStatus.FALLBACK)
-        self.assertIn("Rule Engine 평가 상태는 LIKELY_INELIGIBLE", response.answer)
+        self.assertIn("맞지 않는 조건이 있습니다", response.answer)
+        self.assertNotIn("Rule Engine", response.answer)
+        self.assertNotIn("LIKELY_INELIGIBLE", response.answer)
 
     async def test_invalid_structured_answer_falls_back(self) -> None:
         provider = FakeLLMProvider(

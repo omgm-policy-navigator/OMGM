@@ -327,6 +327,8 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertIn("신청 조건", body["answer"])
         self.assertIn("혼인신고 여부", body["answer"])
         self.assertIn("귀속 연도", body["answer"])
+        self.assertNotIn("Rule Engine", body["answer"])
+        self.assertNotIn("OFFICIAL_CONFIRMATION_REQUIRED", body["answer"])
         finder.assert_any_await(db, session_id=7, category_code="housing", message="결혼세액공제 신청 조건 알려줘")
         finder.assert_any_await(db, session_id=7, category_code=None, message="결혼세액공제 신청 조건 알려줘")
         top_bundle.assert_not_awaited()
