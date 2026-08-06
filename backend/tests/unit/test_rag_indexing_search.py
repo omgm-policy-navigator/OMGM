@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import shutil
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
@@ -12,7 +14,7 @@ import pytest
 from app.modules.rag.document_processing import ChunkKind, DocumentType, EmbeddingSeed
 from app.modules.rag.embedding import EMBEDDING_DIMENSIONS, EmbeddingError, OllamaEmbeddingProvider
 from app.modules.rag.indexing import IndexableChunk, RagChunkType, reindex_document, retrieval_chunk_type
-from app.modules.rag.reindex import load_approved_seed_documents
+from app.modules.rag.reindex import load_approved_seed_documents, synchronize_index
 from app.modules.rag.search import SearchHit, search_policy_evidence
 
 
@@ -37,6 +39,13 @@ class FakeEmbeddingProvider:
 @dataclass
 class FakeIndexRepository:
     documents: dict[str, dict[str, IndexableChunk]] = field(default_factory=dict)
+
+    async def delete_documents_not_in(self, document_ids: set[str]) -> None:
+        self.documents = {
+            document_id: chunks
+            for document_id, chunks in self.documents.items()
+            if document_id in document_ids
+        }
 
     async def replace_document_chunks(self, document_id: str, chunks: tuple[IndexableChunk, ...]) -> None:
         self.documents[document_id] = {chunk.chunk_id: chunk for chunk in chunks}
@@ -78,8 +87,41 @@ def test_reviewed_d4_seed_is_loadable_for_reindexing() -> None:
     documents = load_approved_seed_documents(seed_directory)
 
     assert len(documents) == 28
-    assert sum(len(chunks) for chunks in documents.values()) == 28
-    assert all(chunk.source_location for chunks in documents.values() for chunk in chunks)
+    assert sum(len(batch.seeds) for batch in documents.values()) == 28
+    assert all(chunk.source_location for batch in documents.values() for chunk in batch.seeds)
+
+
+def _copy_rag_seed_files(target: Path) -> None:
+    source = Path(__file__).resolve().parents[2] / "data" / "policy-seed"
+    for filename in ("02_policy.csv", "08_policy_document.csv", "10_policy_document_chunk.csv"):
+        shutil.copyfile(source / filename, target / filename)
+
+
+def _change_first_document(target: Path, **changes: str) -> None:
+    path = target / "08_policy_document.csv"
+    with path.open(encoding="utf-8-sig", newline="") as source:
+        rows = list(csv.DictReader(source))
+    rows[0].update(changes)
+    with path.open("w", encoding="utf-8", newline="") as destination:
+        writer = csv.DictWriter(destination, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_unapproved_and_nonofficial_documents_are_not_loaded(tmp_path: Path) -> None:
+    _copy_rag_seed_files(tmp_path)
+    _change_first_document(tmp_path, document_status="REVIEW_REQUIRED")
+    assert "1" not in load_approved_seed_documents(tmp_path)
+
+    _change_first_document(tmp_path, document_status="APPROVED", trust_level="SECONDARY")
+    assert "1" not in load_approved_seed_documents(tmp_path)
+
+
+def test_chunk_parent_metadata_mismatch_is_rejected(tmp_path: Path) -> None:
+    _copy_rag_seed_files(tmp_path)
+    _change_first_document(tmp_path, source_url="https://example.go.kr/different")
+    with pytest.raises(ValueError, match="source URL does not match"):
+        load_approved_seed_documents(tmp_path)
 
 
 @async_test
@@ -108,6 +150,21 @@ async def test_reindex_replaces_same_document_without_duplicates() -> None:
 
     assert list(repository.documents["doc_1"]) == ["chunk_1"]
     assert repository.documents["doc_1"]["chunk_1"].source_location == "신청 대상 > 1문단"
+
+
+@async_test
+async def test_full_synchronization_deletes_removed_documents() -> None:
+    repository = FakeIndexRepository(documents={"old-document": {}, "doc_1": {}})
+    batch = next(
+        iter(
+            load_approved_seed_documents(
+                Path(__file__).resolve().parents[2] / "data" / "policy-seed"
+            ).values()
+        )
+    )
+    await synchronize_index({"doc_1": batch}, FakeEmbeddingProvider(), repository)
+
+    assert "old-document" not in repository.documents
 
 
 @async_test

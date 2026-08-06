@@ -4,7 +4,7 @@ from sqlalchemy import delete, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog.models import DocumentChunk
+from app.catalog.models import DocumentChunk, DocumentChunkEmbedding
 from app.modules.rag.indexing import IndexableChunk
 from app.modules.rag.search import SearchHit
 
@@ -16,6 +16,13 @@ def _vector_literal(vector: tuple[float, ...]) -> str:
 class SqlAlchemyChunkIndexRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def delete_documents_not_in(self, document_ids: set[str]) -> None:
+        statement = delete(DocumentChunk)
+        if document_ids:
+            statement = statement.where(DocumentChunk.document_id.not_in(document_ids))
+        await self._session.execute(statement)
+        await self._session.flush()
 
     async def replace_document_chunks(self, document_id: str, chunks: tuple[IndexableChunk, ...]) -> None:
         chunk_ids = [chunk.chunk_id for chunk in chunks]
@@ -49,6 +56,12 @@ class SqlAlchemyChunkIndexRepository:
             )
             await self._session.execute(statement)
             await self._session.execute(
+                delete(DocumentChunkEmbedding).where(
+                    DocumentChunkEmbedding.chunk_id == chunk.chunk_id,
+                    DocumentChunkEmbedding.model != chunk.embedding_model,
+                )
+            )
+            await self._session.execute(
                 text(
                     """
                     INSERT INTO document_chunk_embedding (chunk_id, model, embedding)
@@ -63,7 +76,7 @@ class SqlAlchemyChunkIndexRepository:
                     "embedding": _vector_literal(chunk.embedding),
                 },
             )
-        await self._session.commit()
+        await self._session.flush()
 
 
 class SqlAlchemyRagSearchRepository:

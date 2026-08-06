@@ -33,7 +33,7 @@ LLM은 조건 후보 추출 보조, 검색 질의 보정, 행정 용어 설명, 
 
 D4 CSV의 `embedding` 열은 기준본이므로 계속 비워 둔다. A3는 `quality_status=APPROVED`이고 정책 상태가 `ACTIVE`인 행만 `qwen3-embedding:0.6b`의 1024차원 벡터로 생성해 `document_chunk`와 `document_chunk_embedding`에 적재한다.
 
-동일 문서는 Chunk ID upsert와 문서별 stale Chunk 삭제로 재색인하며, 모델별 벡터는 `(chunk_id, model)`이 유일하다. 실행 명령은 `cd backend && python -m app.modules.rag.reindex`다.
+부모 문서의 승인 상태·공식 신뢰도와 Chunk의 정책 ID·문서 유형·URL을 검증한 뒤 색인한다. 동일 문서는 Chunk ID upsert와 문서별 stale Chunk 삭제로 재색인하고, 전체 Seed에 없는 문서도 동기화 시 삭제한다. 현재 모델과 다른 과거 벡터는 제거하며 전체 문서 처리가 성공한 뒤 한 번 commit한다. 실행 명령은 `cd backend && python -m app.modules.rag.reindex`다.
 
 ## A4 검색 계약
 

@@ -2,8 +2,8 @@
 
 ## 검증
 
-- A3/A4 및 관련 설정 집중 테스트: `33 passed`
-- 전체 백엔드 테스트: `160 passed`
+- PR 리뷰 회귀·Seed 무결성 집중 테스트: `29 passed`
+- 전체 백엔드 테스트: `163 passed, 1 skipped`
 - Ruff (`src/app`, `tests`, 신규 migration): 통과
 - Compose 설정 렌더링: 통과
 - `git diff --check`: 통과
@@ -15,7 +15,7 @@
 
 - `20260806_0006_rag_vector_index.py`
 - `document_chunk`, `document_chunk_embedding`, HNSW cosine index 추가
-- 실제 PostgreSQL upgrade/downgrade와 Ollama 재색인은 Docker daemon 제한으로 실행하지 못했다.
+- pgvector 통합 테스트는 Migration, 1024차원 저장, 잘못된 차원 거부, cosine 순서, stale Chunk·이전 모델 정리와 cascade를 검증한다. 로컬에서는 Docker daemon 부재로 skip됐으며 `DATABASE_URL`이 설정된 CI의 pgvector PostgreSQL에서 실행된다.
 
 ## Troubleshooting
 

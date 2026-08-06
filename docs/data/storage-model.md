@@ -42,7 +42,7 @@ pgvector는 PostgreSQL 확장으로 다음 데이터를 관리한다.
 
 별도의 Vector DB는 현재 도입하지 않는다.
 
-D4 CSV의 `embedding` 열은 기준본으로 비워 둔다. A3는 `APPROVED` Chunk의 메타데이터를 `document_chunk`, 1024차원 벡터를 `document_chunk_embedding`에 저장한다. `(document_id, source_location, content_hash)`와 `(chunk_id, model)` 유일성으로 같은 원문 재색인의 중복을 방지하며 HNSW cosine index를 사용한다.
+D4 CSV의 `embedding` 열은 기준본으로 비워 둔다. A3는 부모 문서가 `APPROVED`·`OFFICIAL`이고 정책과 Chunk가 활성·승인된 경우에만 Chunk 메타데이터를 `document_chunk`, 1024차원 벡터를 `document_chunk_embedding`에 저장한다. `(document_id, source_location, content_hash)`와 `(chunk_id, model)` 유일성으로 같은 원문 재색인의 중복을 방지하며 HNSW cosine index를 사용한다. 전체 Seed 동기화는 유효 집합 밖의 문서와 이전 모델 벡터를 제거한다.
 
 ## 버전 원칙
 

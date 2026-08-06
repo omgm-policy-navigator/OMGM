@@ -69,6 +69,16 @@ class RuleReviewStatus(StrEnum):
     DRAFT = "DRAFT"
 
 
+class DocumentStatus(StrEnum):
+    APPROVED = "APPROVED"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class TrustLevel(StrEnum):
+    OFFICIAL = "OFFICIAL"
+    SECONDARY = "SECONDARY"
+
+
 class ShowOperator(StrEnum):
     EQ = "EQ"
     NE = "NE"
@@ -141,6 +151,8 @@ REQUIRED_COLUMNS = {
         "title",
         "content",
         "source_url",
+        "document_status",
+        "trust_level",
         "embedding",
     },
     "10_policy_document_chunk.csv": {
@@ -243,6 +255,8 @@ class RagDocument:
     title: str
     content: str
     source_url: str
+    document_status: DocumentStatus
+    trust_level: TrustLevel
 
 
 @dataclass(frozen=True)
@@ -590,6 +604,10 @@ def load_policy_seed(directory: Path) -> PolicySeedCatalog:
             title=row["title"],
             content=row["content"],
             source_url=_require_http_url(row["source_url"], f"document {row['id']}.source_url"),
+            document_status=_require_enum(
+                DocumentStatus, row["document_status"], f"document {row['id']}.document_status"
+            ),
+            trust_level=_require_enum(TrustLevel, row["trust_level"], f"document {row['id']}.trust_level"),
         )
         for row in _read_rows(directory, "08_policy_document.csv")
     )

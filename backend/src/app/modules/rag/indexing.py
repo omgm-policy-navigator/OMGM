@@ -51,6 +51,8 @@ class IndexableChunk:
 
 
 class ChunkIndexRepository(Protocol):
+    async def delete_documents_not_in(self, document_ids: set[str]) -> None: ...
+
     async def replace_document_chunks(self, document_id: str, chunks: tuple[IndexableChunk, ...]) -> None: ...
 
 
