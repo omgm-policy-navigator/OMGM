@@ -77,8 +77,8 @@ export function ChatArea() {
                   type="button"
                   key={id}
                   onClick={() => setSelectedCategoryId(id)}
-                  className={`flex h-[110px] w-[90px] shrink-0 flex-col items-center justify-center gap-3 rounded-arch px-2 transition duration-200 hover:-translate-y-1 hover:bg-[#5F966D] hover:text-white ${
-                    selected ? "border-b-4 border-text-primary bg-[#4F8F60] text-white shadow-floating" : "bg-brand-surface text-text-secondary"
+                  className={`flex h-[110px] w-[90px] shrink-0 flex-col items-center justify-center gap-3 rounded-arch px-2 transition duration-200 hover:-translate-y-1 hover:bg-brand-primary-hover hover:text-white ${
+                    selected ? "border-b-4 border-text-primary bg-brand-primary-strong text-white shadow-floating" : "bg-brand-surface text-text-secondary"
                   }`}
                 >
                   <Icon size={24} />

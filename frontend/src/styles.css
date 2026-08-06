@@ -1,9 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "@xyflow/react/dist/style.css";
 @import "tailwindcss";
+@source not "../design";
 
 @theme {
   --color-brand-primary: #6fa77e;
+  --color-brand-primary-hover: #5f966d;
+  --color-brand-primary-strong: #4f8f60;
   --color-brand-surface: #eaf5ec;
   --color-brand-surface-container: #d6ead8;
   --color-brand-background: #ffffff;

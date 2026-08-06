@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
 import { policyNodes } from "../data/policies";
+import { designTokens } from "../design";
 
 type GraphNodeData = PolicyNodeData & {
   variant: "central" | "policy";
@@ -101,7 +102,7 @@ export function PolicyGraph() {
 
     const radialEdges: Edge[] = policyNodes.map((policy) =>
       createEdge("couple", policy.id, {
-        stroke: "rgba(111, 167, 126, 0.62)",
+        stroke: designTokens.color.graph.edge,
         strokeWidth: 0.75,
       }),
     );
@@ -141,7 +142,7 @@ export function PolicyGraph() {
             }
           }}
         >
-          <Background color="#B8D8C1" gap={32} size={1} />
+          <Background color={designTokens.color.graph.backgroundLine} gap={32} size={1} />
         </ReactFlow>
       </div>
 
