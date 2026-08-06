@@ -66,9 +66,6 @@ export function LandingPage({ onStart, isLeaving }: LandingPageProps) {
             <p className="text-caption text-brand-primary">Support Categories</p>
             <h2 className="mt-2 text-h2">주요 지원 분야</h2>
           </div>
-          <p className="hidden max-w-[420px] text-body-sm text-text-secondary md:block">
-            정책 카드는 12px 라운드와 그린 토큰을 적용했고, 챗봇에서 같은 카테고리 탭으로 이어집니다.
-          </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {categories.map(({ id, label, description, icon: Icon }) => (
