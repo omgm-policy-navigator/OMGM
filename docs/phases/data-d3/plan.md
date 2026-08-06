@@ -7,9 +7,9 @@
 ## 범위
 
 - `policy_rule_seed.csv`, `question_seed.csv`, `policy_relation_seed.csv` 생성
-- Rule별 정책 ID, 질문 ID, 공식 URL, 근거 문구와 재현 위치 연결
+- Rule별 정책 ID, 질문 ID, 공식 URL, 근거 문구, 기준본 위치와 공식 문서 내부 위치를 분리
 - 관리자 검수 상태와 평가 가능 모드 분리
-- 공식 확인이 필요한 Rule의 결정형 평가 제외 상태 보존
+- 공식 내부 위치가 확인되지 않은 Rule과 관계의 결정형 사용 제외 상태 보존
 - 파생 Seed와 기존 03·04·07 기준본의 동기화 검증
 
 ## 제외 범위

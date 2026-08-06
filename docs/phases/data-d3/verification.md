@@ -2,8 +2,8 @@
 
 ## 검증
 
-- D3·정책 Seed·D4 집중 테스트: `37 passed`
-- 전체 백엔드 테스트: `138 passed`
+- D3·정책 Seed·D4 집중 테스트: `39 passed`
+- 전체 백엔드 테스트: `158 passed`
 - Ruff (`src/app`, `tests`): 통과
 - Compose 설정 렌더링: 통과
 - `git diff --check`: 통과

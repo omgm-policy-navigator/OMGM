@@ -28,7 +28,7 @@ D0 Raw Policy Schema는 과거 수집 파이프라인 계약으로 보존한다.
 
 D4 가공 Chunk는 정책 기준 데이터 영역이 소유한다. 각 Chunk는 `policy_id`, `document_id`, 문서·의미 유형, 제목, 원문 URL, 원문 위치, 품질 상태, 콘텐츠 SHA-256을 가진다. `APPROVED` Chunk만 임베딩 입력 Seed로 노출하며 API 요청 중 Chunk CSV를 변경하지 않는다.
 
-D3의 `policy_rule_seed.csv`, `question_seed.csv`, `policy_relation_seed.csv`는 관리자 검수 기준본에서 생성한 분석 산출물이다. 원본 03·04·07 CSV를 대체하지 않으며, Rule 후보는 공식 URL·근거 문구·재현 위치와 검수 상태를 함께 보존한다.
+D3의 `policy_rule_seed.csv`, `question_seed.csv`, `policy_relation_seed.csv`는 관리자 검수 기준본에서 생성한 분석 산출물이다. 원본 03·04·07 CSV를 대체하지 않으며, 기준본 재현 위치와 공식 문서 내부 위치를 분리한다. 공식 내부 위치가 없는 Rule과 관계 후보는 `NEEDS_OFFICIAL_CONFIRMATION`으로 보존한다.
 
 ## 게시 정책 영역
 
