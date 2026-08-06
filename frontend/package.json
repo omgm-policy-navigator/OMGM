@@ -5,7 +5,8 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 127.0.0.1",
+    "dev:host": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b",
