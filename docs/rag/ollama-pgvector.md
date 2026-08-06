@@ -26,3 +26,9 @@ LLM은 조건 후보 추출 보조, 검색 질의 보정, 행정 용어 설명, 
 ## 보안 기준
 
 정책 문서는 명령이 아닌 데이터로 취급한다. Prompt Injection 문구를 실행하지 않고, LLM 입력에 불필요한 개인정보를 전달하지 않는다. LLM 요청·응답 로그에 민감정보를 남기지 않는다.
+
+## D4 Embedding Seed
+
+`backend/data/policy-seed/10_policy_document_chunk.csv`가 임베딩 전 입력 기준본이다. 각 행은 정책·문서 ID, 문서·Chunk 유형, 제목, 본문, 원문 URL, 원문 위치, 품질 상태와 콘텐츠 SHA-256을 포함한다. `quality_status=APPROVED`인 행만 후속 임베딩 작업에 전달한다.
+
+D4는 벡터 값을 생성하지 않으며 `embedding` 열을 비워 둔다. 모델 선택, 차원 확정, pgvector 적재와 재임베딩 운영은 후속 Phase 범위다.

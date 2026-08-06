@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -18,6 +18,7 @@ class AnonymousSession(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     idle_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    selected_category_code: Mapped[str | None] = mapped_column(String(50), ForeignKey("category.code"), index=True)
 
     facts: Mapped[list[UserFact]] = relationship(
         back_populates="session",

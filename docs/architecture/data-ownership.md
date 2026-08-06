@@ -26,6 +26,8 @@
 
 D0 Raw Policy Schema는 과거 수집 파이프라인 계약으로 보존한다. 현재 MVP 실행 경로는 제공·검수된 CSV 기준본이며 `source_url`이 없는 데이터는 로딩하지 않는다. 변동 기준 placeholder는 공식 확인 전 확정 판정 근거로 사용할 수 없다.
 
+D4 가공 Chunk는 정책 기준 데이터 영역이 소유한다. 각 Chunk는 `policy_id`, `document_id`, 문서·의미 유형, 제목, 원문 URL, 원문 위치, 품질 상태, 콘텐츠 SHA-256을 가진다. `APPROVED` Chunk만 임베딩 입력 Seed로 노출하며 API 요청 중 Chunk CSV를 변경하지 않는다.
+
 ## 게시 정책 영역
 
 소유 데이터: 승인·게시된 정책 식별자, 정책명, 기관, 지역, 대상, 신청 기간, 정책 상태, `policy_version`, 승인된 `policy_rule`, 승인된 `policy_document`, 서비스 조회용 Read Model.

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -110,3 +110,7 @@ async def upsert_session_fact(
 
 async def cleanup_expired_sessions(db: AsyncSession, now: datetime | None = None) -> int:
     return await repository.delete_expired_sessions(db, now or utc_now())
+
+
+async def delete_session_facts_by_keys(db: AsyncSession, session: AnonymousSession, condition_keys: set[str]) -> int:
+    return await repository.delete_facts_by_keys(db, session.id, condition_keys)

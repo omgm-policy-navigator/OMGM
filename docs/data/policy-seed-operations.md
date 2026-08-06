@@ -24,4 +24,6 @@
 
 현재 URL 유효성 자동 점검과 embedding 생성은 구현하지 않는다. URL 점검 자동화와 pgvector 적재는 별도 후속 이슈로 관리해야 한다. 이슈가 연결되기 전까지 위 수동 점검을 배포 체크리스트로 사용한다.
 
-RAG 검색 API는 아직 없다. 후속 구현은 embedding이 없을 때 vector query를 실행하지 않고 `INSUFFICIENT_EVIDENCE`와 빈 citations를 반환해야 한다.
+RAG 검색 API는 아직 없다. D4부터 검수된 Chunk Seed는 존재하지만 실제 embedding은 비어 있다. 후속 구현은 embedding이 없을 때 vector query를 실행하지 않고 `INSUFFICIENT_EVIDENCE`와 빈 citations를 반환해야 한다.
+
+정책 문서 내용을 변경하면 연결된 `10_policy_document_chunk.csv`의 Chunk, `source_location`, `content_hash`, 품질 상태를 함께 재검수하고 `SHA256SUMS`를 갱신한다. 신청 조건과 신청 방법이 같은 Chunk에 섞이거나 출처 위치가 없는 행은 `APPROVED`로 두지 않는다.
