@@ -1,4 +1,5 @@
 import { Bell, ChevronLeft, ChevronRight, Heart, Home, Menu, MessageCircle, Settings } from "lucide-react";
+import { useState } from "react";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -15,6 +16,12 @@ const menuItems = [
 ];
 
 export function Sidebar({ collapsed, currentPath, onNavigate, onToggle }: SidebarProps) {
+  const [hoveredMenuIndex, setHoveredMenuIndex] = useState<number | null>(null);
+  const activeMenuIndex = currentPath === "/" ? 0 : 1;
+  const selectedMenuIndex = hoveredMenuIndex ?? activeMenuIndex;
+  const selectedMenu = menuItems[selectedMenuIndex];
+  const SelectedIcon = selectedMenu.icon;
+
   return (
     <aside
       className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-brand-border bg-white transition-[width] duration-300 ease-sidebar ${
@@ -54,16 +61,32 @@ export function Sidebar({ collapsed, currentPath, onNavigate, onToggle }: Sideba
         {!collapsed && <span>Start New Chat</span>}
       </button>
 
-      <nav className="flex flex-1 flex-col gap-2 px-4">
-        {menuItems.map(({ label, icon: Icon, path, hash }) => {
-          const active = currentPath === path && (path !== "/chatbot" || label === "Chatbot");
+      <nav className="relative flex flex-1 flex-col gap-2 px-4" onMouseLeave={() => setHoveredMenuIndex(null)}>
+        <button
+          type="button"
+          tabIndex={-1}
+          className={`pointer-events-none absolute left-4 right-4 z-20 flex h-12 items-center gap-3 rounded-xl bg-brand-primary px-4 py-3 text-left text-body-sm text-white shadow-floating transition-transform duration-200 ease-out ${
+            collapsed ? "justify-center px-0" : ""
+          }`}
+          style={{ transform: `translateY(${selectedMenuIndex * 56}px)` }}
+          aria-hidden="true"
+        >
+          <SelectedIcon size={20} />
+          {!collapsed && <span>{selectedMenu.label}</span>}
+        </button>
+
+        {menuItems.map(({ label, icon: Icon, path, hash }, index) => {
+          const selected = selectedMenuIndex === index;
           return (
             <button
               type="button"
               onClick={() => onNavigate(path, hash)}
+              onMouseEnter={() => setHoveredMenuIndex(index)}
+              onFocus={() => setHoveredMenuIndex(index)}
+              onBlur={() => setHoveredMenuIndex(null)}
               key={label}
-              className={`flex h-12 items-center gap-3 rounded-xl px-4 py-3 text-left text-body-sm transition ${
-                active ? "bg-brand-primary text-white" : "text-text-secondary hover:bg-brand-surface hover:text-text-primary"
+              className={`relative z-10 flex h-12 items-center gap-3 rounded-xl px-4 py-3 text-left text-body-sm transition-colors duration-200 ${
+                selected ? "text-transparent" : "text-text-secondary hover:text-text-primary"
               } ${collapsed ? "justify-center px-0" : ""}`}
               title={collapsed ? label : undefined}
             >

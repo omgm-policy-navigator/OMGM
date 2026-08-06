@@ -135,7 +135,7 @@ export function PolicyGraph() {
           zoomOnPinch={false}
           preventScrolling
           onNodeClick={(_, node) => {
-            const data = node.data as GraphNodeData;
+            const data = node.data;
             if (data.variant === "policy") {
               setSelectedPolicy(data);
             }
