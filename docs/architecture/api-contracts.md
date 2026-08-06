@@ -2,7 +2,7 @@
 
 ## Contract Status
 
-This document is the Phase B0 backend API draft. Only `GET /health` is implemented. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog is an internal backend input and is not an API response schema.
+This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 
@@ -113,6 +113,103 @@ Response `200`:
   "service": "omgm-backend",
   "environment": "local"
 }
+```
+
+## Implemented Policy Catalog Endpoints
+### `GET /api/categories`
+
+Returns policy categories sorted by catalog order.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": "housing",
+    "name": "Housing",
+    "description": "Housing and rent support"
+  }
+]
+```
+
+### `GET /api/categories/{code}/policies`
+
+Returns approved and active policy summaries for one category. Draft, inactive, archived, or otherwise unapproved policies are not exposed.
+
+Response `200`:
+
+```json
+[
+  {
+    "policyId": "policy_housing_001",
+    "categoryCode": "housing",
+    "title": "Newlywed Rent Deposit Support",
+    "agency": "Seoul Housing Office",
+    "region": "Seoul",
+    "applicationPeriod": "2026-01-01 to 2026-12-31",
+    "status": "APPROVED",
+    "officialSourceUrl": "https://example.go.kr/policies/housing-001",
+    "reviewedAt": "2026-08-01"
+  }
+]
+```
+
+### `GET /api/policies/{policy_id}`
+
+Returns approved and active policy detail with institution, source, and application-period metadata.
+
+Response `200`:
+
+```json
+{
+  "policyId": "policy_housing_001",
+  "categoryCode": "housing",
+  "title": "Newlywed Rent Deposit Support",
+  "agency": "Seoul Housing Office",
+  "region": "Seoul",
+  "summary": "Rent deposit interest support for newlywed households.",
+  "applicationPeriod": "2026-01-01 to 2026-12-31",
+  "supportType": "Interest subsidy",
+  "status": "APPROVED",
+  "source": {
+    "label": "Official notice",
+    "url": "https://example.go.kr/policies/housing-001",
+    "reviewedAt": "2026-08-01"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "POLICY_NOT_FOUND",
+    "message": "Requested policy was not found."
+  }
+}
+```
+
+### `GET /api/policies/{policy_id}/documents`
+
+Returns approved policy source documents. The policy must be approved and active, otherwise the endpoint returns `POLICY_NOT_FOUND`.
+
+Response `200`:
+
+```json
+[
+  {
+    "documentId": "doc_policy_housing_001",
+    "policyId": "policy_housing_001",
+    "title": "Newlywed Rent Deposit Support Source Document",
+    "url": "https://example.go.kr/policies/housing-001",
+    "documentType": "official_notice",
+    "officialSource": "Official notice",
+    "reviewedAt": "2026-08-01",
+    "collectedAt": "2026-08-05T00:00:00Z",
+    "documentHash": "sha256:policy_housing_001"
+  }
+]
 ```
 
 ## Draft Endpoints

@@ -46,3 +46,16 @@ pgvector는 PostgreSQL 확장으로 다음 데이터를 관리한다.
 정책 원문, 구조화 조건, 사용자 사실, 판정은 각각 버전을 가져야 한다. 정책 원문이나 조건이 변경되면 기존 판정은 `STALE` 평가 상태로 처리한다.
 
 MVP부터 정책 변경 추적은 별도 `policy_version`으로 관리한다. `verified_at` 날짜나 원문 해시는 버전의 속성일 수 있지만 버전 식별자를 대체하지 않는다.
+
+## Phase B2 Physical Catalog Tables
+
+Phase B2 creates the first physical policy catalog tables:
+
+- `category`: five catalog groups used for policy browsing.
+- `policy`: approved, active, draft, and inactive policy metadata. Public APIs only expose rows where `status = 'APPROVED'` and `is_active = true`.
+- `question`: structured fact-collection questions linked to policies when applicable.
+- `policy_rule`: structured rule candidates and evidence text. B2 stores rules but does not evaluate them.
+- `policy_document`: official source document metadata, reviewed date, collected timestamp, and document hash.
+- `policy_relation`: lightweight relation edges between policies.
+
+Seed data is inserted through Alembic and can be reapplied through `python -m app.db.seed`; both paths use `ON CONFLICT` upserts so repeated seed execution does not duplicate catalog rows.
