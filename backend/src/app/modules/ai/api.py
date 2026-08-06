@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from http import HTTPStatus
@@ -26,6 +27,10 @@ from app.modules.rag.repository import SqlAlchemyRagSearchRepository
 from app.modules.rag.search import Citation, search_policy_evidence
 from app.modules.sessions.security import validate_unsafe_origin
 from app.modules.sessions.service import require_session
+
+RAG_TIMEOUT_SECONDS = 3
+RAG_MINIMUM_SIMILARITY = 0.75
+RAG_TOP_K = 3
 
 router = APIRouter(prefix="/api", tags=["ai"])
 
@@ -76,12 +81,16 @@ async def retrieve_rag_citations(
     question: str,
 ) -> tuple[CitationResponse, ...]:
     try:
-        result = await search_policy_evidence(
-            policy_id=policy_id,
-            question=question,
-            provider=await get_embedding_provider(request),
-            repository=SqlAlchemyRagSearchRepository(db),
-            top_k=3,
+        result = await asyncio.wait_for(
+            search_policy_evidence(
+                policy_id=policy_id,
+                question=question,
+                provider=await get_embedding_provider(request),
+                repository=SqlAlchemyRagSearchRepository(db),
+                top_k=RAG_TOP_K,
+                minimum_similarity=RAG_MINIMUM_SIMILARITY,
+            ),
+            timeout=RAG_TIMEOUT_SECONDS,
         )
     except Exception:
         return ()
@@ -102,6 +111,25 @@ def citation_response(policy_id: str, citation: Citation) -> CitationResponse:
     )
 
 
+def rag_query_for_bundle(bundle) -> str:
+    policy = bundle.policy
+    evidence = bundle.evaluation.evidence if bundle.evaluation is not None else {}
+    condition_keys = sorted(
+        {
+            item.get("factKey")
+            for group_name in (
+                "satisfied",
+                "unsatisfied",
+                "needsConfirmation",
+                "officialConfirmationRequired",
+            )
+            for item in evidence.get(group_name, [])
+            if isinstance(item, dict) and isinstance(item.get("factKey"), str)
+        }
+    )
+    keywords = [policy.title, policy.category_code, policy.support_type, *condition_keys]
+    return " ".join(str(keyword) for keyword in keywords if str(keyword).strip())
+
 async def build_context_for_policy(
     db: AsyncSession,
     request: Request,
@@ -113,7 +141,7 @@ async def build_context_for_policy(
     bundle = await get_policy_evidence_bundle(db, session_id=session_id, policy_id=policy_id)
     if bundle is None:
         raise AppError("POLICY_NOT_FOUND", "Requested policy does not exist.", HTTPStatus.NOT_FOUND)
-    question = user_message or bundle.policy.summary
+    question = rag_query_for_bundle(bundle)
     return ExplanationContext(
         policy=bundle.policy,
         evaluation=bundle.evaluation,
@@ -141,7 +169,7 @@ async def build_context_for_top_policy(
             db,
             request,
             policy_id=bundle.policy.id,
-            question=user_message or bundle.policy.summary,
+            question=rag_query_for_bundle(bundle),
         ),
         user_message=user_message,
     )

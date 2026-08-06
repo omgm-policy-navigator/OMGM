@@ -10,6 +10,8 @@ from app.core.config import AppConfig
 from app.db.session import get_db
 from app.llm import AIOutput, FakeLLMProvider
 from app.main import create_app
+from app.modules.ai.api import rag_query_for_bundle
+from app.modules.ai.schemas import CitationResponse
 
 TEST_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost:5432/test_db"
 
@@ -100,12 +102,19 @@ def policy_bundle():
         title="Housing support",
         summary="Rent support",
         application_period="2026-01-01 to 2026-12-31",
+        category_code="housing",
+        support_type="rent",
     )
     evaluation = SimpleNamespace(
         policy_id="policy_housing_001",
         eligibility_status="LIKELY_ELIGIBLE",
         evaluation_state="ACTIVE",
-        evidence={"satisfied": [], "unsatisfied": []},
+        evidence={
+            "satisfied": [{"factKey": "region"}],
+            "unsatisfied": [],
+            "needsConfirmation": [{"factKey": "income"}],
+            "officialConfirmationRequired": [],
+        },
     )
     document = SimpleNamespace(
         id="doc_1",
@@ -118,8 +127,24 @@ def policy_bundle():
     return SimpleNamespace(policy=policy, evaluation=evaluation, documents=(document,))
 
 
+def rag_citations():
+    return (
+        CitationResponse(
+            sourceId="doc_chunk_1",
+            policyId="policy_housing_001",
+            title="Official notice chunk",
+            url="https://example.go.kr/policy/1",
+            sourceLabel="OFFICIAL",
+            evidenceId="chunk_1",
+            excerpt="Official evidence.",
+            sourceLocation="heading:eligibility",
+            similarity=0.88,
+        ),
+    )
+
+
 class AIExplanationApiTests(unittest.TestCase):
-    def test_explain_policy_uses_cookie_session_and_approved_citations(self) -> None:
+    def test_explain_policy_uses_cookie_session_and_rag_citations(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
@@ -127,7 +152,7 @@ class AIExplanationApiTests(unittest.TestCase):
             new=AsyncMock(return_value=policy_bundle()),
         ) as get_bundle, patch(
             "app.modules.ai.api.retrieve_rag_citations",
-            new=AsyncMock(return_value=()),
+            new=AsyncMock(return_value=rag_citations()),
         ):
             status, _headers, body = asyncio.run(
                 asgi_request(app, "POST", "/api/policies/policy_housing_001/explain", body={"question": "Explain"})
@@ -136,9 +161,28 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["policyId"], "policy_housing_001")
         self.assertEqual(body["eligibilityStatus"], "LIKELY_ELIGIBLE")
-        self.assertEqual(body["citations"][0]["sourceId"], "doc_1")
+        self.assertEqual(body["citations"][0]["sourceId"], "doc_chunk_1")
         self.assertNotIn("sessionId", json.dumps(body))
         get_bundle.assert_awaited_once_with(db, session_id=7, policy_id="policy_housing_001")
+
+    def test_no_rag_citations_requires_official_confirmation(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.get_policy_evidence_bundle",
+            new=AsyncMock(return_value=policy_bundle()),
+        ), patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(app, "POST", "/api/policies/policy_housing_001/explain", body={"question": "Explain"})
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["eligibilityStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
+        self.assertEqual(body["aiStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
+        self.assertEqual(body["citations"], [])
 
     def test_chat_without_policy_uses_top_session_evaluation(self) -> None:
         db = AsyncMock()
@@ -148,7 +192,7 @@ class AIExplanationApiTests(unittest.TestCase):
             new=AsyncMock(return_value=policy_bundle()),
         ) as top_bundle, patch(
             "app.modules.ai.api.retrieve_rag_citations",
-            new=AsyncMock(return_value=()),
+            new=AsyncMock(return_value=rag_citations()),
         ):
             status, _headers, body = asyncio.run(asgi_request(app, "POST", "/api/chat", body={"message": "Tell me"}))
 
@@ -164,7 +208,7 @@ class AIExplanationApiTests(unittest.TestCase):
             new=AsyncMock(return_value=policy_bundle()),
         ), patch(
             "app.modules.ai.api.retrieve_rag_citations",
-            new=AsyncMock(return_value=()),
+            new=AsyncMock(return_value=rag_citations()),
         ):
             status, headers, body = asyncio.run(
                 asgi_request(
@@ -179,3 +223,11 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertTrue(headers["content-type"].startswith("text/event-stream"))
         self.assertIn("event: done", body)
         self.assertIn("Generated explanation", body)
+
+    def test_rag_query_excludes_user_pii_and_uses_condition_keys(self) -> None:
+        query = rag_query_for_bundle(policy_bundle())
+
+        self.assertIn("Housing support", query)
+        self.assertIn("income", query)
+        self.assertNotIn("5230", query)
+        self.assertNotIn("Seocho", query)

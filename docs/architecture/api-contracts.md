@@ -457,7 +457,7 @@ All B7 endpoints identify the anonymous user only through the HttpOnly anonymous
 
 ### `POST /api/chat`
 
-Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official chunk or document evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support.
+Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official RAG chunk evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support. RAG queries are built from policy metadata and condition keys, not raw user free text or personal fact values.
 
 Request:
 
@@ -495,7 +495,7 @@ Response `200`:
 
 ### `POST /api/policies/{policyId}/explain`
 
-Explains one policy for the current anonymous session. Missing active approved policies return `POLICY_NOT_FOUND`. LLM failures are converted to `aiStatus: "FALLBACK"` while keeping the stored Rule Engine `eligibilityStatus` and official citations available.
+Explains one policy for the current anonymous session. Missing active approved policies return `POLICY_NOT_FOUND`. RAG and LLM calls use strict timeout/fallback handling. LLM failures are converted to `aiStatus: "FALLBACK"` while keeping the stored Rule Engine `eligibilityStatus` and official citations available through a static explanation generated from stored JSON evidence.
 
 Request:
 
@@ -509,7 +509,7 @@ Response `200`: same shape as `POST /api/chat`.
 
 ### `GET /api/chat/stream`
 
-Streams the same explanation contract as server-sent events for chat UI rendering.
+Streams the same explanation contract as server-sent events for chat UI rendering. The streamed message uses the same Rule/RAG/LLM guardrails as `POST /api/chat`.
 
 Query parameters:
 
