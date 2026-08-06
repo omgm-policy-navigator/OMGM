@@ -292,56 +292,73 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
   const selectedCategory = categories.find(({ id }) => id === selectedCategoryId) ?? categories[0];
   const isLiveMode = appConfig.apiMode === "live";
   const messageId = useRef(0);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => fallbackMessages(selectedCategory));
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const loadedCategoryIds = useRef(new Set<string>());
+  const [messagesByCategory, setMessagesByCategory] = useState<Record<string, ChatMessage[]>>(() => ({
+    [selectedCategory.id]: fallbackMessages(selectedCategory),
+  }));
   const [draft, setDraft] = useState("");
-  const [activeQuestion, setActiveQuestion] = useState<QuestionResponse | null>(null);
+  const [activeQuestionsByCategory, setActiveQuestionsByCategory] = useState<Record<string, QuestionResponse | null>>({});
   const [loading, setLoading] = useState(false);
-  const [liveIssue, setLiveIssue] = useState<string | null>(null);
-  const appendMessage = useCallback((from: ChatMessage["from"], text: string) => {
-    setMessages((current) => [
+  const [liveIssuesByCategory, setLiveIssuesByCategory] = useState<Record<string, string | null>>({});
+  const messages = messagesByCategory[selectedCategory.id] ?? fallbackMessages(selectedCategory);
+  const activeQuestion = activeQuestionsByCategory[selectedCategory.id] ?? null;
+  const liveIssue = liveIssuesByCategory[selectedCategory.id] ?? null;
+  const appendMessage = useCallback((categoryId: string, from: ChatMessage["from"], text: string) => {
+    setMessagesByCategory((current) => ({
       ...current,
-      {
-        id: `live-${Date.now()}-${messageId.current++}`,
-        from,
-        text,
-        time: messageTime(),
-      },
-    ]);
+      [categoryId]: [
+        ...(current[categoryId] ?? []),
+        {
+          id: `live-${Date.now()}-${messageId.current++}`,
+          from,
+          text,
+          time: messageTime(),
+        },
+      ],
+    }));
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    const categoryId = selectedCategory.id;
 
     async function loadLiveCategory() {
       setLoading(true);
-      setLiveIssue(null);
-      setActiveQuestion(null);
+      setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: null }));
       onGraphChange(null);
 
       try {
         await createSession(controller.signal);
         await selectCategory(selectedCategory.backendCategoryCode, controller.signal);
-        const [questions, graph] = await Promise.all([
-          getNextQuestions(controller.signal),
-          getSessionGraph(selectedCategory.backendCategoryCode, controller.signal),
-        ]);
+        const shouldInitializeConversation = !loadedCategoryIds.current.has(categoryId);
+        const [questions, graph] = await Promise.all([shouldInitializeConversation ? getNextQuestions(controller.signal) : Promise.resolve(null), getSessionGraph(selectedCategory.backendCategoryCode, controller.signal)]);
         onGraphChange(graph);
-        const intro = selectedCategory.liveNote
-          ? `${selectedCategory.label} 화면은 실제 백엔드의 ${selectedCategory.backendCategoryCode} 질문 흐름에 임시 연결되어 있어요.`
-          : `${selectedCategory.label} 주제의 실제 질문 엔진을 연결했어요.`;
-        const nextQuestion = questions.items[0] ?? null;
-        setActiveQuestion(nextQuestion);
-        setMessages([
-          {
-            id: `live-intro-${selectedCategory.id}`,
-            from: "bot",
-            text: nextQuestion ? `${intro}\n${formatQuestion(nextQuestion)}` : `${intro}\n현재 추가 질문이 없습니다. 우측 그래프에서 정책 연결을 확인해보세요.`,
-            time: messageTime(),
-          },
-        ]);
+        if (questions) {
+          const intro = selectedCategory.liveNote
+            ? `${selectedCategory.label} 화면은 실제 백엔드의 ${selectedCategory.backendCategoryCode} 질문 흐름에 임시 연결되어 있어요.`
+            : `${selectedCategory.label} 주제의 실제 질문 엔진을 연결했어요.`;
+          const nextQuestion = questions.items[0] ?? null;
+          setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
+          setMessagesByCategory((current) => ({
+            ...current,
+            [categoryId]: [
+              {
+                id: `live-intro-${categoryId}`,
+                from: "bot",
+                text: nextQuestion ? `${intro}\n${formatQuestion(nextQuestion)}` : `${intro}\n현재 추가 질문이 없습니다. 우측 그래프에서 정책 연결을 확인해보세요.`,
+                time: messageTime(),
+              },
+            ],
+          }));
+          loadedCategoryIds.current.add(categoryId);
+        }
       } catch {
-        setLiveIssue("백엔드 세션 API에 연결하지 못해 목업 대화로 표시 중입니다.");
-        setMessages(fallbackMessages(selectedCategory));
+        setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: "백엔드 세션 API에 연결하지 못해 목업 대화로 표시 중입니다." }));
+        setMessagesByCategory((current) => ({
+          ...current,
+          [categoryId]: current[categoryId] ?? fallbackMessages(selectedCategory),
+        }));
       } finally {
         setLoading(false);
       }
@@ -352,11 +369,20 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
       return () => controller.abort();
     }
 
-    setMessages(fallbackMessages(selectedCategory));
-    setActiveQuestion(null);
-    setLiveIssue(null);
+    setMessagesByCategory((current) => ({
+      ...current,
+      [categoryId]: current[categoryId] ?? fallbackMessages(selectedCategory),
+    }));
+    setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: null }));
+    setLiveIssuesByCategory((current) => ({ ...current, [categoryId]: null }));
     return () => controller.abort();
   }, [isLiveMode, onGraphChange, selectedCategory]);
+
+  useEffect(() => {
+    if (typeof messagesEndRef.current?.scrollIntoView === "function") {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages.length, selectedCategoryId, loading]);
 
   const optionHint = useMemo(() => {
     if (!activeQuestion) {
@@ -375,16 +401,16 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
     }
 
     setDraft("");
-    appendMessage("user", answerText);
+    appendMessage(selectedCategory.id, "user", answerText);
 
     if (!isLiveMode || !activeQuestion) {
-      appendMessage("bot", "현재 자유 입력형 챗봇 API는 아직 노출되어 있지 않아 실제 저장 없이 화면 대화만 표시됩니다.");
+      appendMessage(selectedCategory.id, "bot", "현재 자유 입력형 챗봇 API는 아직 노출되어 있지 않아 실제 저장 없이 화면 대화만 표시됩니다.");
       return;
     }
 
     const value = normalizeAnswer(answerText, activeQuestion);
     if (value === null) {
-      appendMessage("bot", optionHint ? `입력 형식이 맞지 않습니다.\n${optionHint}` : "입력 형식이 맞지 않습니다. 질문에 맞는 값을 짧게 입력해 주세요.");
+      appendMessage(selectedCategory.id, "bot", optionHint ? `입력 형식이 맞지 않습니다.\n${optionHint}` : "입력 형식이 맞지 않습니다. 질문에 맞는 값을 짧게 입력해 주세요.");
       return;
     }
 
@@ -393,24 +419,24 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
       const result = await submitAnswer(activeQuestion, value);
       if (result.conflicts.length > 0) {
         const conflictQuestion = result.conflicts[0]?.question;
-        setActiveQuestion(conflictQuestion ?? activeQuestion);
-        appendMessage("bot", conflictQuestion ? `이전 답변과 충돌합니다.\n${formatQuestion(conflictQuestion)}` : "이전 답변과 충돌합니다. 기존 조건을 먼저 확인해 주세요.");
+        setActiveQuestionsByCategory((current) => ({ ...current, [selectedCategory.id]: conflictQuestion ?? activeQuestion }));
+        appendMessage(selectedCategory.id, "bot", conflictQuestion ? `이전 답변과 충돌합니다.\n${formatQuestion(conflictQuestion)}` : "이전 답변과 충돌합니다. 기존 조건을 먼저 확인해 주세요.");
         return;
       }
 
       const nextQuestion = result.nextQuestions[0] ?? null;
-      setActiveQuestion(nextQuestion);
+      setActiveQuestionsByCategory((current) => ({ ...current, [selectedCategory.id]: nextQuestion }));
       if (nextQuestion) {
-        appendMessage("bot", formatQuestion(nextQuestion));
+        appendMessage(selectedCategory.id, "bot", formatQuestion(nextQuestion));
         return;
       }
 
       await createEvaluations();
       const graph = await getSessionGraph(selectedCategory.backendCategoryCode);
       onGraphChange(graph);
-      appendMessage("bot", "답변을 저장했고 정책 그래프를 갱신했어요. 우측 그래프에서 연결된 정책과 근거를 확인해보세요.");
+      appendMessage(selectedCategory.id, "bot", "답변을 저장했고 정책 그래프를 갱신했어요. 우측 그래프에서 연결된 정책과 근거를 확인해보세요.");
     } catch {
-      appendMessage("bot", "답변 저장 중 문제가 발생했습니다. 백엔드 실행 상태와 세션 설정을 확인해 주세요.");
+      appendMessage(selectedCategory.id, "bot", "답변 저장 중 문제가 발생했습니다. 백엔드 실행 상태와 세션 설정을 확인해 주세요.");
     } finally {
       setLoading(false);
     }
@@ -477,6 +503,7 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
       </div>
 
       <form

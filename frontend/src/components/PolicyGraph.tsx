@@ -1,4 +1,4 @@
-import { Background, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
+import { Background, Controls, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
 import { CircleHelp, FileCheck2, FolderTree, Landmark, ListChecks, UserRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
@@ -7,7 +7,7 @@ import { designTokens } from "../design";
 import type { SessionGraphNode, SessionGraphResponse } from "../shared/api/chatbot";
 
 type GraphNodeData = PolicyNodeData & {
-  variant: "central" | "policy" | "condition" | "category" | "action";
+  variant: "central" | "policy" | "condition" | "category" | "action" | "detail";
   backendType?: string;
   backendData?: Record<string, unknown>;
 };
@@ -144,7 +144,7 @@ function displayLabelForBackendNode(node: SessionGraphNode) {
     return node.data.value === undefined ? factLabel : `${factLabel}\n${labelValue(node.data.value)}`;
   }
   if (type === "ACTION") {
-    return "신청 단계 확인";
+    return "신청 방법";
   }
   return node.label;
 }
@@ -183,7 +183,7 @@ function variantForBackendNode(type: string): GraphNodeData["variant"] {
     return "condition";
   }
   if (normalized === "ACTION") {
-    return "action";
+    return "detail";
   }
   return "policy";
 }
@@ -235,21 +235,21 @@ function layoutLiveNode(graphNode: SessionGraphNode, index: number, total: numbe
   const type = normalizeBackendType(graphNode.type);
 
   if (type === "USER") {
-    return { x: 80, y: 280 };
+    return { x: 360, y: 330 };
   }
   if (type === "CATEGORY") {
-    return { x: 280, y: 280 };
+    return { x: 150, y: 330 };
   }
   if (type === "POLICY") {
-    return { x: 520, y: spreadY(index, total, 250, 120) };
+    return { x: 590, y: spreadY(index, total, 290, 150) };
   }
   if (type === "CONDITION") {
-    return { x: 280, y: spreadY(index, total, 500, 88) };
+    return { x: 40, y: spreadY(index, total, 330, 92) };
   }
   if (type === "ACTION") {
-    return { x: 780, y: spreadY(index, total, 250, 120) };
+    return { x: 860, y: spreadY(index, total, 290, 150) };
   }
-  return { x: 520, y: spreadY(index, total, 500, 96) };
+  return { x: 590, y: spreadY(index, total, 540, 96) };
 }
 
 function edgeStyleForType(edgeType: string): Edge["style"] {
@@ -266,6 +266,56 @@ function edgeStyleForType(edgeType: string): Edge["style"] {
     return { stroke: "#5F9F73", strokeDasharray: "8 5", strokeWidth: 1.4 };
   }
   return { stroke: designTokens.color.graph.edge, strokeWidth: 1 };
+}
+
+function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: number): { nodes: Node<GraphNodeData>[]; edges: Edge[] } {
+  const policyId = typeof policyNode.data.backendData?.policyId === "string" ? policyNode.data.backendData.policyId : policyNode.id;
+  const region = labelValue(policyNode.data.backendData?.region);
+  const supportType = labelValue(policyNode.data.backendData?.supportType);
+  const details = [
+    { id: "target", label: `지원 대상\n${region}`, value: region },
+    { id: "support", label: `지원 내용\n${supportType}`, value: supportType },
+    { id: "apply", label: "신청 방법\n확인 필요", value: "확인 필요" },
+  ];
+
+  return {
+    nodes: details.map((detail, detailIndex) => ({
+      id: `POLICY_DETAIL:${policyId}:${detail.id}`,
+      type: "policyNode",
+      position: {
+        x: 860,
+        y: policyNode.position.y + (detailIndex - 1) * 46,
+      },
+      data: {
+        id: `POLICY_DETAIL:${policyId}:${detail.id}`,
+        label: detail.label,
+        description: `${policyNode.data.label}의 ${detail.label.replace("\n", " 정보: ")}`,
+        icon: ListChecks,
+        status: policyNode.data.status,
+        variant: "detail",
+        backendType: "POLICY_DETAIL",
+        backendData: {
+          policyId,
+          section: detail.id,
+          value: detail.value,
+        },
+      },
+    })),
+    edges: details.map((detail, detailIndex) => ({
+      id: `policy_detail:${policyId}:${detail.id}:${policyIndex}`,
+      source: policyNode.id,
+      target: `POLICY_DETAIL:${policyId}:${detail.id}`,
+      sourceHandle: "right",
+      targetHandle: "left",
+      type: "straight",
+      animated: false,
+      style: {
+        stroke: designTokens.color.graph.edge,
+        strokeDasharray: detailIndex === 2 ? "6 5" : "3 5",
+        strokeWidth: 1,
+      },
+    })),
+  };
 }
 
 export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphProps) {
@@ -295,9 +345,23 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
           },
         };
       });
-      const graphNodePositions = new Map<string, GraphPoint>(liveNodes.map((node) => [node.id, node.position]));
-      const visibleNodeIds = new Set(liveNodes.map(({ id }) => id));
+      const policyDetailGraph = liveNodes
+        .filter((node) => node.data.variant === "policy")
+        .slice(0, 4)
+        .map((node, index) => createPolicyDetailNodes(node, index));
+      const detailNodes = policyDetailGraph.flatMap((graph) => graph.nodes);
+      const detailEdges = policyDetailGraph.flatMap((graph) => graph.edges);
+      const visibleNodes = [...liveNodes, ...detailNodes];
+      const graphNodePositions = new Map<string, GraphPoint>(visibleNodes.map((node) => [node.id, node.position]));
+      const visibleNodeIds = new Set(visibleNodes.map(({ id }) => id));
+      const categoryNode = liveNodes.find((node) => node.data.variant === "category");
       const liveEdges: Edge[] = sessionGraph.edges
+        .map((edge) => {
+          if (edge.type === "HAS_FACT" && categoryNode) {
+            return { ...edge, source: edge.target, target: categoryNode.id };
+          }
+          return edge;
+        })
         .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
         .map((edge) => {
           const sourcePosition = graphNodePositions.get(edge.source);
@@ -315,7 +379,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
           };
         });
 
-      return { nodes: liveNodes, edges: liveEdges };
+      return { nodes: visibleNodes, edges: [...liveEdges, ...detailEdges] };
     }
 
     const center: Node<GraphNodeData> = {
@@ -394,18 +458,18 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
           edges={edges}
           nodeTypes={nodeTypes}
           fitView
-          minZoom={0.55}
-          maxZoom={1.4}
+          minZoom={0.3}
+          maxZoom={1.8}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
           edgesFocusable={false}
           nodesFocusable={false}
-          panOnScroll={false}
-          panOnDrag={false}
-          zoomOnScroll={false}
-          zoomOnPinch={false}
-          preventScrolling
+          panOnScroll
+          panOnDrag
+          zoomOnScroll
+          zoomOnPinch
+          preventScrolling={false}
           onNodeClick={(_, node) => {
             const data = node.data;
             if (data.variant !== "central") {
@@ -413,6 +477,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             }
           }}
         >
+          <Controls position="top-right" showInteractive={false} />
           <Background color={designTokens.color.graph.backgroundLine} gap={32} size={1} />
         </ReactFlow>
       </div>
@@ -427,21 +492,24 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
   const isCentral = data.variant === "central";
   const isPolicy = data.variant === "policy";
   const isCondition = data.variant === "condition";
-  const isAction = data.variant === "action";
+  const isCategory = data.variant === "category";
+  const isDetail = data.variant === "detail" || data.variant === "action";
 
   return (
     <div
-      className={`relative flex text-center shadow-card ${
+      className={`relative flex items-center justify-center text-center shadow-card ${
         isCentral
-          ? "h-[112px] w-[112px] flex-col items-center justify-center rounded-full border-2 border-brand-primary bg-white text-text-primary"
-          : `min-h-[72px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
+          ? "h-[136px] w-[136px] flex-col rounded-full border-2 border-brand-primary bg-white text-text-primary"
+          : `cursor-pointer text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
               isPolicy
-                ? "w-[178px] border-brand-primary bg-brand-surface"
+                ? "h-[126px] w-[126px] flex-col rounded-full border-2 border-brand-primary bg-white px-4"
                 : isCondition
-                  ? "w-[148px] border-brand-border bg-white"
-                  : isAction
-                    ? "w-[150px] border-brand-border bg-brand-surface-container"
-                    : "w-[142px] border-brand-border bg-white"
+                  ? "h-[96px] w-[96px] flex-col rounded-full border border-dashed border-brand-primary bg-white px-3"
+                  : isCategory
+                    ? "h-[112px] w-[112px] flex-col rounded-full border border-brand-border bg-brand-surface px-3"
+                    : isDetail
+                      ? "min-h-[40px] w-[142px] rounded-full border border-brand-border bg-white px-3 py-2"
+                      : "h-[96px] w-[96px] flex-col rounded-full border border-brand-border bg-white px-3"
             }`
       }`}
     >
@@ -451,27 +519,38 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
       {handlePositions.map(({ id, position }) => (
         <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
       ))}
-      <Icon size={isCentral ? 30 : 22} className={`${isCentral ? "mb-2" : "shrink-0"} text-brand-primary`} />
-      <span className={`${isCentral ? "text-caption" : "whitespace-pre-line text-[12px] font-medium leading-4"}`}>{data.label}</span>
+      <Icon size={isCentral ? 34 : isDetail ? 16 : 24} className={`${isDetail ? "mr-2 shrink-0" : "mb-2"} text-brand-primary`} />
+      <span className={`${isCentral ? "text-body-sm font-semibold" : isDetail ? "whitespace-pre-line text-left text-[11px] font-medium leading-4" : "whitespace-pre-line text-[11px] font-medium leading-4"}`}>
+        {data.label}
+      </span>
     </div>
   );
 }
+
+const backendFieldLabels: Record<string, string> = {
+  categoryCode: "주제",
+  eligibilityStatus: "자격 상태",
+  evaluationState: "평가 상태",
+  recommendationScore: "추천 점수",
+  factKey: "조건",
+  value: "값",
+  region: "지역",
+  supportType: "지원 유형",
+  section: "상세 항목",
+};
 
 function formatBackendValue(value: unknown) {
   if (value === null || value === undefined || value === "") {
     return "미확인";
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return JSON.stringify(value);
+  return labelValue(value);
 }
 
 function visibleBackendEntries(data: Record<string, unknown> | undefined) {
   if (!data) {
     return [];
   }
-  return Object.entries(data).filter(([key]) => ["eligibilityStatus", "evaluationState", "recommendationScore", "factKey", "value", "categoryCode"].includes(key));
+  return Object.entries(data).filter(([key]) => ["eligibilityStatus", "evaluationState", "recommendationScore", "factKey", "value", "categoryCode", "region", "supportType", "section"].includes(key));
 }
 
 function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () => void }) {
@@ -489,7 +568,7 @@ function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () =
             </div>
             <div>
               <p className="text-caption text-brand-primary">{policy.backendType ? `${policy.backendType} Detail` : "Policy Detail"}</p>
-              <h3 className="mt-1 text-h3">{policy.label}</h3>
+              <h3 className="mt-1 whitespace-pre-line text-h3">{policy.label}</h3>
             </div>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl text-text-secondary transition hover:bg-white">
@@ -499,12 +578,12 @@ function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () =
         <div className="space-y-5 overflow-y-auto p-6">
           <p className="text-body-md text-text-secondary">{policy.description}</p>
           <div className="rounded-xl border border-brand-border bg-white p-4">
-            <h4 className="text-h4">{backendEntries.length > 0 ? "백엔드 그래프 데이터" : "확인된 조건"}</h4>
+            <h4 className="text-h4">{backendEntries.length > 0 ? "상세 데이터" : "확인된 조건"}</h4>
             <ul className="mt-3 space-y-2 text-body-sm text-text-secondary">
               {backendEntries.length > 0 ? (
                 backendEntries.map(([key, value]) => (
                   <li key={key}>
-                    {key}: {formatBackendValue(value)}
+                    {backendFieldLabels[key] ?? key}: {formatBackendValue(value)}
                   </li>
                 ))
               ) : (
