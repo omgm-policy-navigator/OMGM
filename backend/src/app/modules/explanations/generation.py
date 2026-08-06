@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,25 +31,28 @@ _OPPOSITE_PHRASES: dict[EligibilityStatus, tuple[str, ...]] = {
 }
 
 
-@dataclass(frozen=True)
-class UserConditionContext:
-    key: str
-    value: str
+class UserConditionContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=500)
 
 
-@dataclass(frozen=True)
-class GraphNodeContext:
-    node_id: str
-    node_type: str
-    label: str
+class GraphNodeContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    node_id: str = Field(min_length=1, max_length=100)
+    node_type: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=200)
 
 
-@dataclass(frozen=True)
-class GroundedAnswerInput:
-    user_question: str
-    user_conditions: tuple[UserConditionContext, ...]
+class GroundedAnswerInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+
+    user_question: str = Field(min_length=1, max_length=2000)
+    user_conditions: tuple[UserConditionContext, ...] = Field(max_length=30)
     evaluation: EvaluationResult
-    citations: tuple[Citation, ...]
+    citations: tuple[Citation, ...] = Field(max_length=20)
     selected_graph_node: GraphNodeContext | None = None
 
 
@@ -75,6 +77,7 @@ class RuleGroundedAnswer(BaseModel):
     explanation_status: ExplanationStatus = Field(alias="explanationStatus")
     verdict_summary: str = Field(alias="verdictSummary", min_length=1, max_length=500)
     satisfied_conditions: list[ConditionExplanation] = Field(alias="satisfiedConditions")
+    unsatisfied_conditions: list[ConditionExplanation] = Field(alias="unsatisfiedConditions")
     confirmation_conditions: list[ConditionExplanation] = Field(alias="confirmationConditions")
     application_timing: str = Field(alias="applicationTiming", min_length=1, max_length=500)
     official_sources: list[AICitation] = Field(alias="officialSources")
@@ -121,7 +124,8 @@ def build_grounded_answer_request(data: GroundedAnswerInput) -> LLMRequest:
     }
     system = (
         "You explain a precomputed policy Rule Engine result. Never change or infer eligibility. "
-        "Return the existing AIOutput JSON contract. "
+        "Return the existing AIOutput JSON contract. Your answer is advisory draft text only; "
+        "the server renders policy evidence directly from the cited excerpts. "
         "resultStatus and condition IDs must match the supplied ruleResult. "
         "Use only supplied evidence IDs and URLs. Do not state policy amounts, dates, percentages, ages, or durations "
         "unless the exact number occurs in a retrieved excerpt. "
@@ -140,11 +144,15 @@ async def generate_rule_grounded_answer(data: GroundedAnswerInput, provider: LLM
         return _fallback_answer(data, insufficient_evidence=False)
     if not _is_safe_draft(data, output):
         return _fallback_answer(data, insufficient_evidence=False)
+    if output.is_fallback:
+        return _fallback_answer(data, insufficient_evidence=False)
+    used_evidence_ids = {item.evidence_id for item in output.citations}
     return _assemble_answer(
         data,
-        output.answer,
+        _policy_evidence_text(data.citations, used_evidence_ids),
         explanation_status=ExplanationStatus.GROUNDED,
-        is_fallback=output.is_fallback,
+        is_fallback=False,
+        used_evidence_ids=used_evidence_ids,
     )
 
 
@@ -157,9 +165,22 @@ def _validate_input(data: GroundedAnswerInput) -> None:
     evidence_ids = [item.evidence_id for item in data.citations]
     if len(evidence_ids) != len(set(evidence_ids)):
         raise ValueError("citations must not contain duplicate evidence IDs")
+    groups = (
+        data.evaluation.satisfied,
+        data.evaluation.unsatisfied,
+        data.evaluation.needs_confirmation,
+        data.evaluation.official_confirmation_required,
+    )
+    condition_ids = [_condition_id(item) for group in groups for item in group]
+    if len(condition_ids) > 100:
+        raise ValueError("rule result must not contain more than 100 conditions")
+    if len(condition_ids) != len(set(condition_ids)):
+        raise ValueError("rule result contains duplicate condition IDs")
 
 
 def _is_safe_draft(data: GroundedAnswerInput, output: AIOutput) -> bool:
+    if output.is_fallback or not output.citations:
+        return False
     if output.result_status != _expected_result_status(data.evaluation.eligibility_status):
         return False
     expected_satisfied = {_condition_id(item) for item in data.evaluation.satisfied}
@@ -191,18 +212,24 @@ def _assemble_answer(
     *,
     explanation_status: ExplanationStatus,
     is_fallback: bool,
+    used_evidence_ids: set[str] | None = None,
 ) -> RuleGroundedAnswer:
     return RuleGroundedAnswer(
         eligibilityStatus=data.evaluation.eligibility_status.value,
         explanationStatus=explanation_status,
         verdictSummary=_verdict_summary(data.evaluation.eligibility_status),
         satisfiedConditions=[_condition_response(item) for item in data.evaluation.satisfied],
+        unsatisfiedConditions=[_condition_response(item) for item in data.evaluation.unsatisfied],
         confirmationConditions=[
             _condition_response(item)
             for item in (*data.evaluation.needs_confirmation, *data.evaluation.official_confirmation_required)
         ],
         applicationTiming=_application_timing(data.evaluation.eligibility_status),
-        officialSources=[_citation_response(item) for item in data.citations],
+        officialSources=[
+            _citation_response(item)
+            for item in data.citations
+            if used_evidence_ids is None or item.evidence_id in used_evidence_ids
+        ],
         nextAction=_next_action(data),
         policyExplanation=explanation,
         generalGuidance="일반 안내: 최종 신청 전 공식 공고와 담당 기관에서 최신 기준을 확인하세요.",
@@ -224,7 +251,14 @@ def _fallback_answer(data: GroundedAnswerInput, *, insufficient_evidence: bool) 
 
 
 def _condition_id(item: ConditionEvidence) -> str:
-    return item.rule_id or item.field
+    if not item.rule_id:
+        raise ValueError("condition evidence requires rule_id")
+    return item.rule_id
+
+
+def _policy_evidence_text(citations: tuple[Citation, ...], used_ids: set[str]) -> str:
+    excerpts = [item.excerpt.strip() for item in citations if item.evidence_id in used_ids]
+    return "정책 근거:\n" + "\n".join(f"- {excerpt}" for excerpt in excerpts)
 
 
 def _condition_payload(item: ConditionEvidence) -> dict[str, object]:

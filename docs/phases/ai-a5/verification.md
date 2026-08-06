@@ -2,8 +2,8 @@
 
 ## 검증
 
-- A5·LLM·Rule Engine 집중 테스트: `62 passed`
-- 전체 백엔드 테스트: `180 passed, 1 skipped`
+- A5 회귀 테스트: `12 passed`
+- 전체 백엔드 테스트: `184 passed, 1 skipped`
 - Ruff (`src/app`, `tests`): 통과
 - Compose 설정 렌더링: 통과
 - `git diff --check`: 통과

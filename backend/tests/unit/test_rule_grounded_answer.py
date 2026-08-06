@@ -59,14 +59,16 @@ def request_data(
         missing = (evidence("rule_income", "HOUSEHOLD_INCOME_RANGE", ConditionResult.UNKNOWN),)
     return GroundedAnswerInput(
         user_question="이 정책을 신청할 수 있나요?",
-        user_conditions=(UserConditionContext("RESIDENCE_REGION", "SEOUL"),),
+        user_conditions=(UserConditionContext(key="RESIDENCE_REGION", value="SEOUL"),),
         evaluation=EvaluationResult(
             eligibility_status=status,
             satisfied=satisfied,
             needs_confirmation=missing,
         ),
         citations=(citation(),) if citations is None else citations,
-        selected_graph_node=GraphNodeContext("policy_1", "POLICY", "신혼부부 지원"),
+        selected_graph_node=GraphNodeContext(
+            node_id="policy_1", node_type="POLICY", label="신혼부부 지원"
+        ),
     )
 
 
@@ -103,7 +105,8 @@ def test_grounded_answer_keeps_rule_result_and_input_evidence_authoritative() ->
     assert [item.condition_id for item in result.satisfied_conditions] == ["rule_region"]
     assert result.confirmation_conditions == []
     assert [item.evidence_id for item in result.official_sources] == ["chunk_1"]
-    assert result.policy_explanation.startswith("정책 설명:")
+    assert result.policy_explanation.startswith("정책 근거:")
+    assert "지원 한도는 100만원입니다." in result.policy_explanation
     assert result.general_guidance.startswith("일반 안내:")
 
 
@@ -170,6 +173,70 @@ def test_invented_citation_is_rejected() -> None:
 
     assert result.explanation_status is ExplanationStatus.SAFE_FALLBACK
     assert [item.evidence_id for item in result.official_sources] == ["chunk_1"]
+
+
+def test_ineligible_answer_includes_unsatisfied_conditions() -> None:
+    data = request_data().model_copy(
+        update={
+            "evaluation": EvaluationResult(
+                eligibility_status=EligibilityStatus.LIKELY_INELIGIBLE,
+                unsatisfied=(
+                    evidence("rule_home", "HOME_OWNERSHIP", ConditionResult.UNMET),
+                ),
+            )
+        }
+    )
+    output = answered_output().model_copy(
+        update={"matched_conditions": []}
+    )
+
+    result, _ = generate(data, output)
+
+    assert [item.condition_id for item in result.unsatisfied_conditions] == ["rule_home"]
+
+
+def test_unsupported_qualitative_claim_is_not_exposed() -> None:
+    output = answered_output(
+        "이 정책은 온라인으로만 신청하며 다른 주거지원과 중복 신청은 불가능합니다."
+    )
+
+    result, _ = generate(
+        request_data(citations=(citation("서울 거주 신혼부부가 신청 대상입니다."),)), output
+    )
+
+    assert result.explanation_status is ExplanationStatus.GROUNDED
+    assert "온라인" not in result.policy_explanation
+    assert "중복 신청" not in result.policy_explanation
+    assert "서울 거주 신혼부부" in result.policy_explanation
+
+
+def test_provider_fallback_is_replaced_with_server_fallback() -> None:
+    output = answered_output().model_copy(update={"is_fallback": True})
+
+    result, _ = generate(request_data(), output)
+
+    assert result.explanation_status is ExplanationStatus.SAFE_FALLBACK
+    assert result.is_fallback is True
+
+
+def test_duplicate_rule_condition_ids_are_rejected() -> None:
+    duplicate = evidence("rule_region", "RESIDENCE_REGION", ConditionResult.UNKNOWN)
+    data = request_data().model_copy(
+        update={
+            "evaluation": EvaluationResult(
+                eligibility_status=EligibilityStatus.NEEDS_CONFIRMATION,
+                satisfied=(evidence("rule_region", "RESIDENCE_REGION", ConditionResult.MET),),
+                needs_confirmation=(duplicate,),
+            )
+        }
+    )
+
+    try:
+        generate(data, answered_output())
+    except ValueError as error:
+        assert str(error) == "rule result contains duplicate condition IDs"
+    else:
+        raise AssertionError("duplicate condition IDs must be rejected")
 
 
 def test_prompt_contains_all_inputs_and_non_decision_constraints() -> None:
