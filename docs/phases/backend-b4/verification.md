@@ -7,21 +7,21 @@ cd backend
 uv run pytest tests\integration\test_question_engine_api.py
 ```
 
-Result: passed. 10 tests passed.
+Result: passed. 12 tests passed.
 
 ```bash
 cd backend
 uv run pytest tests\integration\test_anonymous_session_api.py tests\integration\test_question_engine_api.py
 ```
 
-Result: passed. 20 tests passed.
+Result: passed. 22 tests passed.
 
 ```bash
 cd backend
 uv run pytest
 ```
 
-Result: passed. 113 tests passed after merging latest `origin/main`.
+Result: passed. 115 tests passed after review hardening changes.
 
 ```bash
 cd backend

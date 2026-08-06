@@ -302,24 +302,30 @@ def validate_question_dag(questions: tuple[QuestionTemplate, ...] = QUESTION_BAN
         visit(question_id)
 
 
-def dependent_fact_keys(category_code: str, changed_fact_key: str) -> set[str]:
-    by_fact = fact_to_question_ids()
+def dependent_fact_keys(
+    category_code: str,
+    changed_fact_key: str,
+    questions: tuple[QuestionTemplate, ...] = QUESTION_BANK,
+) -> set[str]:
+    by_fact = fact_to_question_ids(questions)
+    by_id = questions_by_id(questions)
     parent_ids = {
         question_id
         for question_id in by_fact.get(changed_fact_key, set())
-        if questions_by_id()[question_id].category_code == category_code
+        if by_id[question_id].category_code == category_code
     }
-    edges = dependency_edges()
+    edges = dependency_edges(questions)
     dependent_question_ids: set[str] = set()
+    visited: set[str] = set(parent_ids)
     pending = list(parent_ids)
     while pending:
         question_id = pending.pop()
         for child_id in edges.get(question_id, set()):
-            if child_id in dependent_question_ids:
+            if child_id in visited:
                 continue
+            visited.add(child_id)
             dependent_question_ids.add(child_id)
             pending.append(child_id)
-    by_id = questions_by_id()
     return {by_id[question_id].fact_key for question_id in dependent_question_ids}
 
 def category_questions(category_code: str) -> list[QuestionTemplate]:

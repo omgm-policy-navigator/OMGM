@@ -14,8 +14,8 @@ Implemented on branch `backend-b4-question-engine`.
 - Added APIs under `/api/v1/session` for category selection, next question retrieval, answer submission, and progress.
 - Stored submitted answers as session-scoped `user_fact` rows through existing B3 storage.
 - Added conflict detection for submitted answers that differ from existing confirmed facts, with explicit conflict-resolution response fields.
-- Added tests for priority, answered-question exclusion, conditional child questions, completion progress, API category selection, next question, conflict responses, DAG cycle rejection, and dependent child fact invalidation.
-- Added cascade invalidation that deletes dependent child `user_fact` rows when a parent answer changes.
+- Added tests for priority, answered-question exclusion, conditional child questions, completion progress, API category selection, next question, conflict responses, DAG cycle rejection, multi-depth dependent invalidation, and atomic answer/invalidation failure handling.
+- Added DFS cascade invalidation that deletes all descendant `user_fact` rows for the current session when a parent answer changes.
 
 ## Deferred
 

@@ -12,6 +12,7 @@ from app.main import create_app
 from app.modules.questions.engine import (
     QuestionTemplate,
     ShowCondition,
+    dependent_fact_keys,
     next_questions,
     progress,
     validate_question_dag,
@@ -148,6 +149,37 @@ class QuestionEngineUnitTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_question_dag(questions)
 
+    def test_dependent_fact_keys_traverses_all_descendants(self) -> None:
+        questions = (
+            QuestionTemplate("q_parent", "housing", "parent", "Parent?", "boolean", True, 10, 10),
+            QuestionTemplate(
+                "q_child",
+                "housing",
+                "child",
+                "Child?",
+                "boolean",
+                True,
+                20,
+                10,
+                parent_question_id="q_parent",
+                show_condition=ShowCondition("parent", True),
+            ),
+            QuestionTemplate(
+                "q_grandchild",
+                "housing",
+                "grandchild",
+                "Grandchild?",
+                "boolean",
+                True,
+                30,
+                10,
+                parent_question_id="q_child",
+                show_condition=ShowCondition("child", True),
+            ),
+        )
+
+        self.assertEqual(dependent_fact_keys("housing", "parent", questions), {"child", "grandchild"})
+
 class QuestionEngineApiTests(unittest.TestCase):
     def test_select_category_stores_session_category(self) -> None:
         db = AsyncMock()
@@ -262,3 +294,38 @@ class QuestionEngineApiTests(unittest.TestCase):
         self.assertEqual(delete_facts.await_args.args[2], {"marriage_registration_date"})
         next_fact_keys = [question["factKey"] for question in body["nextQuestions"]]
         self.assertNotIn("marriage_registration_date", next_fact_keys)
+    def test_submit_answer_does_not_commit_when_dependent_invalidation_fails(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        existing = [fact("marriage_registered", True), fact("marriage_registration_date", "2026-01-01")]
+        with patch(
+            "app.modules.sessions.api.require_session",
+            new=AsyncMock(return_value=active_session("cash")),
+        ), patch(
+            "app.modules.sessions.api.list_session_facts",
+            new=AsyncMock(return_value=existing),
+        ), patch("app.modules.sessions.api.upsert_session_fact", new=AsyncMock()) as upsert, patch(
+            "app.modules.sessions.api.delete_session_facts_by_keys",
+            new=AsyncMock(side_effect=RuntimeError("delete failed")),
+        ):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(
+                    asgi_request(
+                        app,
+                        "POST",
+                        "/api/v1/session/answers",
+                        body={
+                            "answers": [
+                                {
+                                    "questionId": "q_cash_marriage_registered",
+                                    "factKey": "marriage_registered",
+                                    "value": False,
+                                    "confirmed": True,
+                                }
+                            ]
+                        },
+                    )
+                )
+
+        upsert.assert_awaited_once()
+        db.commit.assert_not_awaited()
