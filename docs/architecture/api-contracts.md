@@ -2,7 +2,7 @@
 
 ## Contract Status
 
-This document tracks implemented backend API contracts. Health endpoints were implemented in B1, and policy catalog read endpoints were implemented in B2. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
+This document tracks implemented backend API contracts. Health endpoints were implemented in B1, policy catalog read endpoints were implemented in B2, and anonymous session/user fact endpoints were implemented in B3. Other endpoints define mockable contracts so frontend and backend work can proceed without sharing internal entities. The reviewed policy CSV catalog remains an internal backend input rather than an API response schema.
 
 Base URL for local development: `http://localhost:8000`.
 
@@ -212,49 +212,63 @@ Response `200`:
 ]
 ```
 
-## Draft Endpoints
+## Implemented Anonymous Session Endpoints
 
 ### `POST /api/session`
 
-Creates an anonymous session owned by the backend. The backend generates the session ID and returns it only as a cookie.
+Creates or returns the current anonymous session. The backend generates the session token and returns it only in the `anonymous_session` cookie. Clients must not send or receive session IDs in JSON.
 
-Request: no body.
+Request body is ignored.
 
-Response `201`:
+Response `201` when a new session is created, or `200` when the existing cookie session is still valid:
 
 ```json
 {
-  "expiresAt": "2026-08-06T12:00:00Z"
+  "expiresAt": "2026-08-07T00:00:00Z",
+  "idleExpiresAt": "2026-08-06T11:00:00Z"
 }
 ```
 
-Headers:
+Headers include:
 
 ```http
 Set-Cookie: anonymous_session=<random>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400
 ```
 
-Session lifecycle:
+Production and non-local environments set `Secure`. `APP_ENV=local` may omit `Secure` for local HTTP development. Absolute expiry defaults to 24 hours. Idle expiry defaults to 60 minutes and never extends beyond the absolute expiry.
 
-- TTL is 24 hours.
-- Expiry is not sliding in B0 contracts. Later requests do not extend the session unless a later phase explicitly changes the contract.
-- Multiple tabs in the same browser profile share the same anonymous session cookie.
-- If a valid session already exists, `POST /api/session` returns `200` with the current `expiresAt` and does not rotate the cookie.
-- Production and HTTPS development responses include `Secure`. Local HTTP development may omit `Secure` only in `APP_ENV=local`.
+### `GET /api/session`
+
+Returns expiry metadata for the current anonymous session resolved from the cookie. Missing, deleted, or expired sessions return `SESSION_NOT_FOUND` with HTTP 404.
 
 ### `DELETE /api/session`
 
-Deletes the current anonymous session and clears the cookie. Server-side conversation state, user facts, and evaluation records linked only to that anonymous session become inaccessible immediately and are hard-deleted unless a later retention policy explicitly replaces this behavior.
-
-Request: no body.
+Deletes the current anonymous session and clears the cookie. Linked `user_fact` rows are deleted by database cascade.
 
 Response `204`: no body.
 
-Headers:
+### `GET /api/session/facts`
 
-```http
-Set-Cookie: anonymous_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
+Returns facts for the current anonymous session only.
+
+Response `200`:
+
+```json
+[
+  {
+    "conditionKey": "region",
+    "value": "Seoul",
+    "source": "manual",
+    "confirmed": true,
+    "updatedAt": "2026-08-06T10:00:00Z"
+  }
+]
 ```
+
+### `PUT /api/session/facts/{condition_key}`
+
+Creates or updates a fact for the current anonymous session only. The route path condition key is authoritative; clients cannot set another session or owner in JSON.
+## Draft Endpoints
 
 ### `POST /api/session/reset`
 
@@ -304,9 +318,9 @@ Response `200`:
   "items": [
     {
       "policyId": "policy_123",
-      "title": "신혼부부 주거 지원",
-      "agency": "서울시",
-      "region": "서울",
+      "title": "?좏샎遺遺 二쇨굅 吏??,
+      "agency": "?쒖슱??,
+      "region": "?쒖슱",
       "status": "ACTIVE",
       "policyVersionId": "policy_version_123"
     }
@@ -324,9 +338,9 @@ Response `200`:
 ```json
 {
   "policyId": "policy_123",
-  "title": "신혼부부 주거 지원",
-  "agency": "서울시",
-  "region": "서울",
+  "title": "?좏샎遺遺 二쇨굅 吏??,
+  "agency": "?쒖슱??,
+  "region": "?쒖슱",
   "status": "ACTIVE",
   "policyVersionId": "policy_version_123",
   "source": {
@@ -345,7 +359,7 @@ Request:
 
 ```json
 {
-  "initialMessage": "서울 신혼부부 전세 지원을 찾고 싶어요"
+  "initialMessage": "?쒖슱 ?좏샎遺遺 ?꾩꽭 吏?먯쓣 李얘퀬 ?띠뼱??
 }
 ```
 
@@ -360,13 +374,13 @@ Response `201`:
     {
       "questionId": "q_region",
       "factKey": "region",
-      "prompt": "거주 지역을 확인해 주세요.",
+      "prompt": "嫄곗＜ 吏??쓣 ?뺤씤??二쇱꽭??",
       "answerType": "single_select",
       "required": true,
       "options": [
-        {"label": "서울", "value": "SEOUL"},
-        {"label": "경기", "value": "GYEONGGI"},
-        {"label": "인천", "value": "INCHEON"}
+        {"label": "?쒖슱", "value": "SEOUL"},
+        {"label": "寃쎄린", "value": "GYEONGGI"},
+        {"label": "?몄쿇", "value": "INCHEON"}
       ]
     }
   ]
@@ -487,7 +501,7 @@ Response `200`:
     {
       "conditionId": "cond_income",
       "sourceUrl": "https://example.go.kr/policy/123",
-      "sourceLabel": "소득 기준",
+      "sourceLabel": "?뚮뱷 湲곗?",
       "policyVersionId": "policy_version_123"
     }
   ]
@@ -506,7 +520,7 @@ Response `200`:
     {
       "id": "policy_123",
       "type": "policy",
-      "label": "신혼부부 주거 지원"
+      "label": "?좏샎遺遺 二쇨굅 吏??
     }
   ],
   "edges": []

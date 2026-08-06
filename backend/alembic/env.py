@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import os
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.catalog.models import Base
 from app.db.session import normalize_database_url
+from app.modules.sessions import models as session_models  # noqa: F401
 
 config = context.config
 

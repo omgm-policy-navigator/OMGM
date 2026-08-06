@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -30,6 +30,10 @@ class AppConfig(BaseSettings):
     llm_temperature: float = Field(default=0.1, ge=0, le=2)
     llm_timeout_seconds: int = Field(default=30, gt=0)
     policy_seed_dir: Path = DEFAULT_POLICY_SEED_DIR
+    anonymous_session_cookie_name: str = "anonymous_session"
+    anonymous_session_absolute_ttl_minutes: int = Field(default=1440, gt=0)
+    anonymous_session_idle_ttl_minutes: int = Field(default=60, gt=0)
+    anonymous_session_cookie_samesite: str = "lax"
 
     @field_validator("log_level")
     @classmethod
@@ -54,6 +58,14 @@ class AppConfig(BaseSettings):
         if not stripped:
             raise ValueError("Value must not be empty.")
         return stripped
+
+    @field_validator("anonymous_session_cookie_samesite")
+    @classmethod
+    def validate_cookie_samesite(cls, value: str) -> str:
+        samesite = value.strip().lower()
+        if samesite not in {"lax", "strict"}:
+            raise ValueError("ANONYMOUS_SESSION_COOKIE_SAMESITE must be lax or strict.")
+        return samesite
 
     @classmethod
     def from_env(cls) -> AppConfig:
