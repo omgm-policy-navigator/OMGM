@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "dataset": "e2e",
+  "cases": [
+    {
+      "id": "e2e-eligible-with-citation",
+      "title": "모든 조건 충족 후 공식 근거 설명",
+      "tags": ["all_conditions_met", "happy_path"],
+      "input": {"userQuestion": "신청할 수 있나요?", "facts": {"RESIDENCE_REGION": "SEOUL", "HOME_OWNERSHIP": "NONE"}, "policyId": "policy-housing-001", "documentVersion": "2026-08-01", "ruleCaseId": "rule-all-required-met", "retrievalCaseId": "rag-selected-policy-official-hit", "providerResultStatus": "ANSWERED"},
+      "expected": {"factReview": "CONFIRMED", "eligibilityStatus": "LIKELY_ELIGIBLE", "evaluationState": "ACTIVE", "rag": {"insufficientEvidence": false, "evidenceIds": ["chunk-eligibility-current"]}, "explanationStatus": "GROUNDED", "verdictOwnedBy": "RULE_ENGINE"}
+    },
+    {
+      "id": "e2e-income-follow-up",
+      "title": "소득 모름 후 추가 질문",
+      "tags": ["income_unknown", "missing_data"],
+      "input": {"userQuestion": "소득은 잘 모르겠어요.", "facts": {"RESIDENCE_REGION": "SEOUL"}, "policyId": "policy-housing-001", "ruleCaseId": "rule-income-unknown", "factCaseId": "fact-income-unknown"},
+      "expected": {"factReview": "NEEDS_CONFIRMATION", "eligibilityStatus": "NEEDS_CONFIRMATION", "evaluationState": "ACTIVE", "nextQuestionFactKey": "HOUSEHOLD_INCOME_RANGE", "mustNotTreatUnknownAsIneligible": true}
+    },
+    {
+      "id": "e2e-marriage-conflict",
+      "title": "혼인 상태 충돌 재확인",
+      "tags": ["marriage_status_conflict", "conflict"],
+      "input": {"userQuestion": "아직 혼인신고 전이에요.", "existingFacts": {"MARRIAGE_STATUS": "MARRIED"}, "candidateFacts": {"MARRIAGE_STATUS": "PRE_MARRIAGE"}, "policyId": "policy-cash-001", "factCaseId": "fact-marriage-status-conflict"},
+      "expected": {"factReview": "CONFLICT", "evaluationState": "CONFLICTED", "conflictFactKeys": ["MARRIAGE_STATUS"], "requiresUserResolution": true, "mustNotOverwriteConfirmedFact": true}
+    },
+    {
+      "id": "e2e-ended-window",
+      "title": "신청기간 종료 판정",
+      "tags": ["application_ended", "boundary"],
+      "input": {"evaluationDate": "2026-08-06", "applicationEndsAt": "2026-07-31", "policyId": "policy-loan-001", "ruleCaseId": "rule-application-ended"},
+      "expected": {"eligibilityStatus": "LIKELY_INELIGIBLE", "evaluationState": "ACTIVE", "explanationMustNotClaimEligible": true}
+    },
+    {
+      "id": "e2e-future-window",
+      "title": "향후 조건 충족 시점 안내",
+      "tags": ["available_later", "future_condition"],
+      "input": {"evaluationDate": "2026-08-06", "applicationStartsAt": "2026-09-01", "policyId": "policy-childcare-001", "ruleCaseId": "rule-available-later"},
+      "expected": {"eligibilityStatus": "AVAILABLE_LATER", "evaluationState": "ACTIVE", "nextAction": "CHECK_AFTER_APPLICATION_START"}
+    },
+    {
+      "id": "e2e-insufficient-official-evidence",
+      "title": "공식 근거 부족 fallback",
+      "tags": ["official_evidence_insufficient", "failure"],
+      "input": {"userQuestion": "제출 서류가 무엇인가요?", "policyId": "policy-housing-001", "retrievedChunks": [], "retrievalCaseId": "rag-below-threshold"},
+      "expected": {"rag": {"insufficientEvidence": true, "evidenceIds": []}, "explanationStatus": "OFFICIAL_CONFIRMATION_REQUIRED", "officialSources": [], "mustNotGeneratePolicyFacts": true}
+    },
+    {
+      "id": "e2e-policy-source-changed",
+      "title": "정책 원문 버전 변경 후 기존 판정 무효화",
+      "tags": ["policy_source_changed", "stale"],
+      "input": {"policyId": "policy-housing-001", "evaluatedPolicyVersion": "2026-07-01", "currentPolicyVersion": "2026-08-01", "indexedEvidenceIds": ["chunk-2025"], "retrievalCaseId": "rag-stale-document-excluded"},
+      "expected": {"evaluationState": "STALE", "requiresReevaluation": true, "requiresReindex": true, "excludedEvidenceIds": ["chunk-2025"]}
+    }
+  ]
+}

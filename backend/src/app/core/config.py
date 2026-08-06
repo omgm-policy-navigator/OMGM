@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -27,7 +27,7 @@ class AppConfig(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_generation_model: str = "qwen3:4b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
-    llm_temperature: float = Field(default=0.1, ge=0, le=2)
+    llm_temperature: float = Field(default=0.1, ge=0, le=0.2)
     llm_timeout_seconds: int = Field(default=30, gt=0)
     policy_seed_dir: Path = DEFAULT_POLICY_SEED_DIR
     anonymous_session_cookie_name: str = "anonymous_session"

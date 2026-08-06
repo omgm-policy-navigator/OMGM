@@ -451,6 +451,85 @@ Response `200`: same item shape as `POST /api/v1/session/evaluations.items`.
 Returns one stored evaluation for the current session and policy. Missing evaluations return `EVALUATION_NOT_FOUND`.
 
 User fact changes through session answer/fact endpoints mark existing current-session evaluations `STALE`; callers should create evaluations again to refresh them.
+## Phase B7 RAG and LLM Explanation APIs
+
+All B7 endpoints identify the anonymous user only through the HttpOnly anonymous-session cookie. Request bodies and URLs must not carry a session id. Rule Engine evaluations remain the source of eligibility status; RAG supplies approved official citations from the pgvector-backed document chunk index when available, and the LLM supplies explanatory text only.
+
+### `POST /api/chat`
+
+Generates a policy explanation for the current session. When `policyId` is omitted, the backend uses the highest-ranked current-session evaluation if one exists. If no approved official RAG chunk evidence is available, the response uses `aiStatus: "OFFICIAL_CONFIRMATION_REQUIRED"` and does not ask the LLM to invent support. RAG queries are built from policy metadata and condition keys, not raw user free text or personal fact values. Retrieved chunks are wrapped in `<retrieved_context>` delimiters and treated as reference data, not instructions.
+
+Request:
+
+```json
+{
+  "message": "Explain my result in plain language.",
+  "policyId": "policy_housing_001"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "policyId": "policy_housing_001",
+  "eligibilityStatus": "LIKELY_ELIGIBLE",
+  "evaluationState": "ACTIVE",
+  "aiStatus": "GENERATED",
+  "answer": "Generated explanation from official evidence.",
+  "citations": [
+    {
+      "sourceId": "doc_1",
+      "policyId": "policy_housing_001",
+      "title": "Official notice",
+      "url": "https://example.go.kr/policy/1",
+      "sourceLabel": "Example Office",
+      "evidenceId": "hash_1",
+      "excerpt": null,
+      "sourceLocation": null,
+      "similarity": null
+    }
+  ]
+}
+```
+
+### `POST /api/policies/{policyId}/explain`
+
+Explains one policy for the current anonymous session. Missing active approved policies return `POLICY_NOT_FOUND`. RAG and LLM calls use strict timeout/fallback handling. LLM output must pass the B7 structured answer schema (`summary`, `reasons`, `next_steps`, `disclaimer`) and post-generation contradiction checks before being returned. LLM failures are converted to `aiStatus: "FALLBACK"` while keeping the stored Rule Engine `eligibilityStatus` and official citations available through a static explanation generated from stored JSON evidence.
+
+Request:
+
+```json
+{
+  "question": "Why did I get this result?"
+}
+```
+
+Response `200`: same shape as `POST /api/chat`.
+
+### `GET /api/chat/stream`
+
+Streams the same explanation contract as server-sent events for chat UI rendering. The streamed message uses the same Rule/RAG/LLM guardrails as `POST /api/chat`.
+
+Query parameters:
+
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `message` | string | Yes | User prompt to explain. |
+| `policy_id` | string | No | Policy to explain. Defaults to the highest-ranked session evaluation. |
+
+Event sequence:
+
+```text
+event: status
+data: {"status":"started","text":null}
+
+event: message
+data: {"status":"streaming","text":"Generated explanation from official evidence."}
+
+event: done
+data: {"status":"done","text":null}
+```
 ## Draft Endpoints
 
 ### `POST /api/v1/session/reset`
