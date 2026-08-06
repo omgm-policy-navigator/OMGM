@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -54,6 +54,7 @@ class Policy(Base):
     documents: Mapped[list[PolicyDocument]] = relationship(back_populates="policy")
     questions: Mapped[list[Question]] = relationship(back_populates="policy")
     rules: Mapped[list[PolicyRule]] = relationship(back_populates="policy")
+    evaluations: Mapped[list[PolicyEvaluation]] = relationship(back_populates="policy")
 
 
 class Question(Base):
@@ -108,3 +109,30 @@ class PolicyRelation(Base):
     source_policy_id: Mapped[str] = mapped_column(ForeignKey("policy.id"), nullable=False, index=True)
     target_policy_id: Mapped[str] = mapped_column(ForeignKey("policy.id"), nullable=False, index=True)
     relation_type: Mapped[str] = mapped_column(String(50), nullable=False)
+
+class PolicyEvaluation(Base):
+    __tablename__ = "policy_evaluation"
+    __table_args__ = (
+        UniqueConstraint("session_id", "policy_id", name="uq_policy_evaluation_session_policy"),
+        Index("ix_policy_evaluation_session_id", "session_id"),
+        Index("ix_policy_evaluation_policy_id", "policy_id"),
+        Index("ix_policy_evaluation_state", "evaluation_state"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("anonymous_session.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    policy_id: Mapped[str] = mapped_column(ForeignKey("policy.id"), nullable=False)
+    eligibility_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    evaluation_state: Mapped[str] = mapped_column(String(30), nullable=False)
+    recommendation_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evidence: Mapped[dict] = mapped_column(JSON, nullable=False)
+    fact_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    policy: Mapped[Policy] = relationship(back_populates="evaluations")

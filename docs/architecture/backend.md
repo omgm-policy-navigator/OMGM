@@ -116,3 +116,9 @@ The module exposes cookie lifecycle endpoints and fact list/upsert endpoints und
 Phase B4 adds `app/modules/questions` for deterministic question selection. The module owns MVP question templates, priority ordering, parent-child visibility through `showCondition`, DAG validation, answered-question exclusion, completion progress, conflict detection support, and DFS-based descendant fact invalidation guidance. It uses plain facts and category codes as input and does not depend on FastAPI routers or SQLAlchemy sessions.
 
 The session API stores the selected category on `anonymous_session` and stores submitted answers as session-scoped `user_fact` rows. B4 does not evaluate policy eligibility or mark evaluations `STALE` because evaluation persistence is not implemented yet.
+
+## Phase B5 Rule Engine and Evaluations
+
+Phase B5 extends `app/modules/eligibility` with deterministic Rule Engine operators, explicit three-valued condition results, required and optional conditions, explicit AND/OR condition groups, application-window status handling, fixed evaluation-time input, recommendation scoring, and JSON evidence generation. The Rule Engine stays pure Python and does not depend on FastAPI routers or SQLAlchemy sessions.
+
+The session API persists `policy_evaluation` rows scoped by anonymous session and policy. User fact changes mark existing current-session evaluations `STALE` so stale diagnostic results are not silently reused.
