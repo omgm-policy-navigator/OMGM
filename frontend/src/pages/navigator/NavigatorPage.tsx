@@ -7,7 +7,7 @@ export function NavigatorPage() {
       <section className="hero-panel" aria-labelledby="navigator-title">
         <div>
           <p className="eyebrow">OMGM Policy Navigator</p>
-          <h1 id="navigator-title">나만 결혼해?</h1>
+          <h1 id="navigator-title">나만 결혼 혜택?</h1>
           <p className="lede">결혼·신혼부부 지원정책을 조건과 근거 중심으로 확인합니다.</p>
         </div>
         <HealthStatusPanel />
