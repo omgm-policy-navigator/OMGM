@@ -99,6 +99,35 @@ export type AIExplanationResponse = {
   }>;
 };
 
+export type PolicySummaryResponse = {
+  policyId: string;
+  categoryCode: string;
+  title: string;
+  agency: string;
+  region: string;
+  applicationPeriod: string;
+  status: string;
+  officialSourceUrl: string;
+  reviewedAt: string;
+};
+
+export type PolicyDetailResponse = {
+  policyId: string;
+  categoryCode: string;
+  title: string;
+  agency: string;
+  region: string;
+  summary: string;
+  applicationPeriod: string;
+  supportType: string;
+  status: string;
+  source: {
+    label: string;
+    url: string;
+    reviewedAt: string;
+  };
+};
+
 export function createSession(signal?: AbortSignal) {
   return postJson<{ status: string }>("/api/v1/session", undefined, { signal });
 }
@@ -143,4 +172,12 @@ export function getSessionGraph(categoryCode: string, signal?: AbortSignal) {
 
 export function sendChatMessage(message: string, signal?: AbortSignal) {
   return postJson<AIExplanationResponse>("/api/chat", { message }, { signal });
+}
+
+export function listCategoryPolicies(categoryCode: string, signal?: AbortSignal) {
+  return getJson<PolicySummaryResponse[]>(`/api/categories/${categoryCode}/policies`, { signal });
+}
+
+export function getPolicyDetail(policyId: string, signal?: AbortSignal) {
+  return getJson<PolicyDetailResponse>(`/api/policies/${policyId}`, { signal });
 }

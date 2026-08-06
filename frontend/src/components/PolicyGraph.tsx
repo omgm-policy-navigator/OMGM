@@ -1,10 +1,17 @@
 import { Background, Controls, Handle, ReactFlow, type Edge, type Node, type NodeProps, Position } from "@xyflow/react";
-import { CircleHelp, FileCheck2, FolderTree, Landmark, ListChecks, UserRound, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CircleHelp, ExternalLink, FileCheck2, FolderTree, Landmark, ListChecks, UserRound, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { PolicyNodeData } from "../data/policies";
 import { categories, policyNodes } from "../data/policies";
 import { designTokens } from "../design";
-import type { SessionGraphNode, SessionGraphResponse } from "../shared/api/chatbot";
+import {
+  getPolicyDetail,
+  listCategoryPolicies,
+  type PolicyDetailResponse,
+  type PolicySummaryResponse,
+  type SessionGraphNode,
+  type SessionGraphResponse,
+} from "../shared/api/chatbot";
 
 type GraphNodeData = PolicyNodeData & {
   variant: "central" | "policy" | "condition" | "category" | "action" | "detail";
@@ -98,6 +105,8 @@ const valueLabels: Record<string, string> = {
   wedding: "웨딩",
   settlement: "정착",
 };
+
+const eligibleStatuses = new Set(["LIKELY_ELIGIBLE", "eligible", "ELIGIBLE"]);
 
 function normalizeBackendType(type: string): BackendNodeType | "UNKNOWN" {
   const normalized = type.toUpperCase();
@@ -223,6 +232,94 @@ function spreadY(index: number, total: number, centerY: number, spacing: number)
   return centerY + (index - (total - 1) / 2) * spacing;
 }
 
+function hasSessionAnswers(sessionGraph: SessionGraphResponse | null) {
+  if (!sessionGraph) {
+    return false;
+  }
+  return sessionGraph.nodes.some((node) => {
+    const type = normalizeBackendType(node.type);
+    if (type === "CONDITION") {
+      return node.data.value !== undefined && node.data.value !== null && node.data.value !== "";
+    }
+    if (type === "POLICY") {
+      return typeof node.data.eligibilityStatus === "string";
+    }
+    return false;
+  });
+}
+
+function isApplicablePolicyNode(node: SessionGraphNode) {
+  return normalizeBackendType(node.type) === "POLICY" && eligibleStatuses.has(String(node.data.eligibilityStatus));
+}
+
+function policyGridPosition(index: number, total: number): GraphPoint {
+  const columns = total > 5 ? 2 : 1;
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  const rows = Math.ceil(total / columns);
+  const x = columns === 1 ? 610 : 560 + column * 250;
+  const y = spreadY(row, rows, 330, 190);
+  return { x, y };
+}
+
+function policySummaryById(policySummaries: PolicySummaryResponse[]) {
+  return new Map(policySummaries.map((policy) => [policy.policyId, policy]));
+}
+
+function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: number, total: number): Node<GraphNodeData> {
+  return {
+    id: `POLICY:${policy.policyId}`,
+    type: "policyNode",
+    position: policyGridPosition(index, total),
+    data: {
+      id: `POLICY:${policy.policyId}`,
+      label: policy.title,
+      description: `${policy.agency} / ${labelValue(policy.region)} / ${policy.applicationPeriod}`,
+      icon: Landmark,
+      status: "recommended",
+      variant: "policy",
+      backendType: "POLICY",
+      backendData: {
+        policyId: policy.policyId,
+        categoryCode: policy.categoryCode,
+        title: policy.title,
+        agency: policy.agency,
+        region: policy.region,
+        applicationPeriod: policy.applicationPeriod,
+        status: policy.status,
+        officialSourceUrl: policy.officialSourceUrl,
+      },
+    },
+  };
+}
+
+function enrichPolicyNode(node: Node<GraphNodeData>, summary: PolicySummaryResponse | undefined, index: number, total: number): Node<GraphNodeData> {
+  if (!summary) {
+    return { ...node, position: policyGridPosition(index, total) };
+  }
+
+  return {
+    ...node,
+    position: policyGridPosition(index, total),
+    data: {
+      ...node.data,
+      label: summary.title,
+      description: `${summary.agency} / ${labelValue(summary.region)} / ${summary.applicationPeriod}`,
+      backendData: {
+        ...node.data.backendData,
+        policyId: summary.policyId,
+        categoryCode: summary.categoryCode,
+        title: summary.title,
+        agency: summary.agency,
+        region: summary.region,
+        applicationPeriod: summary.applicationPeriod,
+        status: summary.status,
+        officialSourceUrl: summary.officialSourceUrl,
+      },
+    },
+  };
+}
+
 function countNodesByType(nodes: SessionGraphNode[]) {
   return nodes.reduce((counts, node) => {
     const type = normalizeBackendType(node.type);
@@ -272,18 +369,20 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
   const policyId = typeof policyNode.data.backendData?.policyId === "string" ? policyNode.data.backendData.policyId : policyNode.id;
   const region = labelValue(policyNode.data.backendData?.region);
   const supportType = labelValue(policyNode.data.backendData?.supportType);
+  const applicationPeriod = labelValue(policyNode.data.backendData?.applicationPeriod);
   const details = [
     { id: "target", label: `지원 대상\n${region}`, value: region },
     { id: "support", label: `지원 내용\n${supportType}`, value: supportType },
-    { id: "apply", label: "신청 방법\n확인 필요", value: "확인 필요" },
+    { id: "apply", label: `신청 기간\n${applicationPeriod}`, value: applicationPeriod },
   ];
+  const detailX = policyNode.position.x + 260;
 
   return {
     nodes: details.map((detail, detailIndex) => ({
       id: `POLICY_DETAIL:${policyId}:${detail.id}`,
       type: "policyNode",
       position: {
-        x: 860,
+        x: detailX,
         y: policyNode.position.y + (detailIndex - 1) * 46,
       },
       data: {
@@ -295,6 +394,7 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
         variant: "detail",
         backendType: "POLICY_DETAIL",
         backendData: {
+          ...policyNode.data.backendData,
           policyId,
           section: detail.id,
           value: detail.value,
@@ -320,12 +420,32 @@ function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: n
 
 export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphProps) {
   const [selectedPolicy, setSelectedPolicy] = useState<GraphNodeData | null>(null);
+  const [policySummaries, setPolicySummaries] = useState<PolicySummaryResponse[]>([]);
+  const [policyDetails, setPolicyDetails] = useState<Record<string, PolicyDetailResponse>>({});
+  const selectedCategory = categories.find(({ id }) => id === selectedCategoryId) ?? categories[0];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listCategoryPolicies(selectedCategory.backendCategoryCode, controller.signal)
+      .then((items) => setPolicySummaries(items))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPolicySummaries([]);
+      });
+    return () => controller.abort();
+  }, [selectedCategory.backendCategoryCode]);
 
   const { nodes, edges } = useMemo(() => {
+    const answered = hasSessionAnswers(sessionGraph);
+    const summariesById = policySummaryById(policySummaries);
+
     if (sessionGraph && sessionGraph.nodes.length > 0) {
       const totalByType = countNodesByType(sessionGraph.nodes);
       const indexByType = new Map<BackendNodeType | "UNKNOWN", number>();
-      const liveNodes: Node<GraphNodeData>[] = sessionGraph.nodes.map((graphNode) => {
+      const sourceNodes = answered ? sessionGraph.nodes.filter((graphNode) => normalizeBackendType(graphNode.type) !== "POLICY") : sessionGraph.nodes;
+      const liveNodes: Node<GraphNodeData>[] = sourceNodes.map((graphNode) => {
         const type = normalizeBackendType(graphNode.type);
         const typeIndex = indexByType.get(type) ?? 0;
         indexByType.set(type, typeIndex + 1);
@@ -345,13 +465,37 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
           },
         };
       });
-      const policyDetailGraph = liveNodes
-        .filter((node) => node.data.variant === "policy")
-        .slice(0, 4)
+      const policyNodesFromSession = sessionGraph.nodes.filter(isApplicablePolicyNode);
+      const visiblePolicyNodes = answered
+        ? policyNodesFromSession.map((graphNode, index) => {
+            const policyId = typeof graphNode.data.policyId === "string" ? graphNode.data.policyId : graphNode.id;
+            const summary = summariesById.get(policyId);
+            const baseNode: Node<GraphNodeData> = {
+              id: graphNode.id,
+              type: "policyNode",
+              position: policyGridPosition(index, policyNodesFromSession.length),
+              data: {
+                id: graphNode.id,
+                label: displayLabelForBackendNode(graphNode),
+                description: descriptionForBackendNode(graphNode),
+                icon: iconForBackendNode(graphNode),
+                status: statusForBackendNode(graphNode),
+                variant: "policy",
+                backendType: graphNode.type,
+                backendData: graphNode.data,
+              },
+            };
+            return enrichPolicyNode(baseNode, summary, index, policyNodesFromSession.length);
+          })
+        : policySummaries.map((policy, index) => createPolicyNodeFromSummary(policy, index, policySummaries.length));
+      const liveNodesWithoutPolicies = liveNodes.filter((node) => node.data.variant !== "policy");
+      const composedNodes = [...liveNodesWithoutPolicies, ...visiblePolicyNodes];
+      const visibleDetailGraph = visiblePolicyNodes
+        .slice(0, answered ? visiblePolicyNodes.length : 4)
         .map((node, index) => createPolicyDetailNodes(node, index));
-      const detailNodes = policyDetailGraph.flatMap((graph) => graph.nodes);
-      const detailEdges = policyDetailGraph.flatMap((graph) => graph.edges);
-      const visibleNodes = [...liveNodes, ...detailNodes];
+      const detailNodes = visibleDetailGraph.flatMap((graph) => graph.nodes);
+      const detailEdges = visibleDetailGraph.flatMap((graph) => graph.edges);
+      const visibleNodes = [...composedNodes, ...detailNodes];
       const graphNodePositions = new Map<string, GraphPoint>(visibleNodes.map((node) => [node.id, node.position]));
       const visibleNodeIds = new Set(visibleNodes.map(({ id }) => id));
       const categoryNode = liveNodes.find((node) => node.data.variant === "category");
@@ -378,8 +522,87 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             style: edgeStyleForType(edge.type),
           };
         });
+      const policyConnectionEdges: Edge[] =
+        categoryNode && (!answered || liveEdges.every((edge) => !visiblePolicyNodes.some((node) => edge.target === node.id)))
+          ? visiblePolicyNodes.map((node) => ({
+              id: `category:${categoryNode.id}:${node.id}`,
+              source: categoryNode.id,
+              target: node.id,
+              sourceHandle: "right",
+              targetHandle: "left",
+              type: "straight",
+              animated: false,
+              style: {
+                stroke: designTokens.color.graph.edge,
+                strokeWidth: answered ? 1.6 : 1.25,
+              },
+            }))
+          : [];
 
-      return { nodes: visibleNodes, edges: [...liveEdges, ...detailEdges] };
+      return { nodes: visibleNodes, edges: [...liveEdges, ...policyConnectionEdges, ...detailEdges] };
+    }
+
+    if (policySummaries.length > 0) {
+      const center: Node<GraphNodeData> = {
+        id: "couple",
+        type: "policyNode",
+        position: { x: 230, y: 330 },
+        data: {
+          id: "couple",
+          label: "우리 부부",
+          description: "질문에 답하면 신청 가능성이 높은 정책만 좁혀서 보여줍니다.",
+          icon: UserRound,
+          status: "recommended",
+          variant: "central",
+        },
+      };
+      const category: Node<GraphNodeData> = {
+        id: `CATEGORY:${selectedCategory.backendCategoryCode}`,
+        type: "policyNode",
+        position: { x: 420, y: 330 },
+        data: {
+          id: `CATEGORY:${selectedCategory.backendCategoryCode}`,
+          label: selectedCategory.label,
+          description: `${selectedCategory.label} 주제에 등록된 정책 전체입니다.`,
+          icon: selectedCategory.icon,
+          status: "recommended",
+          variant: "category",
+          backendType: "CATEGORY",
+          backendData: { categoryCode: selectedCategory.backendCategoryCode },
+        },
+      };
+      const catalogNodes = policySummaries.map((policy, index) => createPolicyNodeFromSummary(policy, index, policySummaries.length));
+      const detailGraph = catalogNodes.slice(0, 4).map((node, index) => createPolicyDetailNodes(node, index));
+      const detailNodes = detailGraph.flatMap((graph) => graph.nodes);
+      const detailEdges = detailGraph.flatMap((graph) => graph.edges);
+      const categoryEdges: Edge[] = catalogNodes.map((node) => ({
+        id: `category:${selectedCategory.backendCategoryCode}:${node.id}`,
+        source: category.id,
+        target: node.id,
+        sourceHandle: "right",
+        targetHandle: "left",
+        type: "straight",
+        animated: false,
+        style: { stroke: designTokens.color.graph.edge, strokeWidth: 1.25 },
+      }));
+
+      return {
+        nodes: [center, category, ...catalogNodes, ...detailNodes],
+        edges: [
+          {
+            id: `couple:${category.id}`,
+            source: center.id,
+            target: category.id,
+            sourceHandle: "right",
+            targetHandle: "left",
+            type: "straight",
+            animated: false,
+            style: { stroke: designTokens.color.graph.edge, strokeWidth: 1 },
+          },
+          ...categoryEdges,
+          ...detailEdges,
+        ],
+      };
     }
 
     const center: Node<GraphNodeData> = {
@@ -439,16 +662,34 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
     );
 
     return { nodes: [center, ...policyGraphNodes], edges: radialEdges };
-  }, [sessionGraph]);
+  }, [policySummaries, selectedCategory, sessionGraph]);
 
-  const selectedCategory = categories.find(({ id }) => id === selectedCategoryId) ?? categories[0];
+  const selectedPolicyId = typeof selectedPolicy?.backendData?.policyId === "string" ? selectedPolicy.backendData.policyId : null;
+  const selectedPolicyDetail = selectedPolicyId ? policyDetails[selectedPolicyId] : undefined;
+
+  useEffect(() => {
+    if (!selectedPolicyId || policyDetails[selectedPolicyId]) {
+      return;
+    }
+    const controller = new AbortController();
+    getPolicyDetail(selectedPolicyId, controller.signal)
+      .then((detail) => setPolicyDetails((current) => ({ ...current, [selectedPolicyId]: detail })))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      });
+    return () => controller.abort();
+  }, [policyDetails, selectedPolicyId]);
 
   return (
     <section className="relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-brand-border bg-white shadow-card" aria-label="맞춤 정책 그래프">
       <header className="z-10 border-b border-brand-border bg-white/90 p-6 backdrop-blur">
         <h2 className="text-h3">맞춤 정책 그래프</h2>
         <p className="mt-1 text-body-sm text-text-secondary">
-          {sessionGraph ? `${selectedCategory.label} 정책과 확인 조건을 연결해 표시합니다.` : "정책 노드를 클릭하면 자격 근거와 다음 단계를 확인할 수 있어요."}
+          {hasSessionAnswers(sessionGraph)
+            ? `${selectedCategory.label} 답변 기준으로 신청 가능성이 확인된 정책을 표시합니다.`
+            : `${selectedCategory.label} 주제의 등록 정책을 먼저 보여드립니다.`}
         </p>
       </header>
 
@@ -482,7 +723,13 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
         </ReactFlow>
       </div>
 
-      {selectedPolicy && <PolicyModal policy={selectedPolicy} onClose={() => setSelectedPolicy(null)} />}
+      {hasSessionAnswers(sessionGraph) && nodes.every((node) => node.data.variant !== "policy") && (
+        <div className="pointer-events-none absolute inset-x-6 top-28 z-10 rounded-xl border border-brand-border bg-white/90 p-4 text-body-sm text-text-secondary shadow-card">
+          현재 답변 기준으로 신청 가능성이 확인된 정책이 아직 없습니다. 부족한 조건을 더 입력하면 그래프가 갱신됩니다.
+        </div>
+      )}
+
+      {selectedPolicy && <PolicyModal policy={selectedPolicy} policyDetail={selectedPolicyDetail} onClose={() => setSelectedPolicy(null)} />}
     </section>
   );
 }
@@ -537,6 +784,15 @@ const backendFieldLabels: Record<string, string> = {
   region: "지역",
   supportType: "지원 유형",
   section: "상세 항목",
+  agency: "기관",
+  applicationPeriod: "신청 기간",
+  officialSourceUrl: "공식 URL",
+};
+
+const detailSectionLabels: Record<string, string> = {
+  target: "지원 대상",
+  support: "지원 내용",
+  apply: "신청 기간",
 };
 
 function formatBackendValue(value: unknown) {
@@ -550,12 +806,21 @@ function visibleBackendEntries(data: Record<string, unknown> | undefined) {
   if (!data) {
     return [];
   }
-  return Object.entries(data).filter(([key]) => ["eligibilityStatus", "evaluationState", "recommendationScore", "factKey", "value", "categoryCode", "region", "supportType", "section"].includes(key));
+  return Object.entries(data).filter(([key]) =>
+    ["eligibilityStatus", "evaluationState", "recommendationScore", "factKey", "value", "categoryCode", "region", "supportType", "section", "agency", "applicationPeriod"].includes(key),
+  );
 }
 
-function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () => void }) {
+function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData; policyDetail?: PolicyDetailResponse; onClose: () => void }) {
   const Icon = policy.icon;
   const backendEntries = visibleBackendEntries(policy.backendData);
+  const sourceUrl =
+    policyDetail?.source.url ??
+    (typeof policy.backendData?.officialSourceUrl === "string" ? policy.backendData.officialSourceUrl : null);
+  const sourceLabel = policyDetail?.source.label ?? "공식 페이지";
+  const section = typeof policy.backendData?.section === "string" ? policy.backendData.section : null;
+  const modalTitle = policyDetail?.title ?? (typeof policy.backendData?.title === "string" ? policy.backendData.title : policy.label);
+  const modalDescription = policyDetail?.summary ?? policy.description;
 
   return (
     <>
@@ -567,8 +832,8 @@ function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () =
               <Icon size={24} />
             </div>
             <div>
-              <p className="text-caption text-brand-primary">{policy.backendType ? `${policy.backendType} Detail` : "Policy Detail"}</p>
-              <h3 className="mt-1 whitespace-pre-line text-h3">{policy.label}</h3>
+              <p className="text-caption text-brand-primary">{section ? detailSectionLabels[section] ?? "정책 세부 정보" : "정책 상세"}</p>
+              <h3 className="mt-1 whitespace-pre-line text-h3">{section ? policy.label : modalTitle}</h3>
             </div>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl text-text-secondary transition hover:bg-white">
@@ -576,14 +841,34 @@ function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () =
           </button>
         </header>
         <div className="space-y-5 overflow-y-auto p-6">
-          <p className="text-body-md text-text-secondary">{policy.description}</p>
+          <p className="text-body-md text-text-secondary">{modalDescription}</p>
+          {policyDetail && (
+            <dl className="grid grid-cols-1 gap-3 text-body-sm text-text-secondary sm:grid-cols-2">
+              <div>
+                <dt className="font-semibold text-text-primary">담당 기관</dt>
+                <dd>{policyDetail.agency}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-text-primary">지역</dt>
+                <dd>{labelValue(policyDetail.region)}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-text-primary">지원 유형</dt>
+                <dd>{labelValue(policyDetail.supportType)}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-text-primary">신청 기간</dt>
+                <dd>{policyDetail.applicationPeriod}</dd>
+              </div>
+            </dl>
+          )}
           <div className="rounded-xl border border-brand-border bg-white p-4">
-            <h4 className="text-h4">{backendEntries.length > 0 ? "상세 데이터" : "확인된 조건"}</h4>
+            <h4 className="text-h4">{backendEntries.length > 0 ? "확인 데이터" : "확인된 조건"}</h4>
             <ul className="mt-3 space-y-2 text-body-sm text-text-secondary">
               {backendEntries.length > 0 ? (
                 backendEntries.map(([key, value]) => (
                   <li key={key}>
-                    {backendFieldLabels[key] ?? key}: {formatBackendValue(value)}
+                    {backendFieldLabels[key] ?? key}: {key === "section" ? detailSectionLabels[String(value)] ?? formatBackendValue(value) : formatBackendValue(value)}
                   </li>
                 ))
               ) : (
@@ -596,9 +881,21 @@ function PolicyModal({ policy, onClose }: { policy: GraphNodeData; onClose: () =
               )}
             </ul>
           </div>
-          <button type="button" className="h-12 w-full rounded-xl bg-brand-primary text-body-md text-white transition duration-200 hover:brightness-90 active:scale-95">
-            신청 일정과 제출 서류 보기
-          </button>
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary text-body-md text-white transition duration-200 hover:brightness-90 active:scale-95"
+            >
+              <ExternalLink size={18} />
+              {sourceLabel} 열기
+            </a>
+          ) : (
+            <button type="button" disabled className="h-12 w-full rounded-xl bg-brand-surface text-body-md text-text-secondary">
+              연결된 공식 URL이 없습니다
+            </button>
+          )}
         </div>
       </article>
     </>
