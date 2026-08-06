@@ -24,9 +24,9 @@
 
 RAG는 구조화 메타데이터와 Rule Engine으로 이미 선정 또는 평가된 정책의 승인된 공식 근거 원문을 찾는 데 사용한다. RAG는 정책 자격 후보를 만들지 않는다. 검색 결과가 없거나 출처가 부족하면 정책을 생성하지 않는다. 검색 점수와 최종 판정 근거는 분리해 저장한다.
 
-현재 입력은 `08_policy_document.csv`의 38개 문서다. `embedding`은 아직 생성하지 않으며, 문서 DTO는 추후 청크·임베딩 단계의 입력으로만 사용한다. 요약 문서이므로 상세 기준 확인이 필요한 답변은 반드시 `source_url`의 공식 안내를 함께 제시한다.
+현재 입력은 `10_policy_document_chunk.csv`의 검수 Chunk다. A3는 승인 Chunk 중 활성 정책만 1024차원 pgvector 인덱스로 재색인한다. CSV의 빈 `embedding` 열은 기준본에 벡터를 기록하지 않는다는 의미이며 실제 벡터는 PostgreSQL에만 저장한다.
 
-현재 RAG 검색 API와 vector repository는 구현되지 않았다. 따라서 빈 vector를 조회하는 런타임 경로도 없다. 후속 검색 API는 embedding 준비 여부를 먼저 확인하고, 준비되지 않았으면 vector 검색을 실행하지 않은 채 `INSUFFICIENT_EVIDENCE`와 빈 citations를 반환해야 한다. CSV 요약문을 vector 검색 결과인 것처럼 간주하지 않는다.
+A4 vector repository는 선택된 단일 정책 ID, 문서 승인 상태, 공식 신뢰도, 활성 정책 상태와 임베딩 모델을 SQL에서 동시에 제한한다. 임계값 이상 결과가 없으면 vector 결과를 꾸며내지 않고 `insufficient_evidence`와 빈 citations를 반환한다. 검색 HTTP API는 이번 Phase 범위가 아니다.
 
 ## LLM의 역할과 한계
 
