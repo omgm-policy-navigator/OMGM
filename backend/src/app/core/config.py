@@ -51,7 +51,14 @@ class AppConfig(BaseSettings):
             raise ValueError("LLM_PROVIDER must be one of ollama, fake, template.")
         return provider
 
-    @field_validator("app_env", "backend_host", "database_url", "ollama_base_url", "ollama_generation_model")
+    @field_validator(
+        "app_env",
+        "backend_host",
+        "database_url",
+        "ollama_base_url",
+        "ollama_generation_model",
+        "ollama_embedding_model",
+    )
     @classmethod
     def validate_required_text(cls, value: str) -> str:
         stripped = value.strip()

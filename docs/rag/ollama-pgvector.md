@@ -31,4 +31,10 @@ LLM은 조건 후보 추출 보조, 검색 질의 보정, 행정 용어 설명, 
 
 `backend/data/policy-seed/10_policy_document_chunk.csv`가 임베딩 전 입력 기준본이다. 각 행은 정책·문서 ID, 문서·Chunk 유형, 제목, 본문, 원문 URL, 원문 위치, 품질 상태와 콘텐츠 SHA-256을 포함한다. `quality_status=APPROVED`인 행만 후속 임베딩 작업에 전달한다.
 
-D4는 벡터 값을 생성하지 않으며 `embedding` 열을 비워 둔다. 모델 선택, 차원 확정, pgvector 적재와 재임베딩 운영은 후속 Phase 범위다.
+D4 CSV의 `embedding` 열은 기준본이므로 계속 비워 둔다. A3는 `quality_status=APPROVED`이고 정책 상태가 `ACTIVE`인 행만 `qwen3-embedding:0.6b`의 1024차원 벡터로 생성해 `document_chunk`와 `document_chunk_embedding`에 적재한다.
+
+부모 문서의 승인 상태·공식 신뢰도와 Chunk의 정책 ID·문서 유형·URL을 검증한 뒤 색인한다. 동일 문서는 Chunk ID upsert와 문서별 stale Chunk 삭제로 재색인하고, 전체 Seed에 없는 문서도 동기화 시 삭제한다. 현재 모델과 다른 과거 벡터는 제거하며 전체 문서 처리가 성공한 뒤 한 번 commit한다. 실행 명령은 `cd backend && python -m app.modules.rag.reindex`다.
+
+## A4 검색 계약
+
+검색 SQL은 `policy_id`, `document_status=APPROVED`, `trust_level=OFFICIAL`, `policy_status=ACTIVE`, 현재 임베딩 모델을 동시에 필터링한다. 코사인 유사도 임계값 아래 결과와 다른 정책·비활성 정책 근거는 반환하지 않는다. 결과에는 원문 URL과 위치, 정책 버전, Chunk ID가 포함되며 결과가 없으면 근거 부족으로 처리한다.
