@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class SelectCategoryRequest(BaseModel):
-    category_code: str = Field(alias="categoryCode")
+    category_code: str = Field(alias="categoryCode", min_length=1, max_length=50)
 
 
 class SelectCategoryResponse(BaseModel):
@@ -45,14 +45,14 @@ class NextQuestionsResponse(BaseModel):
 
 
 class AnswerInput(BaseModel):
-    question_id: str = Field(alias="questionId")
-    fact_key: str = Field(alias="factKey")
+    question_id: str = Field(alias="questionId", min_length=1, max_length=80)
+    fact_key: str = Field(alias="factKey", min_length=1, max_length=80)
     value: Any
     confirmed: bool = True
 
 
 class SubmitAnswersRequest(BaseModel):
-    answers: list[AnswerInput]
+    answers: list[AnswerInput] = Field(min_length=1, max_length=50)
 
 
 class AnswerConflictResponse(BaseModel):

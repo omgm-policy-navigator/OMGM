@@ -20,6 +20,7 @@ def create_llm_provider(config: AppConfig) -> LLMProvider:
         model=config.ollama_generation_model,
         timeout_seconds=config.llm_timeout_seconds,
         temperature=config.llm_temperature,
+        max_attempts=config.llm_max_attempts,
     )
 
 

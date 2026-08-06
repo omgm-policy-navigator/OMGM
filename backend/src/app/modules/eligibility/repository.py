@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.catalog.models import Policy, PolicyEvaluation, PolicyStatus
+from app.catalog.models import ApprovalStatus, Policy, PolicyEvaluation, PolicyStatus
 from app.modules.eligibility.rules import EvaluationState
 
 
@@ -22,7 +22,14 @@ async def list_active_policies_for_category(db: AsyncSession, category_code: str
         )
         .order_by(Policy.title, Policy.id)
     )
-    return list(result.scalars().all())
+    policies = list(result.scalars().all())
+    evaluable: list[Policy] = []
+    for policy in policies:
+        approved_rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+        if approved_rules:
+            policy.rules = approved_rules
+            evaluable.append(policy)
+    return evaluable
 
 
 async def get_active_policy_with_rules(db: AsyncSession, policy_id: str) -> Policy | None:
@@ -35,7 +42,13 @@ async def get_active_policy_with_rules(db: AsyncSession, policy_id: str) -> Poli
             Policy.is_active.is_(True),
         )
     )
-    return result.scalar_one_or_none()
+    policy = result.scalar_one_or_none()
+    if policy is not None:
+        approved_rules = [rule for rule in policy.rules if rule.approval_status == ApprovalStatus.APPROVED]
+        if not approved_rules:
+            return None
+        policy.rules = approved_rules
+    return policy
 
 
 async def upsert_policy_evaluation(

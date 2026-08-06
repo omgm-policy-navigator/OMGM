@@ -102,3 +102,19 @@ Deleting a session removes linked `user_fact` rows through database cascade. Exp
 ## AI A6 Safety Evaluation
 
 A6 uses synthetic controlled observations only. It does not persist prompts, user facts, policy excerpts, or raw model responses. Prompt Injection resistance and timeout/model-failure handling are explicit safety metrics. Missing observations reduce metric Coverage rather than becoming `false` or `0`; incomplete Coverage cannot pass the controlled safety gate. Any changed Rule result, ungrounded policy claim, or unsafe failure termination fails the report.
+## Backend B8 operational controls
+
+B8 applies a bounded request body and an in-process client-IP rate limit before routing. The limit is intentionally an
+MVP single-instance control; a shared gateway/distributed limiter is required when the backend is horizontally scaled.
+Request logs are JSON and contain request metadata only. Keys associated with credentials, tokens, income, and assets
+are redacted, while email addresses and Korean mobile numbers are masked recursively.
+
+The session cleanup admin endpoint accepts authority only from the server-configured Bearer credential. User text,
+including prompt-injection text, is never interpreted as authorization. Expired sessions are cascade-deleted both by a
+periodic backend task and the authenticated endpoint. Rule and policy-document rows now have independent approval
+states; only `APPROVED` rows belonging to an approved active policy may reach eligibility or explanation paths.
+
+Body enforcement counts actual ASGI request chunks, so missing or rewritten `Content-Length` cannot bypass it. Forwarded
+client addresses are ignored unless the immediate peer is explicitly configured as a trusted proxy. Expired rate-limit
+buckets are removed. Migration defaults all legacy Rule/document rows to `DRAFT` and promotes only exact reviewed Seed
+rows written by B7; missing approval metadata is handled fail-closed. Policies without an approved Rule are not evaluated.

@@ -113,6 +113,7 @@ def document(policy_id: str) -> SimpleNamespace:
         reviewed_at=date(2026, 8, 1),
         collected_at=datetime(2026, 8, 5, tzinfo=UTC),
         document_hash="sha256:policy_housing_001",
+        approval_status="APPROVED",
     )
 
 

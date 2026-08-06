@@ -38,6 +38,24 @@ curl http://localhost:8000/health/ready
 
 API docs are available at `http://localhost:8000/docs` while the server is running.
 
+## Operations and security
+
+Requests are limited to 64 KiB and 60 requests per client IP per 60 seconds by default. Override these with
+`REQUEST_MAX_BODY_BYTES`, `RATE_LIMIT_REQUESTS`, and `RATE_LIMIT_WINDOW_SECONDS`. Anonymous sessions are removed every
+`SESSION_CLEANUP_INTERVAL_SECONDS` and can also be cleaned explicitly after setting `ADMIN_API_KEY`:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/admin/sessions/cleanup \
+  -H "Authorization: Bearer ${ADMIN_API_KEY}"
+```
+
+Do not place the admin key in browser code or a `VITE_*` variable. Ollama calls use `LLM_TIMEOUT_SECONDS` and retry
+transient timeout/network/502/503/504 failures up to `LLM_MAX_ATTEMPTS`.
+
+The body limit counts actual received bytes, including chunked requests. Behind a reverse proxy, set
+`TRUSTED_PROXY_IPS` only to direct proxy IPs under your control; forwarded client IP headers from other peers are
+ignored. A gateway-level body and rate limit should also be configured for production.
+
 ## Verification
 
 ```bash

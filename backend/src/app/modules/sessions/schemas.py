@@ -27,12 +27,12 @@ class UserFactResponse(BaseModel):
 class UpsertUserFactRequest(BaseModel):
     value: Any
     confirmed: bool = True
-    source: str = "manual"
-    note: str | None = None
+    source: str = Field(default="manual", min_length=1, max_length=30)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class ResetCategorySessionRequest(BaseModel):
-    category_code: str = Field(alias="categoryCode")
+    category_code: str = Field(alias="categoryCode", min_length=1, max_length=50)
 
 
 class ResetCategorySessionResponse(BaseModel):
