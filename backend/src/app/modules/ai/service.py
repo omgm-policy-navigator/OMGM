@@ -47,6 +47,18 @@ CONDITION_DETAIL_PATTERNS = (
     "eligibility",
     "requirement",
 )
+APPLICATION_PERIOD_PATTERNS = (
+    "신청기간",
+    "신청 기간",
+    "접수기간",
+    "접수 기간",
+    "모집기간",
+    "모집 기간",
+    "언제",
+    "기간",
+    "application period",
+    "deadline",
+)
 FACT_LABELS = {
     "region": "거주 지역",
     "income": "소득 구간",
@@ -102,6 +114,7 @@ def build_prompt(context: ExplanationContext, citations: list[CitationResponse])
     payload = {
         "task": "Explain the deterministic rule evaluation using only read-only rule context and citations.",
         "role": "Explain eligibility result and official next steps. Do not decide eligibility.",
+        "userMessage": context.user_message,
         "policy": None
         if policy is None
         else {
@@ -263,6 +276,9 @@ def catalog_answer(context: ExplanationContext, eligibility_status: str, evaluat
     if policy is None:
         return DEFAULT_ANSWER
 
+    if wants_application_period(context.user_message):
+        return application_period_answer(policy)
+
     region = display_catalog_value(getattr(policy, "region", "공식 공고 확인"))
     support_type = display_catalog_value(getattr(policy, "support_type", "공식 공고 확인"))
     parts = [
@@ -329,6 +345,23 @@ def wants_condition_details(message: str | None) -> bool:
         return False
     normalized = message.casefold()
     return any(pattern in normalized for pattern in CONDITION_DETAIL_PATTERNS)
+
+
+def wants_application_period(message: str | None) -> bool:
+    if message is None:
+        return False
+    normalized = message.casefold().replace(" ", "")
+    return any(pattern.replace(" ", "") in normalized for pattern in APPLICATION_PERIOD_PATTERNS)
+
+
+def application_period_answer(policy: Policy) -> str:
+    period = display_catalog_value(getattr(policy, "application_period", "공식 공고 확인"))
+    if period == "공식 공고 확인":
+        return (
+            f"{policy.title}의 신청 기간은 현재 카탈로그에 구체 날짜가 등록돼 있지 않고 "
+            "공식 공고 확인으로 표시되어 있습니다. 모집 시작일과 마감일은 공식 안내 페이지에서 확인해 주세요."
+        )
+    return f"{policy.title}의 신청 기간은 {period}입니다. 모집 가능 여부는 공식 안내 페이지에서 다시 확인해 주세요."
 
 
 def fallback_response(

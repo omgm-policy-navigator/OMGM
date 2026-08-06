@@ -331,6 +331,53 @@ class AIExplanationApiTests(unittest.TestCase):
         finder.assert_any_await(db, session_id=7, category_code=None, message="결혼세액공제 신청 조건 알려줘")
         top_bundle.assert_not_awaited()
 
+    def test_chat_without_policy_answers_application_period_directly(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(return_value=policy_bundle()),
+        ), patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(
+                    app,
+                    "POST",
+                    "/api/chat",
+                    body={"message": "Housing support 신청기간은?"},
+                )
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["policyId"], "policy_housing_001")
+        self.assertIn("신청 기간은 2026-01-01 to 2026-12-31", body["answer"])
+        self.assertNotIn("Rule Engine 상태", body["answer"])
+
+    def test_chat_without_policy_handles_unknown_application_period(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(return_value=tax_policy_bundle()),
+        ), patch(
+            "app.modules.ai.api.retrieve_rag_citations",
+            new=AsyncMock(return_value=()),
+        ):
+            status, _headers, body = asyncio.run(
+                asgi_request(
+                    app,
+                    "POST",
+                    "/api/chat",
+                    body={"message": "결혼세액공제 신청기간은?"},
+                )
+            )
+
+        self.assertEqual(status, 200)
+        self.assertIn("공식 공고 확인으로 표시", body["answer"])
+        self.assertNotIn("Rule Engine 상태", body["answer"])
+
     def test_chat_without_policy_uses_ranked_evaluation_for_ordinal_followup(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
