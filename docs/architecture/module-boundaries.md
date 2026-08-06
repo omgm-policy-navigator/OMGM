@@ -125,3 +125,13 @@
 출력: 검증된 추출 후보, `requires_confirmation`, 충돌 후보.
 
 금지 사항: FastAPI Router 또는 SQLAlchemy Session 의존, 추출 후보 직접 저장, 허용되지 않은 키 통과, 모호한 값을 확정 사실로 승격, 자격 상태 계산.
+
+## `backend/src/app/modules/rag`
+
+책임: 정책 문서를 제목·조항·문단·표 행 단위로 분리하고 의미 유형, 문서 유형, 원문 위치, 품질 상태와 콘텐츠 해시를 부여한다.
+
+입력: 정책 ID와 문서 ID가 연결된 검수 문서 DTO.
+
+출력: 원문 URL과 위치를 포함한 `DocumentChunk`, 품질 승인 Chunk 기반 `EmbeddingSeed`.
+
+금지 사항: FastAPI Router 또는 SQLAlchemy Session 의존, 외부 원문 수집, 최종 자격 판정, 검수 필요 Chunk의 임베딩 입력 승격, 실제 벡터 생성·적재.
