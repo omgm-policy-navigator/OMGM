@@ -81,13 +81,17 @@ def fact(key, value):
     return SimpleNamespace(condition_key=key, value=value)
 
 
+def scoped_fact(category_code, key, value):
+    return fact(f"{category_code}:{key}", value)
+
+
 class SessionGraphApiTests(unittest.TestCase):
     def test_get_graph_uses_cookie_session_scope_and_selected_category(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.sessions.api.list_session_facts",
-            new=AsyncMock(return_value=[fact("region", "Seoul")]),
+            new=AsyncMock(return_value=[scoped_fact("housing", "region", "Seoul")]),
         ), patch(
             "app.modules.sessions.api.list_graph_categories",
             new=AsyncMock(return_value=[GraphCategory("housing", "Housing")]),

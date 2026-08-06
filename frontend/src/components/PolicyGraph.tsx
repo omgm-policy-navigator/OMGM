@@ -454,60 +454,6 @@ function edgeStyleForType(edgeType: string): Edge["style"] {
   return { stroke: designTokens.color.graph.edge, strokeWidth: 1 };
 }
 
-function createPolicyDetailNodes(policyNode: Node<GraphNodeData>, policyIndex: number): { nodes: Node<GraphNodeData>[]; edges: Edge[] } {
-  const policyId = typeof policyNode.data.backendData?.policyId === "string" ? policyNode.data.backendData.policyId : policyNode.id;
-  const region = labelValue(policyNode.data.backendData?.region);
-  const supportType = labelValue(policyNode.data.backendData?.supportType);
-  const applicationPeriod = labelValue(policyNode.data.backendData?.applicationPeriod);
-  const details = [
-    { id: "target", label: `지원 대상\n${region}`, value: region },
-    { id: "support", label: `지원 내용\n${supportType}`, value: supportType },
-    { id: "apply", label: `신청 기간\n${applicationPeriod}`, value: applicationPeriod },
-  ];
-  const detailX = policyNode.position.x + 330;
-
-  return {
-    nodes: details.map((detail, detailIndex) => ({
-      id: `POLICY_DETAIL:${policyId}:${detail.id}`,
-      type: "policyNode",
-      position: {
-        x: detailX,
-        y: policyNode.position.y + (detailIndex - 1) * 64,
-      },
-      data: {
-        id: `POLICY_DETAIL:${policyId}:${detail.id}`,
-        label: detail.label,
-        description: `${policyNode.data.label}의 ${detail.label.replace("\n", " 정보: ")}`,
-        icon: ListChecks,
-        status: policyNode.data.status,
-        variant: "detail",
-        tone: "positive",
-        backendType: "POLICY_DETAIL",
-        backendData: {
-          ...policyNode.data.backendData,
-          policyId,
-          section: detail.id,
-          value: detail.value,
-        },
-      },
-    })),
-    edges: details.map((detail, detailIndex) => ({
-      id: `policy_detail:${policyId}:${detail.id}:${policyIndex}`,
-      source: policyNode.id,
-      target: `POLICY_DETAIL:${policyId}:${detail.id}`,
-      sourceHandle: "right",
-      targetHandle: "left",
-      type: "straight",
-      animated: false,
-      style: {
-        stroke: designTokens.color.graph.edge,
-        strokeDasharray: detailIndex === 2 ? "6 5" : "3 5",
-        strokeWidth: 1,
-      },
-    })),
-  };
-}
-
 export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphProps) {
   const [selectedPolicy, setSelectedPolicy] = useState<GraphNodeData | null>(null);
   const [policySummaries, setPolicySummaries] = useState<PolicySummaryResponse[]>([]);
@@ -601,13 +547,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
       });
       const liveNodesWithoutPolicies = liveNodes.filter((node) => node.data.variant !== "policy");
       const composedNodes = [...liveNodesWithoutPolicies, ...visiblePolicyNodes];
-      const visibleDetailGraph = visiblePolicyNodes
-        .filter((node) => node.data.status === "eligible")
-        .slice(0, answered ? 3 : 0)
-        .map((node, index) => createPolicyDetailNodes(node, index));
-      const detailNodes = visibleDetailGraph.flatMap((graph) => graph.nodes);
-      const detailEdges = visibleDetailGraph.flatMap((graph) => graph.edges);
-      const visibleNodes = [...composedNodes, ...detailNodes];
+      const visibleNodes = composedNodes;
       const graphNodePositions = new Map<string, GraphPoint>(visibleNodes.map((node) => [node.id, node.position]));
       const visibleNodeIds = new Set(visibleNodes.map(({ id }) => id));
       const categoryNode = liveNodes.find((node) => node.data.variant === "category");
@@ -651,7 +591,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             }))
           : [];
 
-      return { nodes: visibleNodes, edges: [...liveEdges, ...policyConnectionEdges, ...detailEdges] };
+      return { nodes: visibleNodes, edges: [...liveEdges, ...policyConnectionEdges] };
     }
 
     if (policySummaries.length > 0) {

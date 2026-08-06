@@ -74,6 +74,10 @@ def fact(key, value):
     return SimpleNamespace(condition_key=key, value=value)
 
 
+def scoped_fact(category_code, key, value):
+    return fact(f"{category_code}:{key}", value)
+
+
 def rule(rule_id, fact_key, operator, value_text, required=True):
     return SimpleNamespace(
         id=rule_id,
@@ -117,7 +121,7 @@ class SessionEvaluationApiTests(unittest.TestCase):
         app = app_with_session(db)
         with patch("app.modules.sessions.api.require_session", new=AsyncMock(return_value=active_session())), patch(
             "app.modules.sessions.api.list_session_facts",
-            new=AsyncMock(return_value=[fact("region", "Seoul")]),
+            new=AsyncMock(return_value=[scoped_fact("housing", "region", "Seoul")]),
         ), patch(
             "app.modules.sessions.api.list_active_policies_for_category",
             new=AsyncMock(return_value=[policy()]),

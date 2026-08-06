@@ -21,6 +21,7 @@ type ChatMessage = {
   from: "bot" | "user";
   text: string;
   time: string;
+  questionId?: string;
 };
 
 const CHAT_STORAGE_KEY = "omgm.chatbot.conversations.v1";
@@ -187,6 +188,30 @@ function formatQuestion(question: QuestionResponse) {
   }
 
   return `${prompt}\n선택지: ${options.join(", ")}\n${formatQuestionGuide(question)}`;
+}
+
+function createBotQuestionMessage(categoryId: string, question: QuestionResponse): ChatMessage {
+  return {
+    id: `live-question-${categoryId}-${question.questionId}-${Date.now()}`,
+    from: "bot",
+    text: formatQuestion(question),
+    time: messageTime(),
+    questionId: question.questionId,
+  };
+}
+
+function isMessageForQuestion(message: ChatMessage | undefined, question: QuestionResponse) {
+  if (!message || message.from !== "bot") {
+    return false;
+  }
+  if (message.questionId) {
+    return message.questionId === question.questionId;
+  }
+  return message.text === formatQuestion(question);
+}
+
+function latestBotMessage(messages: ChatMessage[]) {
+  return [...messages].reverse().find((message) => message.from === "bot");
 }
 
 function normalizeAnswer(input: string, question: QuestionResponse): string | number | boolean | null {
@@ -394,20 +419,26 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
         const nextQuestion = questions.items[0] ?? null;
         setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
         setMessagesByCategory((current) => {
-          if ((current[categoryId]?.length ?? 0) > 0 && loadedCategoryIds.current.has(categoryId)) {
+          const existing = current[categoryId] ?? [];
+          if (existing.length === 0) {
+            return {
+              ...current,
+              [categoryId]: nextQuestion
+                ? [createBotQuestionMessage(categoryId, nextQuestion)]
+                : [
+                    {
+                      id: `live-intro-${categoryId}`,
+                      from: "bot",
+                      text: "현재 추가 질문이 없습니다. 궁금한 내용을 입력하면 연결된 정책 기준으로 답변해드릴게요.",
+                      time: messageTime(),
+                    },
+                  ],
+            };
+          }
+          if (!nextQuestion || isMessageForQuestion(latestBotMessage(existing), nextQuestion)) {
             return current;
           }
-          return {
-            ...current,
-            [categoryId]: current[categoryId] ?? [
-              {
-                id: `live-intro-${categoryId}`,
-                from: "bot",
-                text: nextQuestion ? formatQuestion(nextQuestion) : "현재 추가 질문이 없습니다. 궁금한 내용을 입력하면 연결된 정책 기준으로 답변해드릴게요.",
-                time: messageTime(),
-              },
-            ],
-          };
+          return { ...current, [categoryId]: [...existing, createBotQuestionMessage(categoryId, nextQuestion)] };
         });
         loadedCategoryIds.current.add(categoryId);
       } catch {
@@ -495,11 +526,14 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
         const questions = await getNextQuestions();
         const nextQuestion = questions.items[0] ?? null;
         setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
-        appendMessage(
-          categoryId,
-          "bot",
-          nextQuestion ? formatQuestion(nextQuestion) : "현재 주제에서 추가 질문이 없습니다. 궁금한 정책을 입력하면 연결된 정책 기준으로 답변해드릴게요.",
-        );
+        if (nextQuestion) {
+          setMessagesByCategory((current) => ({
+            ...current,
+            [categoryId]: [...(current[categoryId] ?? []), createBotQuestionMessage(categoryId, nextQuestion)],
+          }));
+        } else {
+          appendMessage(categoryId, "bot", "현재 주제에서 추가 질문이 없습니다. 궁금한 정책을 입력하면 연결된 정책 기준으로 답변해드릴게요.");
+        }
       } catch {
         appendMessage(categoryId, "bot", "현재 주제 질문을 불러오지 못했습니다. 백엔드 실행 상태를 확인해 주세요.");
       } finally {
@@ -528,7 +562,10 @@ export function ChatArea({ selectedCategoryId, sessionGraph, onCategoryChange, o
       const nextQuestion = result.nextQuestions[0] ?? null;
       setActiveQuestionsByCategory((current) => ({ ...current, [categoryId]: nextQuestion }));
       if (nextQuestion) {
-        appendMessage(categoryId, "bot", formatQuestion(nextQuestion));
+        setMessagesByCategory((current) => ({
+          ...current,
+          [categoryId]: [...(current[categoryId] ?? []), createBotQuestionMessage(categoryId, nextQuestion)],
+        }));
         return;
       }
 
