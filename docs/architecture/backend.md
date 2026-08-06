@@ -24,6 +24,8 @@ backend/
 
 `app/modules/eligibility` is the first concrete feature module. It owns the evaluation use case boundary and keeps Rule Engine logic as pure domain code inside the module. Future feature modules are created only when implementation begins.
 
+`app/modules/rag` owns document processing, embedding/indexing, and policy-scoped retrieval contracts. SQLAlchemy persistence stays in the RAG repository adapter; indexing and search services depend on provider and repository protocols rather than FastAPI or database sessions.
+
 ## Responsibility Map
 
 | Responsibility | Owner | May depend on | Must not do |

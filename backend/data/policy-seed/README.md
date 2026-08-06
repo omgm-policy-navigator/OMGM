@@ -16,7 +16,7 @@ RAG Chunk 수: 38개
 - 05_user_fact_template.csv: 사용자 응답 저장용 빈 템플릿
 - 06_policy_evaluation_template.csv: 판정 결과 저장용 빈 템플릿
 - 07_policy_relation.csv: 선후·대안·충돌·재평가 관계
-- 08_policy_document.csv: RAG용 정책 개요 문서
+- 08_policy_document.csv: 승인 상태와 출처 신뢰도를 포함한 RAG용 정책 개요 문서
 - 09_policy_flat.csv: 빠른 MVP·분석용 통합 파일
 - 10_policy_document_chunk.csv: 검수된 RAG Chunk와 임베딩 입력 Seed
 
