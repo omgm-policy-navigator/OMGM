@@ -179,3 +179,9 @@ Backend code requires confirmation when confidence is below `0.8`, the evidence 
 A3 uses `qwen3-embedding:0.6b` with a fixed 1024-dimensional storage contract. Only D4 `APPROVED` chunks belonging to `ACTIVE` policies are indexed. Chunk types exposed to retrieval are `OVERVIEW`, `ELIGIBILITY`, `APPLICATION`, `DOCUMENTS`, `FAQ`, and `CAUTION`.
 
 A4 retrieval requires an explicit selected `policy_id` and filters `document_status=APPROVED`, `trust_level=OFFICIAL`, `policy_status=ACTIVE`, and the configured embedding model before applying the cosine similarity threshold and Top K limit. Citation DTOs include document ID, chunk evidence ID, policy version, public source URL, source location, excerpt, and similarity. No matching evidence returns an explicit insufficient-evidence result with no citations; retrieval never expands the policy candidate set or changes eligibility.
+
+## Phase A5 Rule-grounded Answer Generation
+
+A5 accepts the user question and conditions, a completed Rule Engine `EvaluationResult`, retrieved Citation chunks, and an optional selected graph node. The LLM drafts explanation text only. Backend code owns the final eligibility status, satisfied and confirmation condition lists, official sources, application-timing guidance, and next action.
+
+The draft is discarded when its `resultStatus` differs from the Rule result, condition IDs differ, a Citation is not present in retrieved evidence, an explicit eligibility statement opposes the Rule status, or a policy number is absent from every retrieved excerpt. Missing citations skip the LLM call and return `explanationStatus=OFFICIAL_CONFIRMATION_REQUIRED` without policy-detail assertions. Policy evidence and non-authoritative general guidance are separate `policyExplanation` and `generalGuidance` fields.
