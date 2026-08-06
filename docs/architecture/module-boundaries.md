@@ -147,3 +147,13 @@
 출력: 원문 URL과 위치를 포함한 `DocumentChunk`, 품질 승인 Chunk 기반 `EmbeddingSeed`.
 
 금지 사항: FastAPI Router 또는 SQLAlchemy Session 의존, 외부 원문 수집, 최종 자격 판정, 검수 필요 Chunk의 임베딩 입력 승격, 실제 벡터 생성·적재.
+
+## `backend/src/app/modules/ai_evaluation`
+
+책임: AI 통제 경계의 품질·안전 관측값을 집계하고 지표별 분자·분모·Coverage와 안전 게이트 결과를 생성한다.
+
+입력: 기대·실제 fact, 검색·Citation ID, Rule 상태, 정책 Claim 근거 수, Prompt Injection 및 장애 종료 관측값.
+
+출력: 조건 추출 정확도, RAG Recall, Citation 정확도, Rule 일치율, 무근거 답변 비율, Prompt Injection 저항률, 안전 장애 종료율과 전체 통과 여부.
+
+금지 사항: FastAPI Router·SQLAlchemy Session 의존, LLM 호출, Rule 재판정, 누락 신호의 `false`·`0` 변환, 운영 사용자 데이터 저장.

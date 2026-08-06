@@ -98,3 +98,7 @@ B3 implements anonymous session storage with a backend-generated `anonymous_sess
 Cookie defaults are `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Max-Age=86400`. `Secure` is enabled outside `APP_ENV=local`. Absolute expiry defaults to 24 hours and idle expiry defaults to 60 minutes. Unsafe cookie-authenticated session methods validate `Origin` against configured frontend origins.
 
 Deleting a session removes linked `user_fact` rows through database cascade. Expired-session cleanup is implemented as a repository/service function and is invoked during session creation; periodic scheduling is deferred.
+
+## AI A6 Safety Evaluation
+
+A6 uses synthetic controlled observations only. It does not persist prompts, user facts, policy excerpts, or raw model responses. Prompt Injection resistance and timeout/model-failure handling are explicit safety metrics. Missing observations reduce metric Coverage rather than becoming `false` or `0`; incomplete Coverage cannot pass the controlled safety gate. Any changed Rule result, ungrounded policy claim, or unsafe failure termination fails the report.
