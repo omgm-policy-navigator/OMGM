@@ -190,7 +190,7 @@ class AIExplanationApiTests(unittest.TestCase):
         self.assertEqual(body["citations"][0]["url"], "https://example.go.kr/policy/1")
         self.assertIn("Housing support", body["answer"])
 
-    def test_chat_without_policy_uses_top_session_evaluation(self) -> None:
+    def test_chat_without_policy_uses_top_session_evaluation_for_recommendation_intent(self) -> None:
         db = AsyncMock()
         app = app_with_session(db)
         with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
@@ -203,11 +203,32 @@ class AIExplanationApiTests(unittest.TestCase):
             "app.modules.ai.api.retrieve_rag_citations",
             new=AsyncMock(return_value=rag_citations()),
         ):
-            status, _headers, body = asyncio.run(asgi_request(app, "POST", "/api/chat", body={"message": "Tell me"}))
+            status, _headers, body = asyncio.run(
+                asgi_request(app, "POST", "/api/chat", body={"message": "지금 가장 적절한 정책 추천해줘"})
+            )
 
         self.assertEqual(status, 200)
         self.assertEqual(body["aiStatus"], "GENERATED")
         top_bundle.assert_awaited_once_with(db, session_id=7)
+
+    def test_chat_without_policy_rejects_unrelated_message(self) -> None:
+        db = AsyncMock()
+        app = app_with_session(db)
+        with patch("app.modules.ai.api.require_session", new=AsyncMock(return_value=active_session())), patch(
+            "app.modules.ai.api.find_policy_evidence_bundle_for_message",
+            new=AsyncMock(return_value=None),
+        ) as finder, patch(
+            "app.modules.ai.api.get_top_session_policy_evidence_bundle",
+            new=AsyncMock(),
+        ) as top_bundle:
+            status, _headers, body = asyncio.run(asgi_request(app, "POST", "/api/chat", body={"message": "안녕?"}))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["policyId"], None)
+        self.assertEqual(body["aiStatus"], "OFFICIAL_CONFIRMATION_REQUIRED")
+        self.assertIn("정책명을 포함해 다시 질문", body["answer"])
+        finder.assert_awaited_once_with(db, session_id=7, category_code="housing", message="안녕?")
+        top_bundle.assert_not_awaited()
 
     def test_chat_without_policy_matches_catalog_policy_before_top_evaluation(self) -> None:
         db = AsyncMock()

@@ -134,6 +134,28 @@ def rag_query_for_bundle(bundle) -> str:
     keywords = [policy.title, policy.category_code, policy.support_type, *condition_keys]
     return " ".join(str(keyword) for keyword in keywords if str(keyword).strip())
 
+
+TOP_POLICY_FALLBACK_PATTERNS = (
+    "가장 적절",
+    "추천",
+    "맞는 정책",
+    "가능한 정책",
+    "신청 가능",
+    "나한테 맞",
+    "우리에게 맞",
+    "뭐가 좋아",
+    "어떤 정책",
+    "which policy",
+    "recommend",
+    "best policy",
+)
+
+
+def should_use_top_policy_fallback(message: str) -> bool:
+    normalized = message.casefold()
+    return any(pattern in normalized for pattern in TOP_POLICY_FALLBACK_PATTERNS)
+
+
 async def build_context_for_policy(
     db: AsyncSession,
     request: Request,
@@ -170,6 +192,8 @@ async def build_context_for_top_policy(
         message=user_message,
     )
     if bundle is None:
+        if not should_use_top_policy_fallback(user_message):
+            return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
         bundle = await get_top_session_policy_evidence_bundle(db, session_id=session_id)
     if bundle is None:
         return ExplanationContext(policy=None, evaluation=None, documents=(), user_message=user_message)
