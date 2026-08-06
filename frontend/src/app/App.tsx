@@ -20,19 +20,29 @@ export function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const navigate = (nextRoute: Route) => {
-    window.history.pushState({}, "", nextRoute);
+  const navigate = (nextRoute: Route, hash?: string) => {
+    window.history.pushState({}, "", `${nextRoute}${hash ? `#${hash}` : ""}`);
     setRoute(nextRoute);
+
+    if (hash) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(hash)?.scrollIntoView({ block: "start" });
+      });
+    }
   };
 
   const startChat = () => {
     setIsLeavingLanding(true);
-    window.setTimeout(() => navigate("/chatbot"), 200);
+    window.setTimeout(() => navigate("/chatbot", "chat"), 200);
   };
 
   return (
     <QueryClientProvider client={queryClient}>
-      {route === "/chatbot" ? <ChatbotPage /> : <LandingPage onStart={startChat} isLeaving={isLeavingLanding} />}
+      {route === "/chatbot" ? (
+        <ChatbotPage currentPath={route} onNavigate={navigate} />
+      ) : (
+        <LandingPage onStart={startChat} isLeaving={isLeavingLanding} />
+      )}
     </QueryClientProvider>
   );
 }
