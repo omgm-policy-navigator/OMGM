@@ -64,6 +64,6 @@ class ConfigTests(unittest.TestCase):
                 AppConfig.from_env()
 
     def test_invalid_llm_temperature_raises_configuration_error(self) -> None:
-        with patch.dict(os.environ, {"DATABASE_URL": TEST_DATABASE_URL, "LLM_TEMPERATURE": "3"}, clear=True):
+        with patch.dict(os.environ, {"DATABASE_URL": TEST_DATABASE_URL, "LLM_TEMPERATURE": "0.7"}, clear=True):
             with self.assertRaises(ConfigurationError):
                 AppConfig.from_env()
