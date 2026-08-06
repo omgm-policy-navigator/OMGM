@@ -203,9 +203,7 @@ function descriptionForBackendNode(node: SessionGraphNode) {
   }
   const type = normalizeBackendType(node.type);
   if (type === "POLICY") {
-    const status = typeof node.data.eligibilityStatus === "string" ? `자격 상태: ${node.data.eligibilityStatus}` : "세션 답변을 기준으로 평가된 정책입니다.";
-    const score = typeof node.data.recommendationScore === "number" ? `추천 점수: ${node.data.recommendationScore}` : null;
-    return [status, score].filter(Boolean).join(" / ");
+    return typeof node.data.eligibilityStatus === "string" ? eligibilityStatusLabel(node.data.eligibilityStatus) : "세션 답변을 기준으로 평가된 정책입니다.";
   }
   if (type === "CONDITION") {
     const factKey = typeof node.data.factKey === "string" ? node.data.factKey : "condition";
@@ -253,13 +251,36 @@ function isApplicablePolicyNode(node: SessionGraphNode) {
 }
 
 function policyGridPosition(index: number, total: number): GraphPoint {
-  const columns = total > 5 ? 2 : 1;
+  const columns = total > 8 ? 3 : total > 4 ? 2 : 1;
   const column = index % columns;
   const row = Math.floor(index / columns);
   const rows = Math.ceil(total / columns);
-  const x = columns === 1 ? 610 : 560 + column * 250;
-  const y = spreadY(row, rows, 330, 190);
+  const x = columns === 1 ? 640 : columns === 2 ? 560 + column * 320 : 500 + column * 290;
+  const y = spreadY(row, rows, 330, 170);
   return { x, y };
+}
+
+function conditionGridPosition(index: number, total: number): GraphPoint {
+  return { x: 90, y: spreadY(index, total, 330, 112) };
+}
+
+function eligibilityStatusLabel(status: unknown) {
+  if (status === "LIKELY_ELIGIBLE" || status === "eligible" || status === "ELIGIBLE") {
+    return "신청 가능성 높음";
+  }
+  if (status === "NEEDS_CONFIRMATION") {
+    return "추가 확인 필요";
+  }
+  if (status === "OFFICIAL_CONFIRMATION_REQUIRED") {
+    return "공식 확인 필요";
+  }
+  if (status === "AVAILABLE_LATER") {
+    return "추후 신청 가능";
+  }
+  if (status === "LIKELY_INELIGIBLE") {
+    return "조건 불일치";
+  }
+  return "평가 전";
 }
 
 function policySummaryById(policySummaries: PolicySummaryResponse[]) {
@@ -274,7 +295,7 @@ function createPolicyNodeFromSummary(policy: PolicySummaryResponse, index: numbe
     data: {
       id: `POLICY:${policy.policyId}`,
       label: policy.title,
-      description: `${policy.agency} / ${labelValue(policy.region)} / ${policy.applicationPeriod}`,
+      description: `${policy.agency}\n${labelValue(policy.region)} / ${policy.applicationPeriod}`,
       icon: Landmark,
       status: "recommended",
       variant: "policy",
@@ -304,7 +325,7 @@ function enrichPolicyNode(node: Node<GraphNodeData>, summary: PolicySummaryRespo
     data: {
       ...node.data,
       label: summary.title,
-      description: `${summary.agency} / ${labelValue(summary.region)} / ${summary.applicationPeriod}`,
+      description: `${summary.agency}\n${labelValue(summary.region)} / ${summary.applicationPeriod}`,
       backendData: {
         ...node.data.backendData,
         policyId: summary.policyId,
@@ -332,16 +353,16 @@ function layoutLiveNode(graphNode: SessionGraphNode, index: number, total: numbe
   const type = normalizeBackendType(graphNode.type);
 
   if (type === "USER") {
-    return { x: 360, y: 330 };
+    return { x: 250, y: 330 };
   }
   if (type === "CATEGORY") {
-    return { x: 150, y: 330 };
+    return { x: 420, y: 330 };
   }
   if (type === "POLICY") {
     return { x: 590, y: spreadY(index, total, 290, 150) };
   }
   if (type === "CONDITION") {
-    return { x: 40, y: spreadY(index, total, 330, 92) };
+    return conditionGridPosition(index, total);
   }
   if (type === "ACTION") {
     return { x: 860, y: spreadY(index, total, 290, 150) };
@@ -491,7 +512,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
       const liveNodesWithoutPolicies = liveNodes.filter((node) => node.data.variant !== "policy");
       const composedNodes = [...liveNodesWithoutPolicies, ...visiblePolicyNodes];
       const visibleDetailGraph = visiblePolicyNodes
-        .slice(0, answered ? visiblePolicyNodes.length : 4)
+        .slice(0, answered ? 3 : 0)
         .map((node, index) => createPolicyDetailNodes(node, index));
       const detailNodes = visibleDetailGraph.flatMap((graph) => graph.nodes);
       const detailEdges = visibleDetailGraph.flatMap((graph) => graph.edges);
@@ -572,9 +593,6 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
         },
       };
       const catalogNodes = policySummaries.map((policy, index) => createPolicyNodeFromSummary(policy, index, policySummaries.length));
-      const detailGraph = catalogNodes.slice(0, 4).map((node, index) => createPolicyDetailNodes(node, index));
-      const detailNodes = detailGraph.flatMap((graph) => graph.nodes);
-      const detailEdges = detailGraph.flatMap((graph) => graph.edges);
       const categoryEdges: Edge[] = catalogNodes.map((node) => ({
         id: `category:${selectedCategory.backendCategoryCode}:${node.id}`,
         source: category.id,
@@ -587,7 +605,7 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
       }));
 
       return {
-        nodes: [center, category, ...catalogNodes, ...detailNodes],
+        nodes: [center, category, ...catalogNodes],
         edges: [
           {
             id: `couple:${category.id}`,
@@ -600,7 +618,6 @@ export function PolicyGraph({ selectedCategoryId, sessionGraph }: PolicyGraphPro
             style: { stroke: designTokens.color.graph.edge, strokeWidth: 1 },
           },
           ...categoryEdges,
-          ...detailEdges,
         ],
       };
     }
@@ -742,15 +759,33 @@ function PolicyNode({ data }: NodeProps<Node<GraphNodeData>>) {
   const isCategory = data.variant === "category";
   const isDetail = data.variant === "detail" || data.variant === "action";
 
+  if (isPolicy) {
+    return (
+      <div className="relative flex min-h-[112px] w-[250px] cursor-pointer items-start gap-3 rounded-2xl border-2 border-brand-primary bg-white px-4 py-4 text-left text-text-primary shadow-card transition hover:-translate-y-1 hover:bg-brand-surface-container">
+        {handlePositions.map(({ id, position }) => (
+          <Handle key={`target-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="target" position={position} />
+        ))}
+        {handlePositions.map(({ id, position }) => (
+          <Handle key={`source-${id}`} id={id} className="!h-0 !w-0 !border-0 !bg-transparent" type="source" position={position} />
+        ))}
+        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-surface text-brand-primary">
+          <Icon size={22} />
+        </div>
+        <div className="min-w-0">
+          <span className="block whitespace-pre-line break-keep text-[13px] font-semibold leading-5">{data.label}</span>
+          <span className="mt-2 block whitespace-pre-line text-[11px] font-medium leading-4 text-text-secondary">{data.description}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`relative flex items-center justify-center text-center shadow-card ${
         isCentral
           ? "h-[136px] w-[136px] flex-col rounded-full border-2 border-brand-primary bg-white text-text-primary"
           : `cursor-pointer text-text-primary transition hover:-translate-y-1 hover:border-brand-primary hover:bg-brand-surface-container ${
-              isPolicy
-                ? "h-[126px] w-[126px] flex-col rounded-full border-2 border-brand-primary bg-white px-4"
-                : isCondition
+              isCondition
                   ? "h-[96px] w-[96px] flex-col rounded-full border border-dashed border-brand-primary bg-white px-3"
                   : isCategory
                     ? "h-[112px] w-[112px] flex-col rounded-full border border-brand-border bg-brand-surface px-3"
@@ -778,7 +813,6 @@ const backendFieldLabels: Record<string, string> = {
   categoryCode: "주제",
   eligibilityStatus: "자격 상태",
   evaluationState: "평가 상태",
-  recommendationScore: "추천 점수",
   factKey: "조건",
   value: "값",
   region: "지역",
@@ -807,8 +841,21 @@ function visibleBackendEntries(data: Record<string, unknown> | undefined) {
     return [];
   }
   return Object.entries(data).filter(([key]) =>
-    ["eligibilityStatus", "evaluationState", "recommendationScore", "factKey", "value", "categoryCode", "region", "supportType", "section", "agency", "applicationPeriod"].includes(key),
+    ["eligibilityStatus", "evaluationState", "factKey", "value", "categoryCode", "region", "supportType", "section", "agency", "applicationPeriod"].includes(key),
   );
+}
+
+function formatBackendEntryValue(key: string, value: unknown) {
+  if (key === "eligibilityStatus") {
+    return eligibilityStatusLabel(value);
+  }
+  if (key === "evaluationState") {
+    return value === "ACTIVE" || value === "complete" ? "최신 답변 기준" : formatBackendValue(value);
+  }
+  if (key === "section") {
+    return detailSectionLabels[String(value)] ?? formatBackendValue(value);
+  }
+  return formatBackendValue(value);
 }
 
 function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData; policyDetail?: PolicyDetailResponse; onClose: () => void }) {
@@ -821,6 +868,7 @@ function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData;
   const section = typeof policy.backendData?.section === "string" ? policy.backendData.section : null;
   const modalTitle = policyDetail?.title ?? (typeof policy.backendData?.title === "string" ? policy.backendData.title : policy.label);
   const modalDescription = policyDetail?.summary ?? policy.description;
+  const eligibilityStatus = policy.backendData?.eligibilityStatus;
 
   return (
     <>
@@ -862,13 +910,22 @@ function PolicyModal({ policy, policyDetail, onClose }: { policy: GraphNodeData;
               </div>
             </dl>
           )}
+          {eligibilityStatus !== null && eligibilityStatus !== undefined && (
+            <div className="rounded-xl border border-brand-border bg-brand-surface p-4 text-body-sm text-text-secondary">
+              <h4 className="text-h4 text-text-primary">추천 기준</h4>
+              <p className="mt-2">
+                {eligibilityStatusLabel(eligibilityStatus)}은 현재 입력한 조건에서 필수 조건 불일치가 없는 정책을 우선 보여주는 내부 정렬 결과입니다. 최종 자격과 모집 가능 여부는 공식 페이지에서
+                다시 확인해야 합니다.
+              </p>
+            </div>
+          )}
           <div className="rounded-xl border border-brand-border bg-white p-4">
             <h4 className="text-h4">{backendEntries.length > 0 ? "확인 데이터" : "확인된 조건"}</h4>
             <ul className="mt-3 space-y-2 text-body-sm text-text-secondary">
               {backendEntries.length > 0 ? (
                 backendEntries.map(([key, value]) => (
                   <li key={key}>
-                    {backendFieldLabels[key] ?? key}: {key === "section" ? detailSectionLabels[String(value)] ?? formatBackendValue(value) : formatBackendValue(value)}
+                    {backendFieldLabels[key] ?? key}: {formatBackendEntryValue(key, value)}
                   </li>
                 ))
               ) : (

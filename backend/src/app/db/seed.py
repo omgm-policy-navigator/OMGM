@@ -10,9 +10,34 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.catalog.models import Category, Policy, PolicyDocument, PolicyRelation, PolicyRule, PolicyStatus, Question
 from app.core.config import AppConfig
 from app.db.session import create_engine
+from app.modules.policies import PolicySeedCatalog, load_policy_seed
 
 REVIEWED_AT = date(2026, 8, 1)
 COLLECTED_AT = datetime(2026, 8, 5, tzinfo=UTC)
+
+SOURCE_CATEGORY_TO_DB_CATEGORY: dict[str, tuple[str, str, int, str]] = {
+    "1": ("housing", "주거", 10, "임대주택, 보증금, 월세·주거비 지원"),
+    "2": ("loan", "대출", 20, "전세·주택구입 정책대출 및 이자지원"),
+    "3": ("cash", "웨딩", 30, "공공예식장, 결혼 준비·살림비 지원"),
+    "4": ("education", "세제 혜택", 50, "혼인·자녀·주거 관련 세액공제와 비과세"),
+    "5": ("childcare", "출산·육아", 40, "임신, 출산, 산후조리, 양육·돌봄 지원"),
+}
+
+POLICY_ID_PREFIX_BY_CATEGORY: dict[str, str] = {
+    "housing": "policy_housing",
+    "loan": "policy_loan",
+    "cash": "policy_cash",
+    "education": "policy_education",
+    "childcare": "policy_childcare",
+}
+
+SUPPORT_TYPE_BY_CATEGORY: dict[str, str] = {
+    "housing": "주거 지원",
+    "loan": "정책대출",
+    "cash": "결혼 지원",
+    "education": "세제 혜택",
+    "childcare": "출산·육아 지원",
+}
 
 CATEGORY_SEED_DATA: list[dict[str, Any]] = [
     {"code": "housing", "name": "Housing", "description": "Housing and rent support", "sort_order": 10},
@@ -221,7 +246,7 @@ POLICY_SEED_DATA: list[dict[str, Any]] = [
 ]
 
 
-def question_rows() -> list[dict[str, Any]]:
+def question_rows(policies: list[dict[str, Any]] = POLICY_SEED_DATA) -> list[dict[str, Any]]:
     return [
         {
             "id": f"q_{policy['id']}_region",
@@ -232,11 +257,11 @@ def question_rows() -> list[dict[str, Any]]:
             "required": True,
             "sort_order": 10,
         }
-        for policy in POLICY_SEED_DATA
+        for policy in policies
     ]
 
 
-def rule_rows() -> list[dict[str, Any]]:
+def rule_rows(policies: list[dict[str, Any]] = POLICY_SEED_DATA) -> list[dict[str, Any]]:
     return [
         {
             "id": f"rule_{policy['id']}_region",
@@ -248,7 +273,7 @@ def rule_rows() -> list[dict[str, Any]]:
             "required": True,
             "evidence_text": "Applicant region must match the policy region or national scope.",
         }
-        for policy in POLICY_SEED_DATA
+        for policy in policies
     ]
 
 
@@ -285,6 +310,106 @@ POLICY_RELATION_SEED_DATA: list[dict[str, Any]] = [
 ]
 
 
+def application_period(start: date | None, end: date | None) -> str:
+    if start is not None and end is not None:
+        return f"{start.isoformat()} to {end.isoformat()}"
+    if start is not None:
+        return f"{start.isoformat()}부터"
+    if end is not None:
+        return f"{end.isoformat()}까지"
+    return "공식 공고 확인"
+
+
+def reviewed_seed_payload(
+    catalog: PolicySeedCatalog,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    dict[str, str],
+]:
+    categories = [
+        {"code": code, "name": name, "description": description, "sort_order": sort_order}
+        for code, name, sort_order, description in SOURCE_CATEGORY_TO_DB_CATEGORY.values()
+    ]
+    counters = {code: 0 for code in POLICY_ID_PREFIX_BY_CATEGORY}
+    policy_id_map: dict[str, str] = {}
+    policies: list[dict[str, Any]] = []
+
+    for source_policy in sorted(catalog.policies.values(), key=lambda item: int(item.id)):
+        category_code, _name, _sort_order, _description = SOURCE_CATEGORY_TO_DB_CATEGORY[source_policy.category_id]
+        counters[category_code] += 1
+        policy_id = f"{POLICY_ID_PREFIX_BY_CATEGORY[category_code]}_{counters[category_code]:03d}"
+        policy_id_map[source_policy.id] = policy_id
+        policies.append(
+            {
+                "id": policy_id,
+                "category_code": category_code,
+                "title": source_policy.name,
+                "agency": source_policy.managing_agency,
+                "region": region_from_policy(source_policy.name, source_policy.summary),
+                "summary": source_policy.summary,
+                "application_period": application_period(
+                    source_policy.application_start_date,
+                    source_policy.application_end_date,
+                ),
+                "support_type": SUPPORT_TYPE_BY_CATEGORY[category_code],
+                "status": PolicyStatus.APPROVED,
+                "is_active": True,
+                "official_source_url": source_policy.application_url,
+                "source_label": "공식 신청/안내 페이지",
+                "reviewed_at": source_policy.verified_at,
+            }
+        )
+
+    documents = [
+        {
+            "id": f"doc_{policy_id_map[document.policy_id]}",
+            "policy_id": policy_id_map[document.policy_id],
+            "title": document.title,
+            "url": document.source_url,
+            "document_type": str(document.document_type),
+            "official_source": "공식 출처",
+            "reviewed_at": catalog.policies[document.policy_id].verified_at,
+            "collected_at": COLLECTED_AT,
+            "document_hash": f"sha256:{policy_id_map[document.policy_id]}",
+        }
+        for document in catalog.documents
+        if document.policy_id in policy_id_map
+    ]
+    relations = [
+        {
+            "id": f"rel_{relation.id}",
+            "source_policy_id": policy_id_map[relation.from_policy_id],
+            "target_policy_id": policy_id_map[relation.to_policy_id],
+            "relation_type": str(relation.relation_type).lower(),
+        }
+        for relation in catalog.relations
+        if relation.from_policy_id in policy_id_map and relation.to_policy_id in policy_id_map
+    ]
+    return categories, policies, documents, relations, policy_id_map
+
+
+def region_from_policy(name: str, summary: str) -> str:
+    text = f"{name} {summary}"
+    if "서울" in text:
+        return "Seoul"
+    if "경기" in text:
+        return "Gyeonggi"
+    if "인천" in text:
+        return "Incheon"
+    if "부산" in text:
+        return "Busan"
+    if "대전" in text:
+        return "Daejeon"
+    if "전북" in text:
+        return "Jeonbuk"
+    if "세종" in text:
+        return "Sejong"
+    return "National"
+
+
 async def upsert_rows(
     session: AsyncSession,
     model: type[Any],
@@ -299,12 +424,14 @@ async def upsert_rows(
 
 
 async def seed_database(session: AsyncSession) -> None:
-    await upsert_rows(session, Category, CATEGORY_SEED_DATA, ["code"])
-    await upsert_rows(session, Policy, POLICY_SEED_DATA, ["id"])
-    await upsert_rows(session, Question, question_rows(), ["id"])
-    await upsert_rows(session, PolicyRule, rule_rows(), ["id"])
-    await upsert_rows(session, PolicyDocument, document_rows(), ["id"])
-    await upsert_rows(session, PolicyRelation, POLICY_RELATION_SEED_DATA, ["id"])
+    catalog = load_policy_seed(AppConfig.from_env().policy_seed_dir)
+    categories, policies, documents, relations, _policy_id_map = reviewed_seed_payload(catalog)
+    await upsert_rows(session, Category, categories, ["code"])
+    await upsert_rows(session, Policy, policies, ["id"])
+    await upsert_rows(session, Question, question_rows(policies), ["id"])
+    await upsert_rows(session, PolicyRule, rule_rows(policies), ["id"])
+    await upsert_rows(session, PolicyDocument, documents, ["id"])
+    await upsert_rows(session, PolicyRelation, relations, ["id"])
     await session.commit()
 
 
