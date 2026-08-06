@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ChatArea } from "../components/ChatArea";
 import { PolicyGraph } from "../components/PolicyGraph";
 import { Sidebar } from "../components/Sidebar";
+import { categories } from "../data/policies";
+import type { SessionGraphResponse } from "../shared/api/chatbot";
 
 type ChatbotPageProps = {
   currentPath: "/" | "/chatbot";
@@ -10,6 +12,8 @@ type ChatbotPageProps = {
 
 export function ChatbotPage({ currentPath, onNavigate }: ChatbotPageProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? "housing");
+  const [sessionGraph, setSessionGraph] = useState<SessionGraphResponse | null>(null);
 
   return (
     <main className="min-h-screen bg-brand-background text-text-primary">
@@ -19,8 +23,13 @@ export function ChatbotPage({ currentPath, onNavigate }: ChatbotPageProps) {
           collapsed ? "ml-20" : "ml-[260px]"
         }`}
       >
-        <ChatArea />
-        <PolicyGraph />
+        <ChatArea
+          selectedCategoryId={selectedCategoryId}
+          sessionGraph={sessionGraph}
+          onCategoryChange={setSelectedCategoryId}
+          onGraphChange={setSessionGraph}
+        />
+        <PolicyGraph selectedCategoryId={selectedCategoryId} sessionGraph={sessionGraph} />
       </div>
     </main>
   );

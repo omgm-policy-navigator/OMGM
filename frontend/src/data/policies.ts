@@ -5,6 +5,8 @@ export type PolicyCategory = {
   id: string;
   label: string;
   description: string;
+  backendCategoryCode: string;
+  liveNote?: string;
   icon: LucideIcon;
 };
 
@@ -17,11 +19,25 @@ export type PolicyNodeData = {
 };
 
 export const categories: PolicyCategory[] = [
-  { id: "housing", label: "주거", description: "전월세, 임차보증금, 공공임대", icon: Home },
-  { id: "loan", label: "대출", description: "이자지원, 신혼부부 전용 대출", icon: Banknote },
-  { id: "wedding", label: "웨딩", description: "공공 예식장, 결혼 준비 지원", icon: HandHeart },
-  { id: "tax", label: "세제 혜택", description: "공제, 감면, 신고 일정", icon: ReceiptText },
-  { id: "childcare", label: "출산/육아", description: "출산가구, 보육, 돌봄 지원", icon: Baby },
+  { id: "housing", label: "주거", description: "전월세, 임차보증금, 공공임대", backendCategoryCode: "housing", icon: Home },
+  { id: "loan", label: "대출", description: "이자지원, 신혼부부 전용 대출", backendCategoryCode: "loan", icon: Banknote },
+  {
+    id: "wedding",
+    label: "웨딩",
+    description: "공공 예식장, 결혼 준비 지원",
+    backendCategoryCode: "cash",
+    liveNote: "백엔드 질문 엔진에 웨딩 전용 category가 없어 현금성 지원 흐름으로 임시 연결합니다.",
+    icon: HandHeart,
+  },
+  {
+    id: "tax",
+    label: "세제 혜택",
+    description: "공제, 감면, 신고 일정",
+    backendCategoryCode: "education",
+    liveNote: "백엔드 질문 엔진에 세제 전용 category가 없어 재무 상담/교육 흐름으로 임시 연결합니다.",
+    icon: ReceiptText,
+  },
+  { id: "childcare", label: "출산/육아", description: "출산가구, 보육, 돌봄 지원", backendCategoryCode: "childcare", icon: Baby },
 ];
 
 export const policyNodes: PolicyNodeData[] = [

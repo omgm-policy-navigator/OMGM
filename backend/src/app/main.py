@@ -1,8 +1,10 @@
+import os
 from http import HTTPStatus
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
@@ -14,6 +16,10 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def parse_allowed_origins(value: str) -> list[str]:
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
 def error_payload(code: str, message: str, details: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     error: dict[str, Any] = {"code": code, "message": message}
     if details is not None:
@@ -23,6 +29,14 @@ def error_payload(code: str, message: str, details: list[dict[str, Any]] | None 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
     app = FastAPI(title="나만 결혼해? Backend", lifespan=lifespan)
+    cors_allowed_origins = config.cors_allowed_origins if config is not None else os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=parse_allowed_origins(cors_allowed_origins),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type"],
+    )
     app.include_router(api_router)
     if config is not None:
         app.state.config = config
